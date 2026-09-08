@@ -15,6 +15,18 @@ on:
       ref:
         required: true
         type: string
+    # Only the signing and notarization secrets are accepted; callers pass them explicitly.
+    secrets:
+      CSC_LINK:
+        required: false
+      CSC_KEY_PASSWORD:
+        required: false
+      APPLE_API_KEY:
+        required: false
+      APPLE_API_KEY_ID:
+        required: false
+      APPLE_API_ISSUER:
+        required: false
 
 permissions:
   contents: write
