@@ -1,0 +1,23 @@
+@font-face {font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('fonts/Fraunces-normal-300_700.woff2') format('woff2');}
+@font-face {font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url('fonts/InstrumentSans-normal-400.woff2') format('woff2');}
+@font-face {font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url('fonts/InstrumentSans-normal-500.woff2') format('woff2');}
+@font-face {font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url('fonts/InstrumentSans-normal-600.woff2') format('woff2');}
