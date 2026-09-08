@@ -10,7 +10,7 @@ const root=path.resolve(__dirname,'..');
   dir:root,name:'Just Zen',platform:'darwin',arch:'arm64',appBundleId:'com.hearth.workspace',
   icon:path.join(root,'assets','justzen.icns'),out:process.env.ZEN_PACKAGE_OUT || path.resolve(root,'../../outputs'),overwrite:true,
   asar:{unpackDir:'node_modules',unpack:'{document-worker.cjs,document-sanitize.cjs}'},
-  ignore:[/^\/smoke/,/^\/README\.md$/,/\.test\.cjs$/,/^\/\.github/,/^\/scripts/,/^\/site/,/^\/release/,/^\/SECURITY-REVIEW/,/^\/ADVERSARIAL-RESULTS\.md$/,/^\/AUDIT-SCOPE\.md$/]
+  ignore:[/^\/smoke/,/^\/README\.md$/,/\.test\.cjs$/,/^\/\.github/,/^\/scripts/,/^\/docs/,/^\/release/,/^\/SECURITY-REVIEW/,/^\/ADVERSARIAL-RESULTS\.md$/,/^\/AUDIT-SCOPE\.md$/]
  });
  const app=path.join(out,'Just Zen.app');
  // Recorded before signing so the local updater can tell which Electron a build contains.

@@ -102,6 +102,7 @@ function renderChat(state){chatState=state;const scroller=$('chat-messages');con
 $('home').onclick=()=>attempt(()=>show('overview'));
 $('vault').onclick=()=>attempt(async()=>{const state=await call('state');renderConnectedFolders(state.connectedFolders || []);await show('files-page');if(root)await list(directory);});
 $('security-nav').onclick=()=>attempt(()=>show('security-page'));
+$('open-security-site').onclick=()=>attempt(()=>browse('https://kierankeene122.github.io/just-zen/security.html'));
 $('toggle-app-lock').onclick=()=>attempt(async()=>{await call('set-app-lock',{enabled:!securityStatus.lock.enabled,minutes:Number($('auto-lock-minutes').value),passcode:$('new-lock-passcode').value});$('new-lock-passcode').value='';await renderSecurityStatus();notice('App lock setting saved.');});
 $('auto-lock-minutes').onchange=()=>attempt(async()=>{if(!securityStatus?.lock.enabled)return;await call('set-app-lock',{enabled:true,minutes:Number($('auto-lock-minutes').value)});await renderSecurityStatus();notice('Automatic lock delay saved.');});
 $('lock-now').onclick=()=>attempt(()=>call('lock-app'));

@@ -1,0 +1,105 @@
+<title>Just Zen Security</title>
+<!-- Fonts are served with the page: no third-party requests, no cookies, nothing to consent to. -->
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="site.css">
+
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="./" style="text-decoration:none"><img src="logo.png" alt="" width="28" height="28">JUST ZEN</a>
+  <nav><a href="./#apps">Apps</a><a href="./#copilot">Claude</a><a href="security.html" aria-current="page">Security</a><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg">Download</a></nav>
+</header>
+
+<section class="page-hero">
+  <div class="eyebrow">Security</div>
+  <h1 style="margin-top:18px">What protects you. What still depends on you.</h1>
+  <p class="lede">Just Zen keeps signed-in websites, Claude and your documents apart from each other and from the rest of your Mac. This page explains each protection, how security updates reach you without anyone touching them, what is tested, and the risks that remain.</p>
+  <p class="lede" style="margin-top:14px">These are best efforts. This is what we have done, described plainly, not a guarantee of anything. Every claim on this page can be checked against the code, the review and the automated checks in the <a href="https://github.com/kierankeene122/just-zen">git repository</a>, which has more detail than fits here.</p>
+</section>
+
+<div class="prose">
+<div class="callout-box"><b>Current assessment.</b> Designed for personal and small-team use. An internal code review was completed on 8 September 2026 with all findings fixed; CodeQL and Semgrep run on every change; releases are signed and notarized; security updates are automated. An independent penetration test has not been carried out. Just Zen is free, open-source software provided as is, without warranty.</div>
+
+<h2>The protections</h2>
+
+<h3>Websites</h3>
+<ul>
+<li>Every site runs in Chromium's sandbox with Node.js disabled and no bridge into Just Zen, your files or Claude.</li>
+<li>New apps get their own isolated cookie and storage profile. Shared, Personal and Work profiles share logins only when you choose them.</li>
+<li>Addresses opened from the URL bar, notes or chat use an in-memory profile that is discarded when the view closes.</li>
+<li>Camera, microphone, screen capture, native-app launches and other permissions are refused. Saved apps may send notifications only from the address they were saved at.</li>
+<li>Downloads always go through a native save dialog. Sites with invalid certificates are refused.</li>
+</ul>
+
+<h3>Encrypted state and app lock</h3>
+<ul>
+<li>Settings, tasks, whiteboard and Claude chat history are encrypted with a key held in the macOS Keychain. Website cookies are encrypted too.</li>
+<li>Optional Touch ID or passcode lock after inactivity. Passcode attempts back off after three failures.</li>
+<li>Any browser profile, Claude history or all Just Zen data can be cleared from the Privacy &amp; data panel in the app.</li>
+</ul>
+
+<h3>Claude Chat</h3>
+<ul>
+<li>Runs inside Anthropic Sandbox Runtime and macOS Seatbelt. It can read only the workspace you choose plus its own login, and write only where the access mode allows.</li>
+<li>Uses a Claude login and history owned by Just Zen. Your personal ~/.claude, home folder, other users, external volumes and temporary folders are denied.</li>
+<li>Network access is limited to Anthropic's servers. Chat refuses to start if the sandbox is not active.</li>
+<li>Read-only blocks changes at the operating-system level. Notes-only asks before touching anything other than Markdown and refuses writes through symbolic links. Shell commands, sub-agents and MCP tools always ask first.</li>
+</ul>
+
+<h3>Claude Terminal and shell</h3>
+<ul>
+<li>Runs with your normal macOS user permissions, exactly like Claude Code in Terminal.app. Just Zen adds no privilege and no sandbox here.</li>
+<li>Claude Code's own command approval applies. Use Chat when you want enforced Read-only or Notes-only access.</li>
+</ul>
+
+<h3>Documents</h3>
+<ul>
+<li>PDFs and text render in a separate sandboxed view with no bridge to the main app or Claude, and no network.</li>
+<li>DOCX and RTF conversion runs in a deny-by-default Seatbelt process with a private temporary folder and no network. Formatted text is reduced to plain allowlisted tags before export.</li>
+<li>Save copy refuses symbolic and hard links so the original can never be overwritten.</li>
+</ul>
+
+<h3>App integrity and updates</h3>
+<ul>
+<li>Releases are signed with a Developer ID and notarized by Apple.</li>
+<li>The app code ships in a single archive whose integrity is verified at launch. Node.js entry points into the app binary (run-as-node, NODE_OPTIONS, inspector) are disabled.</li>
+<li>Website favicons are decoded in a sandboxed renderer, never in the main process.</li>
+<li>Updates are checked 15 seconds after opening and every six hours, downloaded in the background, signature-verified and installed when you quit. Downgrades and pre-releases are refused.</li>
+</ul>
+
+<h2>How automated security updates work</h2>
+<p>From a published patch to your installed app, without anyone touching it.</p>
+<ul>
+<li><strong>Detection.</strong> Dependabot checks weekly for new Electron and dependency versions, waiting three days for patches and seven for larger changes so bad releases surface first. Security advisories trigger a fix immediately.</li>
+<li><strong>Verification.</strong> Each proposed update runs the unit tests, the Seatbelt sandbox test and CodeQL static analysis.</li>
+<li><strong>Merge.</strong> If everything passes and it is not a major version change, the update is merged into the codebase. Major versions wait for a human.</li>
+<li><strong>Release.</strong> When the maintainer cuts a release, one command tags a version and builds a signed, notarized DMG. Merged updates ship in the next release.</li>
+<li><strong>Install.</strong> Every copy of Just Zen picks it up on next open and installs it on quit.</li>
+</ul>
+
+<h2>What is tested, and with what</h2>
+<ul>
+<li><strong>Static analysis.</strong> CodeQL and Semgrep run on every change and block the merge on any finding.</li>
+<li><strong>Dependencies.</strong> Dependabot version and security updates, npm audit on every build, and a cooldown before new releases are adopted.</li>
+<li><strong>Adversarial tests.</strong> Forged IPC from a foreign renderer, path traversal, symlink chains, hostile HTML and PDFs, popup containment and profile separation, run in CI on macOS.</li>
+<li><strong>Sandbox tests.</strong> The Seatbelt profiles are executed for real and asserted to deny the home folder, external volumes, temporary folders and other Claude projects.</li>
+<li><strong>Review.</strong> A full code review on 8 September 2026 found and fixed thirteen issues, from Electron fuses to a Notes-only bypass. The report is in the repository.</li>
+<li><strong>Open source.</strong> The code, the review and every automated check are public, so anyone can inspect what runs on their Mac.</li>
+</ul>
+
+<h2>Risks specific to Just Zen</h2>
+<ul>
+<li><strong>Browser vulnerabilities.</strong> Just Zen bundles its own copy of Chromium through Electron, so a new Chromium flaw can exist here until the next Electron patch ships. Sandboxing limits the impact; the automated update chain keeps that window to days.</li>
+<li><strong>No independent audit yet.</strong> CodeQL and Semgrep scans, the adversarial and sandbox test suites and the code review all pass, but no third party has tested the running app. For regulated or highly sensitive work, commission an external assessment first.</li>
+</ul>
+
+<h2>What you should do</h2>
+<p>Install updates when Just Zen asks by quitting; that is the whole ritual. Connect only the folders Claude needs and prefer Read-only or Notes-only in Chat. Keep apps isolated unless they genuinely need a shared login; sites in the Shared, Personal or Work profiles can see each other's cookies by design. Turn on the app lock if the Mac is shared or ever unattended.</p>
+
+<div class="callout-box"><b>As is.</b> Just Zen is free software provided under the <a href="https://github.com/kierankeene122/just-zen/blob/main/LICENSE">ISC licence</a>, without warranty of any kind. You are responsible for how you use it and for the accounts and data you connect to it. Inspect the code, decide for yourself, and keep backups.</div>
+</div>
+
+<footer class="pagefoot">
+  <div><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg">Download</a><a href="https://github.com/kierankeene122/just-zen">Inspect the code</a><a href="./">Home</a></div>
+  <div>Just Zen · macOS</div>
+</footer>
+</div>
