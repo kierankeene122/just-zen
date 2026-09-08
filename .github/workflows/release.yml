@@ -75,6 +75,8 @@ jobs:
           echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
       - run: npm run dist:publish
       - name: Attest released installers
+        # Build provenance is not offered on user-owned private repositories; it switches on if the repository becomes public or moves to an organisation.
+        if: ${{ !github.event.repository.private }}
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
           subject-path: |
