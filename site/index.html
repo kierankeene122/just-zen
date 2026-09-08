@@ -47,10 +47,18 @@ nav a{text-decoration:none;font-size:14px;color:var(--ink-2);margin-left:22px}
 .shot .bar{display:flex;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line)}
 .shot .bar i{width:11px;height:11px;border-radius:50%;background:var(--line)}
 .shot img{display:block;width:100%;height:auto}
-.callouts{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:26px}
-.callout{display:flex;gap:12px;align-items:flex-start;font-size:15px;color:var(--ink-2)}
-.callout b{color:var(--ink);font-weight:600;display:block}
-.callout .dot{flex:0 0 12px;width:12px;height:12px;border-radius:50%;margin-top:6px}
+.tour-head{display:flex;align-items:end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:22px}
+.tour-head h2{font-size:clamp(28px,3.4vw,42px);font-variation-settings:"opsz" 144}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{font:inherit;font-size:14px;font-weight:500;color:var(--ink-2);background:transparent;border:1px solid var(--line);border-radius:999px;padding:9px 16px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.shot .stage{position:relative}
+.spot{position:absolute;border:2px solid var(--accent);border-radius:10px;box-shadow:0 0 0 9999px rgba(38,54,74,.28);pointer-events:none;transition:left .55s cubic-bezier(.4,0,.2,1),top .55s cubic-bezier(.4,0,.2,1),width .55s cubic-bezier(.4,0,.2,1),height .55s cubic-bezier(.4,0,.2,1)}
+.caption{margin-top:22px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:baseline;max-width:70ch}
+.caption b{font-family:var(--display);font-weight:400;font-size:24px;font-variation-settings:"opsz" 60;color:var(--ink)}
+.caption p{color:var(--ink-2);font-size:16px;min-height:2.6em}
+@media (prefers-reduced-motion:reduce){.spot{transition:none}}
 
 section.pillars{padding:120px 0 40px}
 .pillars h2{font-size:clamp(34px,4.2vw,54px);max-width:18ch;font-variation-settings:"opsz" 144}
@@ -115,17 +123,33 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
   </div>
 </section>
 
-<div class="shot">
-  <div class="frame">
+<div class="shot" id="tour">
+  <div class="tour-head"><h2>Five things you do all day. One window.</h2><div class="tabs" role="tablist" aria-label="Parts of the window"></div></div>
+  <div class="frame"><div class="stage">
     <div class="bar"><i></i><i></i><i></i></div>
     <img src="hero.png" alt="Just Zen: a sidebar of web apps on the left, the whiteboard in the centre, and Claude Code in a pane on the right, all in one window" width="1622" height="932">
-  </div>
-  <div class="callouts">
-    <div class="callout"><span class="dot" style="background:var(--accent)"></span><div><b>Left: your apps</b>Gmail, Outlook, Slack, WhatsApp, Teams, and any website you add. Each keeps its own login.</div></div>
-    <div class="callout"><span class="dot" style="background:var(--sage)"></span><div><b>Centre: your thinking</b>Scribble on an infinite whiteboard, open your notes vault, or read a PDF. It all stays on this Mac.</div></div>
-    <div class="callout"><span class="dot" style="background:var(--violet)"></span><div><b>Right: Claude</b>Claude Code sees the folder you choose, and works while your apps stay open beside it.</div></div>
-  </div>
+    <div class="spot" aria-hidden="true"></div>
+  </div></div>
+  <div class="caption" aria-live="polite"><b></b><p></p></div>
 </div>
+<script>
+(()=>{
+  // Regions are percentages of the screenshot, so the highlight lands on the same part at any size.
+  const stops=[
+    ['Whiteboard',{x:4.2,y:7,w:66.4,h:93},'Think out loud on an infinite canvas: sketches, sticky notes and rough plans, in the centre of everything.'],
+    ['Claude',{x:70.6,y:7,w:24,h:93},'Claude Code lives in the right-hand pane. It reads the folder you connect and works while your apps stay open.'],
+    ['Apps',{x:0,y:7,w:4.2,h:93},'Gmail, Outlook, Slack, WhatsApp, Teams and any website you add sit down the left, each with its own login.'],
+    ['Tasks',{x:94.6,y:7,w:2.7,h:14},'Your task list slides out from the right rail and stays one click away, whatever you are doing.'],
+    ['Documents',{x:97.3,y:7,w:2.7,h:20},'Open PDFs and Word files beside your apps, annotate them and save a copy, without leaving the window.']
+  ];
+  const tabs=document.querySelector('#tour .tabs'),spot=document.querySelector('#tour .spot'),title=document.querySelector('#tour .caption b'),text=document.querySelector('#tour .caption p');
+  let current=0,timer=null;
+  const show=i=>{current=i;const [name,r,copy]=stops[i];Object.assign(spot.style,{left:r.x+'%',top:r.y+'%',width:r.w+'%',height:r.h+'%'});title.textContent=name;text.textContent=copy;[...tabs.children].forEach((b,j)=>b.setAttribute('aria-selected',String(j===i)));};
+  stops.forEach(([name],i)=>{const b=document.createElement('button');b.type='button';b.role='tab';b.textContent=name;b.addEventListener('click',()=>{clearInterval(timer);timer=null;show(i);});tabs.append(b);});
+  show(0);
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches)timer=setInterval(()=>show((current+1)%stops.length),4500);
+})();
+</script>
 
 <section class="pillars" id="apps">
   <div class="eyebrow">Why one window</div>
