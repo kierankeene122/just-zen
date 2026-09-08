@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification, webContents } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification, webContents, clipboard } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const execFile = require('node:util').promisify(require('node:child_process').execFile);
@@ -140,6 +140,7 @@ async function browse(request,legacyForce=false) {
     hardenWebSession(contents.session);
     const origins=notificationOrigins.get(contents.session);try{if(item && secureOrigin(url)){origins.add(new URL(url).origin);notificationSource.origins.add(new URL(url).origin);}}catch{}
     configureWebContents(contents,win,message=>send('notice',message),contents,preferences);
+    attachContextMenu(contents,()=>item?.name || 'the web app');
     contents.on('page-favicon-updated',async (_e,urls)=>{if(!urls.length || !item || bundledIcon(item))return;const icon=await favicon(item.url,urls[0]);if(icon)send('favicon',{url:item.url,icon});});
     // Origins reached by the app's initial redirect chain may notify; later navigations (open redirects, links) may not.
     contents.on('did-navigate',(_e,url)=>{if(browser===view)send('browser-url',url);try{if(item && !notificationSource.landed && secureOrigin(url)){origins.add(new URL(url).origin);notificationSource.origins.add(new URL(url).origin);}}catch{}contents.session.cookies.flushStore().catch(()=>{});});
@@ -160,6 +161,21 @@ async function browse(request,legacyForce=false) {
   if(fresh || force)view.webContents.loadURL(url).catch(()=>{});
   else if(!background)send('browser-url',view.webContents.getURL());
   return {fresh,loading:view.webContents.isLoading()};
+}
+// Right-click menu for any pane: send the selection to the Claude context card, plus the usual editing items.
+function attachContextMenu(contents,sourceName,extra=()=>[]){
+  contents.on('context-menu',(_event,params)=>{
+    if(locked)return;
+    const text=String(params.selectionText || '').trim(),items=[];
+    if(text)items.push({label:'Send Selection to Claude',click:()=>send('claude-context',{text:text.slice(0,20000),source:sourceName()})});
+    items.push(...extra(params,text));
+    if(items.length)items.push({type:'separator'});
+    if(params.isEditable)items.push({role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'});
+    else if(text)items.push({role:'copy'});
+    if(params.linkURL)items.push({label:'Copy Link',click:()=>clipboard.writeText(params.linkURL)});
+    if(items.length && items.at(-1).type==='separator')items.pop();
+    if(items.length)Menu.buildFromTemplate(items).popup({window:win});
+  });
 }
 function subscriptionEnv(){
   const env={...process.env,TERM:'xterm-256color',COLORTERM:'truecolor',PATH:'/opt/homebrew/bin:/usr/local/bin:'+process.env.PATH,CLAUDE_CONFIG_DIR:claudeConfigDir};
@@ -205,6 +221,7 @@ app.whenReady().then(async () => {
   }
   Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'Just Zen',submenu:[{role:'about'},{role:'quit'}]},{label:'Edit',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]},{label:'Go',submenu:[{label:'Command Palette',accelerator:'CmdOrCtrl+Shift+P',click:()=>{if(!locked)send('open-palette',true);}},{label:'Send Selection to Claude',accelerator:'CmdOrCtrl+Shift+A',click:()=>sendSelectionToClaude()}]},{label:'View',submenu:[{role:'togglefullscreen'},...(!app.isPackaged?[{role:'toggleDevTools'}]:[])]}]));
   win.webContents.on('will-navigate', e => e.preventDefault());
+  attachContextMenu(win.webContents,()=>'your workspace',(_params,text)=>text?[]:[{label:'Send Selection to Claude',click:()=>send('capture-selection',true)}]);
   win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
   win.on('resize',bounds);
   win.on('closed',() => { terminal?.kill();chat.stop();for(const view of browsers.values())view.webContents.close(); });
@@ -216,6 +233,7 @@ app.whenReady().then(async () => {
   dc.session.setPermissionRequestHandler((_c,_p,done)=>done(false));dc.session.setPermissionCheckHandler(()=>false);
   const allowedDocumentFiles=new Set(['document-view.html','document-view.css','style.css','document-view.js','document-pane.js','node_modules/dompurify/dist/purify.min.js','node_modules/pdfjs-dist/build/pdf.mjs','node_modules/pdfjs-dist/build/pdf.worker.mjs'].map(f=>require('node:url').pathToFileURL(path.join(__dirname,f)).href));
   dc.session.webRequest.onBeforeRequest((details,done)=>done({cancel:!allowedDocumentFiles.has(details.url)}));
+  attachContextMenu(dc,()=>'the document',()=>[{label:'Send This Page to Claude',click:()=>dc.send('capture-selection')}]);
   dc.setWindowOpenHandler(()=>({action:'deny'}));dc.on('will-navigate',e=>e.preventDefault());dc.on('will-frame-navigate',e=>e.preventDefault());dc.on('will-redirect',e=>e.preventDefault());
   function documentTrusted(e){if(locked || e.sender!==dc || e.senderFrame!==dc.mainFrame || e.senderFrame.url!==documentEntry)throw Error('Untrusted document request');}
   for(const [name,fn] of [['document-open',()=>documents.open()],['document-save',input=>documents.save(input)],['document-close',()=>documents.close()]])ipcMain.handle(name,(e,...args)=>{documentTrusted(e);return fn(...args);});

@@ -193,6 +193,7 @@ palette.addEventListener('click',e=>{if(e.target===palette)palette.close();});
 paletteInput.oninput=()=>attempt(updatePalette);
 paletteInput.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();paletteIndex=Math.min(paletteIndex+1,paletteItems.length-1);renderPalette();}else if(e.key==='ArrowUp'){e.preventDefault();paletteIndex=Math.max(paletteIndex-1,0);renderPalette();}else if(e.key==='Enter'){e.preventDefault();runPaletteItem(paletteIndex);}};
 window.hearth.on('open-palette',()=>attempt(openPalette));
+$('jump').onclick=()=>attempt(openPalette);
 
 // ---- Send this to Claude (⌘⇧A) ----
 let claudeContext=null;
