@@ -32,6 +32,7 @@
 <div class="pillar"><span class="tag" style="background:var(--violet)"></span><h3>Claude Chat</h3><ul><li>Runs inside Anthropic Sandbox Runtime and macOS Seatbelt. It can read only the workspace you choose plus its own login, and write only where the access mode allows.</li>
 <li>Uses a Claude login and history owned by Just Zen. Your personal ~/.claude, home folder, other users, external volumes and temporary folders are denied.</li>
 <li>Network access is limited to Anthropic's servers. Chat refuses to start if the sandbox is not active.</li>
+<li>Text from a website, note or document reaches Claude only when you select it and press ⌘⇧A, and then only after you choose what to do with it. Nothing is sent automatically.</li>
 <li>Read-only blocks changes at the operating-system level. Notes-only asks before touching anything other than Markdown and refuses writes through symbolic links. Shell commands, sub-agents and MCP tools always ask first.</li></ul></div>
 <div class="pillar"><span class="tag" style="background:var(--accent)"></span><h3>Claude Terminal and shell</h3><ul><li>Runs with your normal macOS user permissions, exactly like Claude Code in Terminal.app. Just Zen adds no privilege and no sandbox here.</li>
 <li>Claude Code's own command approval applies. Use Chat when you want enforced Read-only or Notes-only access.</li></ul></div>
