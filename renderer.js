@@ -1,5 +1,6 @@
 import {marked} from './node_modules/marked/lib/marked.esm.js';
 import {createWhiteboard} from './whiteboard.js';
+import {rank} from './palette-match.mjs';
 const $=id=>document.getElementById(id);
 const call=(name,...args)=>window.hearth.call(name,...args);
 let root,claudeRoot=null,claudePolicy='full',claudeWorkspaces=[],currentFile,original='',directory='',page='overview',running=false,mode='chat',theme='light';
@@ -138,7 +139,7 @@ window.hearth.on('app-locked',setLocked);window.hearth.on('data-erased',()=>noti
 new ResizeObserver(size).observe($('terminal'));new ResizeObserver(browserSize).observe($('browser-surface'));
 window.addEventListener('beforeunload',e=>{if(dirty() || running || chatState.busy){if(!confirm('Close Just Zen? Unsaved edits and running work will be stopped.')){e.preventDefault();e.returnValue=false;}}});
 for(const id of ['markdown-preview','chat-messages'])$(id).addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;e.preventDefault();const href=a.getAttribute('href');attempt(async()=>{if(href.startsWith('#vault-note=')){const target=decodeURIComponent(href.slice(12)).split('#')[0];await openFile(await call('resolve-note',{target,from:currentFile}));}else if(/^https?:/i.test(href)){await browse(href);}else if(!href.startsWith('#')){const target=decodeURIComponent(href).split('#')[0];await openFile(await call('resolve-note',{target,from:currentFile}));}});});
-document.addEventListener('keydown',e=>{if(!e.metaKey)return;if(e.key==='s' && page==='files-page'){e.preventDefault();attempt(save);}if(e.key==='1')attempt(()=>show('overview'));if(e.key==='2')$('vault').click();if(e.key==='3')attempt(()=>show('security-page'));});
+document.addEventListener('keydown',e=>{if(!e.metaKey)return;if(e.key==='s' && page==='files-page'){e.preventDefault();attempt(save);}if(e.key==='1')attempt(()=>show('overview'));if(e.key==='2')$('vault').click();if(e.key==='3')attempt(()=>show('security-page'));if(e.key.toLowerCase()==='k' && !e.shiftKey && !e.altKey){e.preventDefault();attempt(openPalette);}});
 let lastActivity=0;for(const event of ['pointerdown','keydown'])document.addEventListener(event,()=>{const now=Date.now();if(now-lastActivity>60_000){lastActivity=now;call('app-activity').catch(()=>{});}},{capture:true});
 attempt(async()=>{const state=await call('state');applyTheme(state.theme || 'light');showVersion(state);if(state.locked)setLocked(true,state.lockMethod);else await hydrate(state);});
 
@@ -152,3 +153,71 @@ function renderConnectedFolders(folders){
  $('connected-folders').replaceChildren();
  for(const folder of folders){const button=document.createElement('button');button.className='connected-folder';button.classList.toggle('selected',folder===root);button.textContent='▱ '+folder;button.title='Use this folder in Files and Claude';button.onclick=()=>attempt(async()=>{if(!discard())return;const state=await call('select-files-folder',folder);setRoot(state.root);renderConnectedFolders(state.connectedFolders);setClaudeAccess({root:state.claudeRoot,policy:state.claudePolicy,workspaces:state.claudeWorkspaces});currentFile=null;original='';directory='';$('editor').value='';$('editor').disabled=true;$('save').disabled=true;$('markdown-preview').textContent='';$('note-tabs').classList.add('hidden');$('filename').textContent='Select a note or source file';await list('');});$('connected-folders').append(button);}
 }
+
+// ---- Command palette (⌘K, or ⌘⇧P from anywhere) ----
+const palette=$('palette'),paletteInput=$('palette-input'),paletteList=$('palette-list');
+let paletteItems=[],paletteIndex=0,paletteHidBrowser=false,paletteSearch=0;
+function staticPaletteItems(){
+ const items=[];
+ for(const item of sidebarItems)items.push({label:item.name,hint:item.url?new URL(item.url).hostname.replace(/^www\./,''):'App',run:()=>openService(item)});
+ items.push({label:'Scribble',hint:'Whiteboard · ⌘1',run:()=>show('overview')},{label:'Files',hint:'Notes and vault · ⌘2',run:()=>$('vault').click()},{label:'Privacy & data',hint:'Build status and controls · ⌘3',run:()=>show('security-page')},{label:'Tasks',hint:'Open the task list',run:()=>$('tasks-rail').click()},{label:'Documents',hint:'Open the document pane',run:()=>$('documents-rail').click()},{label:'Claude Chat',hint:'Talk to Claude',run:async()=>{await applyLayout({agentCollapsed:false});applyMode('chat');$('chat-input').focus();}},{label:'Claude Terminal',hint:'Claude Code in a terminal',run:()=>start('claude')},{label:'Add app or website',hint:'App library',run:openPicker});
+ for(const todo of todos.filter(t=>!t.done))items.push({label:'Complete task: '+todo.text,hint:'Tasks',run:async()=>{todos=await call('toggle-todo',todo.id);renderTodos();notice('Task completed.');}});
+ return items;
+}
+function dynamicPaletteItems(q){
+ if(!q)return [];
+ const items=[{label:'Ask Claude: '+q,hint:'Chat',run:async()=>{await applyLayout({agentCollapsed:false});applyMode('chat');$('chat-input').value=q;$('chat-input').focus();}},{label:'New task: '+q,hint:'Tasks',run:async()=>{todos=await call('add-todo',q);renderTodos();notice('Task added.');}}];
+ if(/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(q))items.unshift({label:'Open website: '+q,hint:'Browser',run:()=>browse(/^https?:/i.test(q)?q:'https://'+q,true)});
+ return items;
+}
+function renderPalette(){
+ paletteList.replaceChildren();
+ if(!paletteItems.length){const p=document.createElement('div');p.className='palette-empty';p.textContent='Nothing matches.';paletteList.append(p);return;}
+ paletteIndex=Math.max(0,Math.min(paletteIndex,paletteItems.length-1));
+ paletteItems.forEach((item,i)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','option');b.setAttribute('aria-selected',String(i===paletteIndex));const label=document.createElement('span');label.textContent=item.label;const hint=document.createElement('small');hint.textContent=item.hint || '';b.append(label,hint);b.onmousemove=()=>{if(paletteIndex!==i){paletteIndex=i;renderPalette();}};b.onclick=()=>runPaletteItem(i);paletteList.append(b);});
+ paletteList.children[paletteIndex]?.scrollIntoView({block:'nearest'});
+}
+async function updatePalette(){
+ const q=paletteInput.value.trim();const token=++paletteSearch;
+ paletteItems=[...rank(staticPaletteItems(),q,q?6:12),...dynamicPaletteItems(q)];paletteIndex=0;renderPalette();
+ if(root && q.length>=2){const notes=await call('search-notes',q).catch(()=>[]);if(token!==paletteSearch)return;const noteItems=notes.map(path=>({label:'Open note: '+path,hint:'Files',run:async()=>{await show('files-page');await openFile(path);}}));paletteItems=[...paletteItems.filter(i=>!i.label.startsWith('Ask Claude') && !i.label.startsWith('New task')),...noteItems,...paletteItems.filter(i=>i.label.startsWith('Ask Claude') || i.label.startsWith('New task'))];renderPalette();}
+}
+async function runPaletteItem(i){const item=paletteItems[i];if(!item)return;palette.close();await attempt(()=>item.run());}
+async function openPalette(){
+ if(document.body.classList.contains('is-locked') || palette.open)return;
+ paletteHidBrowser=page==='browser-page' && !layout.centreCollapsed;if(paletteHidBrowser)await call('hide-browser');
+ paletteInput.value='';palette.showModal();await updatePalette();paletteInput.focus();
+}
+palette.addEventListener('close',()=>{if(paletteHidBrowser){paletteHidBrowser=false;attempt(()=>call('show-browser'));}});
+palette.addEventListener('click',e=>{if(e.target===palette)palette.close();});
+paletteInput.oninput=()=>attempt(updatePalette);
+paletteInput.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();paletteIndex=Math.min(paletteIndex+1,paletteItems.length-1);renderPalette();}else if(e.key==='ArrowUp'){e.preventDefault();paletteIndex=Math.max(paletteIndex-1,0);renderPalette();}else if(e.key==='Enter'){e.preventDefault();runPaletteItem(paletteIndex);}};
+window.hearth.on('open-palette',()=>attempt(openPalette));
+
+// ---- Send this to Claude (⌘⇧A) ----
+let claudeContext=null;
+function currentSelection(){
+ const el=document.activeElement;
+ if(el && el.tagName==='TEXTAREA'){const t=el.value.slice(el.selectionStart,el.selectionEnd);if(t.trim())return {text:t,source:el.id==='editor'?'your note':'the composer'};}
+ if(mode==='terminal' && running){const t=terminal.getSelection();if(t.trim())return {text:t,source:'the terminal'};}
+ const t=String(window.getSelection?.() || '');if(t.trim())return {text:t,source:'the page'};
+ return null;
+}
+function showClaudeContext(context){
+ claudeContext={text:String(context.text).slice(0,20000),source:context.source || 'your selection'};
+ $('chat-context-title').textContent='Selected text from '+claudeContext.source+' · '+claudeContext.text.length.toLocaleString()+' characters';
+ $('chat-context-preview').textContent=claudeContext.text.slice(0,400);
+ $('chat-context').classList.remove('hidden');
+ attempt(async()=>{await applyLayout({agentCollapsed:false});applyMode('chat');});
+}
+function clearClaudeContext(){claudeContext=null;$('chat-context').classList.add('hidden');}
+async function sendClaudeContext(instruction){
+ if(!claudeContext)return;const {text,source}=claudeContext;
+ if(!claudeRoot && !await chooseClaude())return;
+ await call('chat-send',instruction+'\n\nThe text below came from '+source+'.\n\n"""\n'+text+'\n"""');clearClaudeContext();
+}
+window.hearth.on('capture-selection',()=>{const found=currentSelection();if(!found){notice('Select some text first, then press ⌘⇧A.');return;}showClaudeContext(found);});
+window.hearth.on('claude-context',context=>{if(context && typeof context.text==='string')showClaudeContext(context);});
+for(const b of document.querySelectorAll('#chat-context [data-instruction]'))b.onclick=()=>attempt(()=>sendClaudeContext(b.dataset.instruction));
+$('chat-context-ask').onclick=()=>{if(!claudeContext)return;const {text,source}=claudeContext;$('chat-input').value='\n\nThe text below came from '+source+'.\n\n"""\n'+text+'\n"""';$('chat-input').setSelectionRange(0,0);$('chat-input').focus();clearClaudeContext();};
+$('chat-context-discard').onclick=clearClaudeContext;

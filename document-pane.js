@@ -46,5 +46,14 @@ export function createDocumentPane({call,resize}){
  $('pdf-undo').onclick=()=>run(async()=>{if(annotations.length){annotations.pop();changed();await paint();}});
  $('document-close').onclick=()=>run(async()=>{if(dirty&&!confirm('Close this document and discard unsaved edits?'))return;if(loadingTask)await loadingTask.destroy();await call('document-close');loadingTask=null;pdf=null;current=null;dirty=false;annotations=[];renderTask=null;$('document-editor').innerHTML='';$('document-text').value='';$('pdf-notes').replaceChildren();$('pdf-canvas').width=0;for(const id of ['document-tools','pdf-tools','document-editor','document-text','pdf-sheet'])$(id).hidden=true;$('document-name').textContent='Local files stay on this Mac.';$('document-hint').textContent='Open a PDF, DOCX, TXT or RTF to work alongside your apps.';status('Document closed');});
  $('document-save').onclick=()=>run(async()=>{if(!current)return;const saved=await call('document-save',{content:current.type==='txt'?$('document-text').value:$('document-editor').innerHTML,annotations});if(saved){dirty=false;status('Saved '+saved);}});
+ // ⌘⇧A: send the selection to Claude; for a PDF with nothing selected, send the current page's text.
+ async function selectedText(){
+  const chosen=String(window.getSelection?.() || '').trim();if(chosen)return chosen;
+  if(pdf){const sheet=await pdf.getPage(page),content=await sheet.getTextContent();return content.items.map(item=>item.str).join(' ').replace(/\s+/g,' ').trim();}
+  if(!$('document-text').hidden)return $('document-text').value.trim();
+  if(!$('document-editor').hidden)return $('document-editor').innerText.trim();
+  return '';
+ }
+ window.documents.onCaptureSelection?.(()=>run(async()=>{const text=await selectedText();if(!text){status('Select some text first, or open a document.');return;}window.documents.sendToClaude(text);status('Sent to Claude: choose what to do with it in the Claude pane.');}));
  window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='Unsaved document edits';}});
 }

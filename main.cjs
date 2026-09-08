@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification, webContents } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const execFile = require('node:util').promisify(require('node:child_process').execFile);
@@ -190,7 +190,20 @@ app.whenReady().then(async () => {
   chat=new ChatSession({emit:state=>send('chat-state',state),policy:()=>({mode:config.claudePolicy || 'full',root:claudeRoot}),env:()=>({...subscriptionEnv(),ANTHROPIC_API_KEY:undefined,ANTHROPIC_AUTH_TOKEN:undefined,ANTHROPIC_BASE_URL:undefined,CLAUDE_CODE_USE_BEDROCK:undefined,CLAUDE_CODE_USE_VERTEX:undefined,CLAUDE_CODE_USE_FOUNDRY:undefined}),save:async state=>{if(!claudeRoot)return;config.chats=config.chats || {};config.chats[claudeRoot]=state;await persist();}});
   chat.restore(config.chats?.[claudeRoot]);
   win = new BrowserWindow({show:false,width:1440,height:940,minWidth:1100,minHeight:700,title:'Just Zen',icon:path.join(__dirname,'assets','justzen.png'),titleBarStyle:'hiddenInset',backgroundColor:'#ffffff',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
-  Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'Just Zen',submenu:[{role:'about'},{role:'quit'}]},{label:'Edit',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]},{label:'View',submenu:[{role:'togglefullscreen'},...(!app.isPackaged?[{role:'toggleDevTools'}]:[])]}]));
+  // Send the current selection, wherever the focus is, to the Claude context card. Nothing is sent to Claude until the user picks an action.
+  async function sendSelectionToClaude(){
+    if(locked)return;
+    const focused=webContents.getFocusedWebContents();
+    if(!focused || focused===win.webContents){send('capture-selection',true);return;}
+    if(focused===dc){dc.send('capture-selection');return;}
+    for(const view of browsers.values())if(view.webContents===focused){
+      let text='';try{text=String(await focused.executeJavaScript('String(window.getSelection ? window.getSelection().toString() : "")',true)).slice(0,20000);}catch{}
+      if(!text.trim()){send('notice','Select some text first, then press ⌘⇧A.');return;}
+      send('claude-context',{text,source:notificationSources.get(focused)?.name || 'the web app'});return;
+    }
+    send('capture-selection',true);
+  }
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'Just Zen',submenu:[{role:'about'},{role:'quit'}]},{label:'Edit',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]},{label:'Go',submenu:[{label:'Command Palette',accelerator:'CmdOrCtrl+Shift+P',click:()=>{if(!locked)send('open-palette',true);}},{label:'Send Selection to Claude',accelerator:'CmdOrCtrl+Shift+A',click:()=>sendSelectionToClaude()}]},{label:'View',submenu:[{role:'togglefullscreen'},...(!app.isPackaged?[{role:'toggleDevTools'}]:[])]}]));
   win.webContents.on('will-navigate', e => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
   win.on('resize',bounds);
@@ -207,6 +220,7 @@ app.whenReady().then(async () => {
   function documentTrusted(e){if(locked || e.sender!==dc || e.senderFrame!==dc.mainFrame || e.senderFrame.url!==documentEntry)throw Error('Untrusted document request');}
   for(const [name,fn] of [['document-open',()=>documents.open()],['document-save',input=>documents.save(input)],['document-close',()=>documents.close()]])ipcMain.handle(name,(e,...args)=>{documentTrusted(e);return fn(...args);});
   ipcMain.on('document-collapse',e=>{try{documentTrusted(e);documentView.setVisible(false);send('document-collapse');}catch{}});
+  ipcMain.on('document-send-to-claude',(e,text)=>{try{documentTrusted(e);if(typeof text!=='string' || !text.trim())return;send('claude-context',{text:text.slice(0,20000),source:'the document'});}catch{}});
   handle('document-bounds',box=>{const [w,h]=win.getContentSize();if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid document bounds');const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));documentView.setBounds({x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))});documentView.setVisible(Boolean(box.visible)&&!locked);});
   dc.loadURL(documentEntry);
   handle('state',stateSnapshot);
@@ -238,6 +252,7 @@ app.whenReady().then(async () => {
   handle('chat-permission',value=>chat.respond(value));
   handle('chat-new',async ()=>{if(chat.state.busy)throw Error('Stop the current reply first');chat.restore(null);chat.publish();config.chats=config.chats || {};delete config.chats[claudeRoot];await persist();});
   handle('files',files);
+  handle('search-notes',async query=>{if(!root || typeof query!=='string')return [];const q=query.trim().toLowerCase();if(q.length<2)return [];const out=[];let count=0;async function walk(dir){if(out.length>=30 || ++count>1500)return;for(const item of await files(dir).catch(()=>[])){if(out.length>=30)return;if(item.folder)await walk(item.path);else if(/\.(md|markdown|txt)$/i.test(item.name) && item.path.toLowerCase().includes(q))out.push(item.path);}}await walk('');return out;});
   handle('read',async relative => { const file = await localFile(relative); const stat = await fs.stat(file); if(stat.size > 2e6) throw Error('Preview supports text files up to 2 MB'); const text = await fs.readFile(file,'utf8'); if(text.includes('\0')) throw Error('This is a binary file'); return {text}; });
   handle('save',async ({relative,text,original}) => { if(typeof text !== 'string' || text.length > 2e6) throw Error('Invalid file content'); const file = await localFile(relative); if(await fs.readFile(file,'utf8') !== original) throw Error('This file changed on disk. Reopen it before saving.'); await fs.writeFile(file,text); return true; });
   handle('browser-bounds',box=>{const [w,h]=win.getContentSize();if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid view bounds');const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));browserBounds={x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))};bounds();});

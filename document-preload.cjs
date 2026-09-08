@@ -1,2 +1,2 @@
 const {contextBridge,ipcRenderer}=require('electron');
-contextBridge.exposeInMainWorld('documents',{call:(name,...args)=>{if(!['document-open','document-save','document-close'].includes(name))throw Error('Document action denied');return ipcRenderer.invoke(name,...args);},collapse:()=>ipcRenderer.send('document-collapse')});
+contextBridge.exposeInMainWorld('documents',{call:(name,...args)=>{if(!['document-open','document-save','document-close'].includes(name))throw Error('Document action denied');return ipcRenderer.invoke(name,...args);},collapse:()=>ipcRenderer.send('document-collapse'),sendToClaude:text=>ipcRenderer.send('document-send-to-claude',String(text).slice(0,20000)),onCaptureSelection:fn=>ipcRenderer.on('capture-selection',()=>fn())});
