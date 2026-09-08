@@ -30,7 +30,7 @@
 <li>Optional Touch ID or passcode lock after inactivity. Passcode attempts back off after three failures.</li>
 <li>Any browser profile, Claude history or all Just Zen data can be cleared from the Privacy &amp; data panel in the app.</li></ul></div>
 <div class="pillar"><span class="tag" style="background:var(--violet)"></span><h3>Claude Chat</h3><ul><li>Runs inside Anthropic Sandbox Runtime and macOS Seatbelt. It can read only the workspace you choose plus its own login, and write only where the access mode allows.</li>
-<li>Uses a Claude login and history owned by Just Zen. Your personal ~/.claude, home folder, other users, external volumes and temporary folders are denied.</li>
+<li>Uses a Claude login and history owned by Just Zen. Your personal ~/.claude, home folder, other users, external volumes and temporary folders are denied. The only other home-folder path it may read is the encrypted Keychain database, so it can use that login; the system's security daemon does the unlocking, not Claude.</li>
 <li>Network access is limited to Anthropic's servers. Chat refuses to start if the sandbox is not active.</li>
 <li>Text from a website, note or document reaches Claude only when you select it and press ⌘⇧A, and then only after you choose what to do with it. Nothing is sent automatically.</li>
 <li>Read-only blocks changes at the operating-system level. Notes-only asks before touching anything other than Markdown and refuses writes through symbolic links. Shell commands, sub-agents and MCP tools always ask first.</li></ul></div>

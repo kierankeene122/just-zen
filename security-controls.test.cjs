@@ -15,6 +15,7 @@ test('Claude sandbox denies the home directory and only writes the selected work
  assert(full.filesystem.allowRead.includes(root));
  assert(!full.filesystem.allowRead.some(value=>value.startsWith(home+'/.claude')),'the personal ~/.claude is never shared with Chat');
  assert(full.filesystem.allowRead.includes('/Users/person/Library/Hearth/claude-config'));
+ assert(full.filesystem.allowRead.includes('/Users/person/Library/Keychains'),'Keychain database is readable so the sandboxed Claude can use its login');
  assert(!full.filesystem.allowWrite.includes('/private/tmp'));
  assert(full.filesystem.allowWrite.includes(root));
  assert.equal(full.network.allowLocalBinding,false);

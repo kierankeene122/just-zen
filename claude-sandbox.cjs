@@ -17,7 +17,8 @@ function settings({root,mode,userData,home=os.homedir(),configDir=path.join(user
   network:{allowedDomains:['api.anthropic.com','claude.ai','*.claude.ai'],deniedDomains:[],allowUnixSockets:[],allowLocalBinding:false},
   filesystem:{
    denyRead:[home,'/Users','/Volumes','/private/var/folders','/private/tmp','/tmp','/Library/Keychains',projectsDir,path.join(root,'**','.env'),path.join(root,'**','.env.*')],
-   allowRead:[root,configDir,projectDir,stateDir],
+   // The login token lives in the macOS Keychain; the security framework needs to locate the (encrypted) keychain database files to use it.
+   allowRead:[root,configDir,projectDir,stateDir,path.join(home,'Library','Keychains')],
    allowWrite,
    denyWrite:[projectsDir,...(mode==='readOnly'?[root]:[])]
   },
