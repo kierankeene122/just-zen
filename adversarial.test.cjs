@@ -1,8 +1,8 @@
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {secureInside,hook}=require('./claude-policy.cjs');
 const {createDocuments}=require('./documents.cjs');
 test('Claude rejects traversal, sibling-prefix paths and symlink chains including new targets',async()=>{
- const dir=await fs.mkdtemp('/private/tmp/zen-adversarial-');try{
+ const dir=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'zen-adversarial-')));try{
   const root=dir+'/workspace',outside=dir+'/workspace-private';await fs.mkdir(root);await fs.mkdir(outside);await fs.writeFile(outside+'/secret','private');await fs.symlink(outside,root+'/escape');await fs.symlink(root+'/escape',root+'/chain');
   for(const target of ['../workspace-private/secret',outside+'/secret','escape/secret','chain/new.md']){
    assert.equal(await secureInside(root,target),false,target);
@@ -10,8 +10,8 @@ test('Claude rejects traversal, sibling-prefix paths and symlink chains includin
   }
  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
-test('Save copy cannot overwrite the original through a symlink or hardlink',async()=>{
- const dir=await fs.mkdtemp('/private/tmp/zen-save-attack-');try{
+test('Save copy cannot overwrite the original through a symlink or hardlink',{skip:process.platform!=='darwin'},async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'zen-save-attack-'));try{
   const original=dir+'/original.txt';await fs.writeFile(original,'original');
   for(const kind of ['symlink','link']){
    const target=dir+'/'+kind+'.txt';await fs[kind](original,target);
