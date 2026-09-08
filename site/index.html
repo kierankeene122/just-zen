@@ -32,8 +32,7 @@ p{margin:0}
 
 header.top{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.14em;font-size:13px}
-.brand i{width:26px;height:26px;border-radius:50%;background:var(--sage);display:inline-block;position:relative}
-.brand i::after{content:"";position:absolute;inset:7px;border-radius:50%;border:2.5px solid var(--paper);border-right-color:transparent;transform:rotate(-30deg)}
+.brand img{width:28px;height:28px;display:block}
 nav a{text-decoration:none;font-size:14px;color:var(--ink-2);margin-left:22px}
 
 .hero{padding:56px 0 24px;display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:40px;align-items:end}
@@ -105,8 +104,8 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
 
 <div class="wrap">
 <header class="top">
-  <div class="brand"><i></i>JUST ZEN</div>
-  <nav><a href="#apps">Apps</a><a href="#copilot">Claude</a><a href="#private">Privacy</a><a href="https://github.com/kierankeene122/just-zen/releases/latest">Download</a></nav>
+  <div class="brand"><img src="logo.png" alt="" width="28" height="28">JUST ZEN</div>
+  <nav><a href="#apps">Apps</a><a href="#copilot">Claude</a><a href="#private">Privacy</a><a href="https://github.com/kierankeene122/just-zen-releases/releases/latest/download/Just-Zen-arm64.dmg">Download</a></nav>
 </header>
 
 <section class="hero">
@@ -115,7 +114,7 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
     <h1 style="margin-top:18px">Everything you work in.<br><span class="stroke">One window.<svg viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true"><path d="M4 16 C 60 6, 120 20, 180 10 S 270 12, 296 8"/></svg></span></h1>
     <p class="lede">Your apps, your files, your notes and tasks, with Claude Code working alongside you. Nothing to switch to, nowhere else to go.</p>
     <div class="cta">
-      <a class="btn btn-primary" href="https://github.com/kierankeene122/just-zen/releases/latest">Download for Mac</a>
+      <a class="btn btn-primary" href="https://github.com/kierankeene122/just-zen-releases/releases/latest/download/Just-Zen-arm64.dmg" download>Download for Mac</a>
       <a class="btn btn-secondary" href="#private">How it keeps things private</a>
       <small>Apple silicon · macOS 13 or later · signed and notarized</small>
     </div>
@@ -180,7 +179,7 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
 </section>
 
 <footer>
-  <div><a href="https://github.com/kierankeene122/just-zen/releases/latest">Download</a><a href="https://github.com/kierankeene122/just-zen">GitHub</a><a href="#apps">Features</a></div>
+  <div><a href="https://github.com/kierankeene122/just-zen-releases/releases/latest/download/Just-Zen-arm64.dmg">Download</a><a href="https://github.com/kierankeene122/just-zen-releases/releases">All releases</a><a href="#apps">Features</a></div>
   <div>Just Zen · macOS · version 0.3</div>
 </footer>
 </div>

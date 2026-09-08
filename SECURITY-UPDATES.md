@@ -5,8 +5,8 @@ Just Zen checks its trusted GitHub Releases feed 15 seconds after launch and eve
 ## One-time setup
 
 1. Join the Apple Developer Program and create a Developer ID Application certificate.
-2. Create a public GitHub repository whose releases will be the trusted HTTPS update origin.
-3. Set the GitHub Actions repository variables `HEARTH_GITHUB_OWNER` and `HEARTH_GITHUB_REPO`.
+2. Create a public GitHub repository that holds only releases (the source stays private): `kierankeene122/just-zen-releases`. Installed apps and the website download from it anonymously.
+3. Set the GitHub Actions repository variables `HEARTH_GITHUB_OWNER` and `HEARTH_GITHUB_REPO` (the releases repository), and add a fine-grained personal access token with Contents read/write on that repository as the secret `RELEASES_TOKEN`.
 4. Add the signing secrets `CSC_LINK` and `CSC_KEY_PASSWORD`. `CSC_LINK` may contain a base64-encoded Developer ID Application certificate.
 5. Add the notarization secrets `APPLE_API_KEY`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. `APPLE_API_KEY` contains the App Store Connect private key text.
 6. Change the package version, commit it, and push a matching tag such as `v0.3.0`. The release workflow tests, signs, notarizes, attests, and publishes the DMG, ZIP, update metadata, and blockmaps to GitHub Releases.

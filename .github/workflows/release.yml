@@ -17,6 +17,8 @@ on:
         type: string
     # Only the signing and notarization secrets are accepted; callers pass them explicitly.
     secrets:
+      RELEASES_TOKEN:
+        required: false
       CSC_LINK:
         required: false
       CSC_KEY_PASSWORD:
@@ -37,7 +39,8 @@ jobs:
   release:
     runs-on: macos-15
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Releases are published to the separate public releases repository, which needs a token that can write there.
+      GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
       HEARTH_GITHUB_OWNER: ${{ vars.HEARTH_GITHUB_OWNER }}
       HEARTH_GITHUB_REPO: ${{ vars.HEARTH_GITHUB_REPO }}
       CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -58,6 +61,7 @@ jobs:
         run: |
           test -n "$HEARTH_GITHUB_OWNER"
           test -n "$HEARTH_GITHUB_REPO"
+          test -n "$GH_TOKEN"
           test -n "$CSC_LINK"
           test -n "$CSC_KEY_PASSWORD"
           test -n "$APPLE_API_KEY_ID"
@@ -77,8 +81,16 @@ jobs:
         # electron-builder publishes each target in parallel; if the release does not exist yet, both create one and the tag ends up with two.
         env:
           TAG: ${{ inputs.ref || github.ref_name }}
-        run: gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --verify-tag --title "Just Zen $TAG" --notes "Signed and notarized macOS build. Installed copies update automatically."
+        run: |
+          REPO="$HEARTH_GITHUB_OWNER/$HEARTH_GITHUB_REPO"
+          gh release view "$TAG" -R "$REPO" >/dev/null 2>&1 || gh release create "$TAG" -R "$REPO" --title "Just Zen $TAG" --notes "Signed and notarized macOS build for Apple silicon. Installed copies update automatically."
       - run: npm run dist:publish
+      - name: Publish a stable download name for the website
+        env:
+          TAG: ${{ inputs.ref || github.ref_name }}
+        run: |
+          cp release/Just-Zen-*-arm64.dmg release/Just-Zen-arm64.dmg
+          gh release upload "$TAG" release/Just-Zen-arm64.dmg -R "$HEARTH_GITHUB_OWNER/$HEARTH_GITHUB_REPO" --clobber
       - name: Attest released installers
         # Build provenance is not offered on user-owned private repositories; it switches on if the repository becomes public or moves to an organisation.
         if: ${{ !github.event.repository.private }}
