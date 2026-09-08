@@ -102,3 +102,5 @@ header{position:relative}
 .jump .jump-glyph{font-size:15px;opacity:.6}
 .jump kbd{font:inherit;font-size:11px;opacity:.55;border:1px solid var(--line,#e3e7ee);border-radius:6px;padding:1px 6px}
 [data-theme=dark] .jump{background:#1c211f;border-color:#2b302d}
+
+#claude-login{margin-right:6px}

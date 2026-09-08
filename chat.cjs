@@ -50,7 +50,7 @@ class ChatSession {
         let auth={loggedIn:false};
         try{auth=JSON.parse((await execFile('/opt/homebrew/bin/claude',['auth','status','--json'],{env:this.env(),timeout:15000})).stdout);}
         catch(error){try{auth=JSON.parse(String(error.stdout || '{}'));}catch{if(error.code==='ENOENT')throw Error('Claude Code is not installed at /opt/homebrew/bin/claude. Install it with "npm install -g @anthropic-ai/claude-code" and try again.');}}
-        if(!auth.loggedIn || auth.authMethod!=='claude.ai')throw Error('Sign in to Claude first: switch to Terminal, click Start Claude Code, and type /login. Just Zen keeps its own Claude login, separate from any other Claude Code setup on this Mac, so this is needed once.');
+        if(!auth.loggedIn || auth.authMethod!=='claude.ai')throw Error('Sign in to Claude first: click Sign in above the workspace picker. Just Zen keeps its own Claude login, separate from any other Claude Code setup on this Mac, so this is needed once.');
       }
       const query=this.queryFactory || (await import('@anthropic-ai/claude-agent-sdk')).query;
       const access=this.policy();

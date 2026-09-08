@@ -184,12 +184,13 @@ function subscriptionEnv(){
   return env;
 }
 function startTerminal(kind = 'claude') {
-  if (!claudeRoot) throw Error('Choose a Claude workspace first');
+  if (kind!=='login' && !claudeRoot) throw Error('Choose a Claude workspace first');
   if(kind==='claude' && (config.claudePolicy || 'full')!=='full')throw Error('Claude Terminal requires Full workspace mode. Use Chat for enforced Read-only or Notes-only access.');
   if (terminal) throw Error('A session is already running. Stop it before starting another.');
   if(chat?.state.busy)throw Error('Stop the chat turn before starting a terminal');
   const env=subscriptionEnv();
-  terminal = pty.spawn(kind === 'shell' ? '/bin/zsh' : '/opt/homebrew/bin/claude', kind === 'shell' ? ['-l'] : [], {name:'xterm-256color',cols:70,rows:32,cwd:claudeRoot,env});
+  // 'login' runs the CLI's browser sign-in against Just Zen's own Claude config directory.
+  terminal = pty.spawn(kind === 'shell' ? '/bin/zsh' : '/opt/homebrew/bin/claude', kind === 'shell' ? ['-l'] : kind==='login' ? ['auth','login','--claudeai'] : [], {name:'xterm-256color',cols:70,rows:32,cwd:claudeRoot || app.getPath('userData'),env});
   const current = terminal;
   current.onData(data => send('terminal-data',data));
   current.onExit(({exitCode}) => { if(terminal === current) terminal = null; send('terminal-exit',exitCode); });
@@ -298,7 +299,7 @@ app.whenReady().then(async () => {
   handle('add-catalog-app',async id=>{config.services=addApp(config.services || [],id);await persist();return config.services;});
   handle('remove-service',async key=>{closeServiceViews(key);config.services=(config.services || []).filter(s=>(s.id || s.url)!==key);await persist();return config.services;});
   handle('add-service',async ({name,url}) => { url = validURL(url); if(typeof name !== 'string' || !name.trim()) throw Error('Name is required'); config.services=config.services || [];if(!config.services.some(s=>s.url===url))config.services.push({id:require('node:crypto').randomUUID(),name:name.trim().slice(0,50),kind:'web',url,profile:'isolated'}); await persist(); return config.services; });
-  handle('start-terminal',kind => { if(!['claude','shell'].includes(kind)) throw Error('Invalid session'); return startTerminal(kind); });
+  handle('start-terminal',kind => { if(!['claude','shell','login'].includes(kind)) throw Error('Invalid session'); return startTerminal(kind); });
   handle('stop-terminal',() => { terminal?.kill(); });
   handle('terminal-input',data => { if(typeof data === 'string' && data.length < 100000) terminal?.write(data); });
   handle('terminal-size',({cols,rows}) => { if(Number.isInteger(cols) && Number.isInteger(rows) && cols>0 && rows>0 && cols<1000 && rows<1000) terminal?.resize(cols,rows); });
