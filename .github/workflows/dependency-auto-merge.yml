@@ -1,0 +1,44 @@
+name: Dependency auto-merge
+
+# After "Security checks" passes on a Dependabot branch, merge it (patch and minor updates only).
+# Nothing is built here: a signed release happens only when someone runs `npm run release`.
+on:
+  workflow_run:
+    workflows: ["Security checks"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'dependabot/')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Find the open pull request for this branch
+        id: pr
+        run: |
+          git fetch origin "$BRANCH"
+          number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          test -n "$number"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+      - name: Check for major version bumps
+        id: check
+        continue-on-error: true
+        run: node .github/scripts/check-dependency-update.cjs "origin/$BRANCH"
+      - name: Leave the pull request for manual review
+        if: steps.check.outcome == 'failure'
+        run: >-
+          gh pr comment "${{ steps.pr.outputs.number }}"
+          --body "Not auto-merged because this update crosses a major version. Review it manually."
+      - name: Merge
+        if: steps.check.outcome == 'success'
+        run: gh pr merge "${{ steps.pr.outputs.number }}" --squash --delete-branch

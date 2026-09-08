@@ -14,7 +14,8 @@
     "security:audit": "npm audit --omit=dev",
     "fuses:check": "npx @electron/fuses read --app '../../outputs/Just Zen-darwin-arm64/Just Zen.app'",
     "update:electron": "node scripts/update-electron.cjs",
-    "update:agent": "node scripts/install-update-agent.cjs"
+    "update:agent": "node scripts/install-update-agent.cjs",
+    "release": "node scripts/release.cjs"
   },
   "keywords": [],
   "author": "",
