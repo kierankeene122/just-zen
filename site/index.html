@@ -2,31 +2,30 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=Instrument+Sans:wght@400;500;600&display=swap">
 <style>
 :root{
-  --paper:#f7f6f1;--paper-2:#efede6;--line:#dcd9cf;--ink:#26364a;--ink-2:#54627a;--muted:#8a94a6;
-  --coral:#e8875b;--sage:#5d8f77;--violet:#6f74b8;--note:#fff0a8;--note-ink:#4a4118;
-  --grid:rgba(38,54,74,.16);--frame:#ffffff;--shadow:0 30px 70px -30px rgba(38,54,74,.45);
+  --paper:#fbfcfe;--paper-2:#f3f5f9;--line:#e4e8ef;--ink:#26364a;--ink-2:#5b6779;--muted:#8d97a8;
+  --accent:#5278c8;--sage:#5d8f77;--violet:#6f74b8;
+  --frame:#ffffff;--shadow:0 24px 60px -32px rgba(38,54,74,.35);
   --display:"Fraunces",Georgia,"Times New Roman",serif;--body:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --paper:#151816;--paper-2:#1d211e;--line:#2e332f;--ink:#e6ebdf;--ink-2:#b7c0ad;--muted:#7f8a78;
-  --coral:#f0966b;--sage:#7fb597;--violet:#9aa0dd;--note:#e9d97a;--note-ink:#2b2610;
-  --grid:rgba(213,221,204,.16);--frame:#22272a;--shadow:0 30px 70px -30px rgba(0,0,0,.8);
+  --paper:#151816;--paper-2:#1c201e;--line:#2b302d;--ink:#e3e8dc;--ink-2:#aeb7a5;--muted:#7c8675;
+  --accent:#8fb0e8;--sage:#7fb597;--violet:#9aa0dd;
+  --frame:#1f2422;--shadow:0 24px 60px -32px rgba(0,0,0,.8);
 }}
 :root[data-theme="dark"]{
-  --paper:#151816;--paper-2:#1d211e;--line:#2e332f;--ink:#e6ebdf;--ink-2:#b7c0ad;--muted:#7f8a78;
-  --coral:#f0966b;--sage:#7fb597;--violet:#9aa0dd;--note:#e9d97a;--note-ink:#2b2610;
-  --grid:rgba(213,221,204,.16);--frame:#22272a;--shadow:0 30px 70px -30px rgba(0,0,0,.8);
+  --paper:#151816;--paper-2:#1c201e;--line:#2b302d;--ink:#e3e8dc;--ink-2:#aeb7a5;--muted:#7c8675;
+  --accent:#8fb0e8;--sage:#7fb597;--violet:#9aa0dd;
+  --frame:#1f2422;--shadow:0 24px 60px -32px rgba(0,0,0,.8);
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;
-  background-image:radial-gradient(var(--grid) 1.1px,transparent 1.2px);background-size:26px 26px}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.6}
 a{color:inherit}
 .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
 h1,h2,h3{font-family:var(--display);font-weight:400;letter-spacing:-.01em;text-wrap:balance;margin:0}
 .eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
 p{margin:0}
 .btn{display:inline-flex;align-items:center;gap:10px;padding:13px 20px;border-radius:999px;font-weight:600;text-decoration:none;font-size:15px;border:1px solid transparent}
-.btn:focus-visible,a:focus-visible{outline:2px solid var(--coral);outline-offset:3px}
+.btn:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .btn-primary{background:var(--ink);color:var(--paper)}
 .btn-secondary{border-color:var(--line);background:var(--frame);color:var(--ink)}
 
@@ -35,20 +34,16 @@ header.top{display:flex;align-items:center;justify-content:space-between;padding
 .brand img{width:28px;height:28px;display:block}
 nav a{text-decoration:none;font-size:14px;color:var(--ink-2);margin-left:22px}
 
-.hero{padding:56px 0 24px;display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:40px;align-items:end}
-.hero h1{font-size:clamp(44px,6.4vw,84px);line-height:.98;font-variation-settings:"opsz" 144,"SOFT" 40}
-.hero h1 .stroke{position:relative;white-space:nowrap}
-.hero h1 .stroke svg{position:absolute;left:-2%;bottom:-.12em;width:104%;height:.36em;overflow:visible}
-.hero h1 .stroke path{fill:none;stroke:var(--coral);stroke-width:7;stroke-linecap:round;stroke-dasharray:600;stroke-dashoffset:600;animation:draw 1s .35s ease-out forwards}
-@keyframes draw{to{stroke-dashoffset:0}}
-.lede{font-size:20px;color:var(--ink-2);max-width:34ch;margin-top:22px}
-.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px;align-items:center}
+.hero{padding:88px 0 30px;max-width:760px}
+.hero h1{font-size:clamp(42px,5.6vw,72px);line-height:1.04;font-variation-settings:"opsz" 144,"SOFT" 30}
+.hero h1 .stroke{color:var(--accent)}
+.hero h1 .stroke svg{display:none}
+.lede{font-size:20px;color:var(--ink-2);max-width:40ch;margin-top:24px}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px;align-items:center}
 .cta small{color:var(--muted);font-size:13px}
-.note{background:var(--note);color:var(--note-ink);padding:22px 24px 26px;border-radius:4px;font-family:var(--display);font-size:22px;line-height:1.25;font-variation-settings:"SOFT" 60;transform:rotate(-1.4deg);box-shadow:0 14px 28px -18px rgba(38,54,74,.5);max-width:340px;justify-self:end}
-.note small{display:block;font-family:var(--body);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;opacity:.7}
 
-.shot{margin:34px 0 0;position:relative}
-.shot .frame{background:var(--frame);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.shot{margin:56px 0 0;position:relative}
+.shot .frame{background:var(--frame);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .shot .bar{display:flex;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line)}
 .shot .bar i{width:11px;height:11px;border-radius:50%;background:var(--line)}
 .shot img{display:block;width:100%;height:auto}
@@ -57,7 +52,7 @@ nav a{text-decoration:none;font-size:14px;color:var(--ink-2);margin-left:22px}
 .callout b{color:var(--ink);font-weight:600;display:block}
 .callout .dot{flex:0 0 12px;width:12px;height:12px;border-radius:50%;margin-top:6px}
 
-section.pillars{padding:110px 0 40px}
+section.pillars{padding:120px 0 40px}
 .pillars h2{font-size:clamp(34px,4.2vw,54px);max-width:18ch;font-variation-settings:"opsz" 144}
 .pillars .sub{color:var(--ink-2);font-size:19px;max-width:52ch;margin-top:16px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:54px}
@@ -70,7 +65,7 @@ section.pillars{padding:110px 0 40px}
 .pillar li::before{content:"";position:absolute;left:0;top:.62em;width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.45}
 
 section.copilot{padding:70px 0}
-.copilot .panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:center;background:var(--paper-2);border:1px solid var(--line);border-radius:18px;padding:52px}
+.copilot .panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center;background:var(--paper-2);border-radius:16px;padding:56px}
 .copilot h2{font-size:clamp(30px,3.6vw,46px);font-variation-settings:"opsz" 144}
 .copilot p{color:var(--ink-2);margin-top:16px;font-size:17px}
 .chat{background:var(--frame);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px;font-size:15px}
@@ -80,7 +75,7 @@ section.copilot{padding:70px 0}
 .chat .tool span:last-child{color:var(--sage);font-weight:600}
 .chat .allow{display:flex;gap:8px;justify-content:flex-end}
 .chat .allow span{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line)}
-.chat .allow span.on{background:var(--violet);color:#fff;border-color:transparent}
+.chat .allow span.on{background:var(--accent);color:#fff;border-color:transparent}
 
 section.private{padding:60px 0 90px}
 .private h2{font-size:clamp(30px,3.6vw,46px);font-variation-settings:"opsz" 144;max-width:20ch}
@@ -94,12 +89,11 @@ footer{border-top:1px solid var(--line);padding:34px 0 60px;display:flex;justify
 footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
 
 @media (max-width:900px){
-  .hero{grid-template-columns:1fr;gap:28px}.note{justify-self:start;transform:rotate(-1deg)}
+  .hero{padding-top:48px}
   .callouts,.grid3,.facts{grid-template-columns:1fr}
   .copilot .panel{grid-template-columns:1fr;padding:30px}
   nav{display:none}
 }
-@media (prefers-reduced-motion:reduce){.hero h1 .stroke path{animation:none;stroke-dashoffset:0}}
 </style>
 
 <div class="wrap">
@@ -119,7 +113,6 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
       <small>Apple silicon · macOS 13 or later · signed and notarized</small>
     </div>
   </div>
-  <aside class="note"><small>From the whiteboard</small>Gmail on the left, Claude on the right, the notes in the middle. I haven't opened another app since lunch.</aside>
 </section>
 
 <div class="shot">
@@ -128,7 +121,7 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
     <img src="hero.png" alt="Just Zen: a sidebar of web apps on the left, the whiteboard in the centre, and Claude Code in a pane on the right, all in one window" width="1622" height="932">
   </div>
   <div class="callouts">
-    <div class="callout"><span class="dot" style="background:var(--coral)"></span><div><b>Left: your apps</b>Gmail, Outlook, Slack, WhatsApp, Teams, and any website you add. Each keeps its own login.</div></div>
+    <div class="callout"><span class="dot" style="background:var(--accent)"></span><div><b>Left: your apps</b>Gmail, Outlook, Slack, WhatsApp, Teams, and any website you add. Each keeps its own login.</div></div>
     <div class="callout"><span class="dot" style="background:var(--sage)"></span><div><b>Centre: your thinking</b>Scribble on an infinite whiteboard, open your notes vault, or read a PDF. It all stays on this Mac.</div></div>
     <div class="callout"><span class="dot" style="background:var(--violet)"></span><div><b>Right: Claude</b>Claude Code sees the folder you choose, and works while your apps stay open beside it.</div></div>
   </div>
@@ -139,7 +132,7 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
   <h2 style="margin-top:14px">Switching between apps is where the day disappears.</h2>
   <p class="sub">Just Zen puts the things you actually use next to each other, so a message, the file it's about, the note you're writing and the assistant helping you are all on screen at once.</p>
   <div class="grid3">
-    <div class="pillar"><span class="tag" style="background:var(--coral)"></span><h3>All your apps in one place</h3><p>Pick from a library of a hundred web apps or add any website. Every one lives in the sidebar with unread counts and notifications, and opens in its own pane inside Just Zen.</p>
+    <div class="pillar"><span class="tag" style="background:var(--accent)"></span><h3>All your apps in one place</h3><p>Pick from a library of a hundred web apps or add any website. Every one lives in the sidebar with unread counts and notifications, and opens in its own pane inside Just Zen.</p>
       <ul><li>Each app keeps its own login and cookies unless you choose to share them</li><li>Personal and Work profiles for the accounts you keep apart</li><li>Links that try to launch a desktop app stay inside instead</li></ul></div>
     <div class="pillar"><span class="tag" style="background:var(--violet)"></span><h3>Claude as your copilot</h3><p>Claude Code runs in a pane beside your apps with access to the folder you give it. Ask it to read your notes, draft a reply, change a file or build something, and it does it right there.</p>
       <ul><li>Chat for everyday work, Terminal when you want the real thing</li><li>Read-only, Notes-only or Full access, your choice per folder</li><li>Every command it wants to run is shown to you first</li></ul></div>
