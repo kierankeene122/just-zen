@@ -1,0 +1,502 @@
+[
+  {
+    "id": "web-gmail",
+    "source": "https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico",
+    "bytes": 8442
+  },
+  {
+    "id": "web-zoho-mail",
+    "source": "https://www.google.com/s2/favicons?domain=www.zoho.com&sz=128",
+    "bytes": 2984
+  },
+  {
+    "id": "web-protonmail",
+    "source": "https://www.google.com/s2/favicons?domain=proton.me&sz=128",
+    "bytes": 2941
+  },
+  {
+    "id": "web-microsoft-outlook",
+    "source": "https://www.google.com/s2/favicons?domain=outlook.com&sz=128",
+    "bytes": 17824
+  },
+  {
+    "id": "web-microsoft-teams",
+    "source": "https://www.google.com/s2/favicons?domain=teams.microsoft.com&sz=128",
+    "bytes": 3914
+  },
+  {
+    "id": "web-discord",
+    "source": "https://www.google.com/s2/favicons?domain=discord.com&sz=128",
+    "bytes": 1306
+  },
+  {
+    "id": "web-slack",
+    "source": "https://www.google.com/s2/favicons?domain=app.slack.com&sz=128",
+    "bytes": 823
+  },
+  {
+    "id": "web-yahoo-mail",
+    "source": "https://www.google.com/s2/favicons?domain=mail.yahoo.com&sz=128",
+    "bytes": 402
+  },
+  {
+    "id": "web-hangouts-chat",
+    "source": "https://www.google.com/s2/favicons?domain=chat.google.com&sz=128",
+    "bytes": 733
+  },
+  {
+    "id": "web-zoom",
+    "source": "https://www.google.com/s2/favicons?domain=zoom.us&sz=128",
+    "bytes": 1575
+  },
+  {
+    "id": "web-cron",
+    "source": "https://www.google.com/s2/favicons?domain=www.notion.com&sz=128",
+    "bytes": 1194
+  },
+  {
+    "id": "web-calendly",
+    "source": "https://www.google.com/s2/favicons?domain=calendly.com&sz=128",
+    "bytes": 17973
+  },
+  {
+    "id": "web-telegram",
+    "source": "https://www.google.com/s2/favicons?domain=telegram.org&sz=128",
+    "bytes": 1895
+  },
+  {
+    "id": "web-notion",
+    "source": "https://www.google.com/s2/favicons?domain=www.notion.com&sz=128",
+    "bytes": 1194
+  },
+  {
+    "id": "web-trello",
+    "source": "https://www.google.com/s2/favicons?domain=trello.com&sz=128",
+    "bytes": 596
+  },
+  {
+    "id": "web-messenger",
+    "source": "https://www.google.com/s2/favicons?domain=messenger.com&sz=128",
+    "bytes": 5216
+  },
+  {
+    "id": "web-hangouts-meet",
+    "source": "https://www.google.com/s2/favicons?domain=meet.google.com&sz=128",
+    "bytes": 1536
+  },
+  {
+    "id": "web-google-calendar",
+    "source": "https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_31_2x.png",
+    "bytes": 1476
+  },
+  {
+    "id": "web-clickup",
+    "source": "https://www.google.com/s2/favicons?domain=clickup.com&sz=128",
+    "bytes": 2008
+  },
+  {
+    "id": "web-mondaycom",
+    "source": "https://www.google.com/s2/favicons?domain=monday.com&sz=128",
+    "bytes": 1258
+  },
+  {
+    "id": "web-airtable",
+    "source": "https://www.google.com/s2/favicons?domain=airtable.com&sz=128",
+    "bytes": 1312
+  },
+  {
+    "id": "web-microsoft-todo",
+    "source": "https://www.google.com/s2/favicons?domain=to-do.live.com&sz=128",
+    "bytes": 8624
+  },
+  {
+    "id": "web-google-keep",
+    "source": "https://www.gstatic.com/images/branding/product/2x/keep_2020q4_48dp.png",
+    "bytes": 1363
+  },
+  {
+    "id": "web-google-tasks",
+    "source": "https://www.google.com/s2/favicons?domain=tasks.google.com&sz=128",
+    "bytes": 880
+  },
+  {
+    "id": "web-dropbox",
+    "source": "https://www.google.com/s2/favicons?domain=dropbox.com&sz=128",
+    "bytes": 1379
+  },
+  {
+    "id": "web-miro",
+    "source": "https://www.google.com/s2/favicons?domain=miro.com&sz=128",
+    "bytes": 3214
+  },
+  {
+    "id": "web-google-drive",
+    "source": "https://ssl.gstatic.com/images/branding/product/2x/hh_drive_96dp.png",
+    "bytes": 7088
+  },
+  {
+    "id": "web-evernote",
+    "source": "https://www.google.com/s2/favicons?domain=www.evernote.com&sz=128",
+    "bytes": 1211
+  },
+  {
+    "id": "web-microsoft-onedrive",
+    "source": "https://www.google.com/s2/favicons?domain=onedrive.live.com&sz=128",
+    "bytes": 842
+  },
+  {
+    "id": "web-google-forms",
+    "source": "https://ssl.gstatic.com/docs/spreadsheets/forms/favicon_qp2.png",
+    "bytes": 1465
+  },
+  {
+    "id": "web-google-docs",
+    "source": "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico",
+    "bytes": 630
+  },
+  {
+    "id": "web-box",
+    "source": "https://www.google.com/s2/favicons?domain=www.box.com&sz=128",
+    "bytes": 1366
+  },
+  {
+    "id": "web-icloud",
+    "source": "https://www.google.com/s2/favicons?domain=www.icloud.com&sz=128",
+    "bytes": 2429
+  },
+  {
+    "id": "web-google-slides",
+    "source": "https://ssl.gstatic.com/docs/presentations/images/favicon5.ico",
+    "bytes": 632
+  },
+  {
+    "id": "web-google-sheets",
+    "source": "https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico",
+    "bytes": 692
+  },
+  {
+    "id": "web-microsoft-word",
+    "source": "https://www.google.com/s2/favicons?domain=word.cloud.microsoft&sz=128",
+    "bytes": 8482
+  },
+  {
+    "id": "web-microsoft-excel",
+    "source": "https://www.google.com/s2/favicons?domain=excel.cloud.microsoft&sz=128",
+    "bytes": 3450
+  },
+  {
+    "id": "web-microsoft-sharepoint",
+    "source": "https://www.google.com/s2/favicons?domain=sharepoint.com&sz=128",
+    "bytes": 842
+  },
+  {
+    "id": "web-microsoft-onenote",
+    "source": "https://www.google.com/s2/favicons?domain=www.onenote.com&sz=128",
+    "bytes": 3355
+  },
+  {
+    "id": "web-microsoft-powerpoint",
+    "source": "https://www.google.com/s2/favicons?domain=powerpoint.cloud.microsoft&sz=128",
+    "bytes": 4185
+  },
+  {
+    "id": "web-chatgpt",
+    "source": "https://www.google.com/s2/favicons?domain=chatgpt.com&sz=128",
+    "bytes": 2232
+  },
+  {
+    "id": "web-google-bard",
+    "source": "https://www.google.com/s2/favicons?domain=gemini.google.com&sz=128",
+    "bytes": 2774
+  },
+  {
+    "id": "web-claude",
+    "source": "https://www.google.com/s2/favicons?domain=claude.ai&sz=128",
+    "bytes": 3116
+  },
+  {
+    "id": "web-perplexity-ai",
+    "source": "https://www.google.com/s2/favicons?domain=www.perplexity.ai&sz=128",
+    "bytes": 1558
+  },
+  {
+    "id": "web-canva",
+    "source": "https://www.google.com/s2/favicons?domain=www.canva.com&sz=128",
+    "bytes": 18038
+  },
+  {
+    "id": "web-adobe-spark",
+    "source": "https://www.google.com/s2/favicons?domain=www.adobe.com&sz=128",
+    "bytes": 1212
+  },
+  {
+    "id": "web-adobe-acrobat",
+    "source": "https://www.google.com/s2/favicons?domain=acrobat.adobe.com&sz=128",
+    "bytes": 1072
+  },
+  {
+    "id": "web-deepseek",
+    "source": "https://www.google.com/s2/favicons?domain=deepseek.com&sz=128",
+    "bytes": 1286
+  },
+  {
+    "id": "web-photopea",
+    "source": "https://www.google.com/s2/favicons?domain=www.photopea.com&sz=128",
+    "bytes": 2394
+  },
+  {
+    "id": "web-figma",
+    "source": "https://www.google.com/s2/favicons?domain=www.figma.com&sz=128",
+    "bytes": 1002
+  },
+  {
+    "id": "web-grammarly",
+    "source": "https://www.google.com/s2/favicons?domain=grammarly.com&sz=128",
+    "bytes": 3117
+  },
+  {
+    "id": "web-gitlab",
+    "source": "https://www.google.com/s2/favicons?domain=gitlab.com&sz=128",
+    "bytes": 1203
+  },
+  {
+    "id": "web-cloudflare",
+    "source": "https://www.google.com/s2/favicons?domain=cloudflare.com&sz=128",
+    "bytes": 2165
+  },
+  {
+    "id": "web-github",
+    "source": "https://www.google.com/s2/favicons?domain=github.com&sz=128",
+    "bytes": 519
+  },
+  {
+    "id": "web-vercel",
+    "source": "https://www.google.com/s2/favicons?domain=vercel.com&sz=128",
+    "bytes": 629
+  },
+  {
+    "id": "web-aws-console",
+    "source": "https://www.google.com/s2/favicons?domain=aws.amazon.com&sz=128",
+    "bytes": 1734
+  },
+  {
+    "id": "web-replit",
+    "source": "https://www.google.com/s2/favicons?domain=replit.com&sz=128",
+    "bytes": 417
+  },
+  {
+    "id": "web-netlify",
+    "source": "https://www.google.com/s2/favicons?domain=netlify.com&sz=128",
+    "bytes": 566
+  },
+  {
+    "id": "web-supabase",
+    "source": "https://www.google.com/s2/favicons?domain=supabase.com&sz=128",
+    "bytes": 1140
+  },
+  {
+    "id": "web-microsoft-azure",
+    "source": "https://www.google.com/s2/favicons?domain=portal.azure.com&sz=128",
+    "bytes": 842
+  },
+  {
+    "id": "web-salesforce",
+    "source": "https://www.google.com/s2/favicons?domain=salesforce.com&sz=128",
+    "bytes": 652
+  },
+  {
+    "id": "web-google-cloud-console",
+    "source": "https://www.google.com/s2/favicons?domain=cloud.google.com&sz=128",
+    "bytes": 2510
+  },
+  {
+    "id": "web-jira",
+    "source": "https://www.google.com/s2/favicons?domain=www.atlassian.com&sz=128",
+    "bytes": 988
+  },
+  {
+    "id": "web-shopify",
+    "source": "https://www.google.com/s2/favicons?domain=www.shopify.com&sz=128",
+    "bytes": 2791
+  },
+  {
+    "id": "web-zoho-crm",
+    "source": "https://www.google.com/s2/favicons?domain=www.zoho.com&sz=128",
+    "bytes": 2984
+  },
+  {
+    "id": "web-paypal",
+    "source": "https://www.google.com/s2/favicons?domain=paypal.com&sz=128",
+    "bytes": 1367
+  },
+  {
+    "id": "web-hubspot",
+    "source": "https://www.google.com/s2/favicons?domain=hubspot.com&sz=128",
+    "bytes": 1518
+  },
+  {
+    "id": "web-stripe",
+    "source": "https://www.google.com/s2/favicons?domain=stripe.com&sz=128",
+    "bytes": 580
+  },
+  {
+    "id": "web-google-analytics",
+    "source": "https://www.google.com/s2/favicons?domain=marketingplatform.google.com&sz=128",
+    "bytes": 2689
+  },
+  {
+    "id": "web-mailchimp",
+    "source": "https://www.google.com/s2/favicons?domain=mailchimp.com&sz=128",
+    "bytes": 2825
+  },
+  {
+    "id": "web-quickbooks",
+    "source": "https://www.google.com/s2/favicons?domain=quickbooks.intuit.com&sz=128",
+    "bytes": 1344
+  },
+  {
+    "id": "web-make",
+    "source": "https://www.google.com/s2/favicons?domain=www.make.com&sz=128",
+    "bytes": 9232
+  },
+  {
+    "id": "web-google-ads",
+    "source": "https://www.google.com/s2/favicons?domain=ads.google.com&sz=128",
+    "bytes": 14001
+  },
+  {
+    "id": "web-wordpress-com",
+    "source": "https://www.google.com/s2/favicons?domain=wordpress.com&sz=128",
+    "bytes": 7061
+  },
+  {
+    "id": "web-zapier",
+    "source": "https://www.google.com/s2/favicons?domain=zapier.com&sz=128",
+    "bytes": 1799
+  },
+  {
+    "id": "web-squarespace",
+    "source": "https://www.google.com/s2/favicons?domain=www.squarespace.com&sz=128",
+    "bytes": 1388
+  },
+  {
+    "id": "web-wix",
+    "source": "https://www.google.com/s2/favicons?domain=www.wix.com&sz=128",
+    "bytes": 939
+  },
+  {
+    "id": "web-linkedin",
+    "source": "https://www.google.com/s2/favicons?domain=www.linkedin.com&sz=128",
+    "bytes": 834
+  },
+  {
+    "id": "web-instagram",
+    "source": "https://www.google.com/s2/favicons?domain=www.instagram.com&sz=128",
+    "bytes": 8100
+  },
+  {
+    "id": "web-webflow",
+    "source": "https://www.google.com/s2/favicons?domain=webflow.com&sz=128",
+    "bytes": 858
+  },
+  {
+    "id": "web-twitter",
+    "source": "https://www.google.com/s2/favicons?domain=x.com&sz=128",
+    "bytes": 1024
+  },
+  {
+    "id": "web-reddit",
+    "source": "https://www.google.com/s2/favicons?domain=reddit.com&sz=128",
+    "bytes": 2911
+  },
+  {
+    "id": "web-facebook",
+    "source": "https://www.google.com/s2/favicons?domain=facebook.com&sz=128",
+    "bytes": 1705
+  },
+  {
+    "id": "web-pinterest",
+    "source": "https://www.google.com/s2/favicons?domain=www.pinterest.com&sz=128",
+    "bytes": 1262
+  },
+  {
+    "id": "web-bluesky",
+    "source": "https://www.google.com/s2/favicons?domain=bsky.app&sz=128",
+    "bytes": 1121
+  },
+  {
+    "id": "web-apple-music",
+    "source": "https://www.google.com/s2/favicons?domain=music.apple.com&sz=128",
+    "bytes": 2199
+  },
+  {
+    "id": "web-youtube",
+    "source": "https://www.google.com/s2/favicons?domain=youtube.com&sz=128",
+    "bytes": 794
+  },
+  {
+    "id": "web-spotify",
+    "source": "https://www.google.com/s2/favicons?domain=open.spotify.com&sz=128",
+    "bytes": 2417
+  },
+  {
+    "id": "web-threads-net",
+    "source": "https://www.google.com/s2/favicons?domain=www.threads.com&sz=128",
+    "bytes": 3639
+  },
+  {
+    "id": "web-twitch",
+    "source": "https://www.google.com/s2/favicons?domain=www.twitch.tv&sz=128",
+    "bytes": 336
+  },
+  {
+    "id": "web-aliexpress",
+    "source": "https://www.google.com/s2/favicons?domain=www.aliexpress.com&sz=128",
+    "bytes": 3197
+  },
+  {
+    "id": "web-netflix",
+    "source": "https://www.google.com/s2/favicons?domain=www.netflix.com&sz=128",
+    "bytes": 1468
+  },
+  {
+    "id": "web-amazon",
+    "source": "https://www.google.com/s2/favicons?domain=www.amazon.com&sz=128",
+    "bytes": 658
+  },
+  {
+    "id": "web-tiktok",
+    "source": "https://www.google.com/s2/favicons?domain=www.tiktok.com&sz=128",
+    "bytes": 953
+  },
+  {
+    "id": "web-ebay",
+    "source": "https://www.google.com/s2/favicons?domain=ebay.com&sz=128",
+    "bytes": 176
+  },
+  {
+    "id": "web-duolingo",
+    "source": "https://www.google.com/s2/favicons?domain=www.duolingo.com&sz=128",
+    "bytes": 1716
+  },
+  {
+    "id": "web-whatsapp",
+    "source": "https://www.google.com/s2/favicons?domain=whatsapp.com&sz=128",
+    "bytes": 421
+  },
+  {
+    "id": "web-wikipedia",
+    "source": "https://www.google.com/s2/favicons?domain=www.wikipedia.org&sz=128",
+    "bytes": 1294
+  },
+  {
+    "id": "web-google-maps",
+    "source": "https://www.gstatic.com/images/branding/product/2x/maps_96in128dp.png",
+    "bytes": 13970
+  },
+  {
+    "id": "web-bookingcom",
+    "source": "https://www.google.com/s2/favicons?domain=www.booking.com&sz=128",
+    "bytes": 1023
+  }
+]

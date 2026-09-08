@@ -1,0 +1,99 @@
+{
+  "name": "just-zen",
+  "version": "0.3.0",
+  "description": "A calm local workspace for Claude Code, your vault, and web apps",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test *.test.cjs",
+    "rebuild": "electron-rebuild -f -w node-pty",
+    "smoke": "electron . --smoke",
+    "package": "node scripts/package.cjs",
+    "dist": "electron-builder --mac dmg zip --arm64 --publish never",
+    "dist:publish": "electron-builder --mac dmg zip --arm64 --publish always",
+    "security:audit": "npm audit --omit=dev",
+    "fuses:check": "npx @electron/fuses read --app '../../outputs/Just Zen-darwin-arm64/Just Zen.app'",
+    "update:electron": "node scripts/update-electron.cjs",
+    "update:agent": "node scripts/install-update-agent.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "productName": "Just Zen",
+  "build": {
+    "appId": "com.hearth.workspace",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/**/*",
+      "document-worker.cjs"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "loadBrowserProcessSpecificV8Snapshot": false,
+      "grantFileProtocolExtraPrivileges": true,
+      "resetAdHocDarwinSignature": true
+    },
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "**/*",
+      "!*.test.cjs",
+      "!smoke*",
+      "!.github/**",
+      "!scripts/**",
+      "!release/**",
+      "!SECURITY-REVIEW*.md",
+      "!ADVERSARIAL-RESULTS.md",
+      "!AUDIT-SCOPE.md"
+    ],
+    "mac": {
+      "icon": "assets/justzen.icns",
+      "category": "public.app-category.productivity",
+      "minimumSystemVersion": "13.0",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "notarize": true,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "artifactName": "Just-Zen-${version}-${arch}.${ext}",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "${env.HEARTH_GITHUB_OWNER}",
+        "repo": "${env.HEARTH_GITHUB_REPO}",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.263",
+    "@anthropic-ai/sandbox-runtime": "^0.0.75",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "dompurify": "^3.4.15",
+    "electron-updater": "^6.8.9",
+    "marked": "^18.0.11",
+    "node-pty": "^1.1.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289"
+  },
+  "devDependencies": {
+    "@electron/fuses": "^1.8.0",
+    "@electron/packager": "^20.3.0",
+    "@electron/rebuild": "^4.2.0",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3"
+  }
+}

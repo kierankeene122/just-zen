@@ -1,0 +1,802 @@
+[
+  {
+    "id": "web-gmail",
+    "name": "Gmail",
+    "url": "https://mail.google.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-gmail.png"
+  },
+  {
+    "id": "web-microsoft-outlook",
+    "name": "Microsoft  Outlook",
+    "url": "https://outlook.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-outlook.png"
+  },
+  {
+    "id": "web-protonmail",
+    "name": "Proton Mail",
+    "url": "https://mail.proton.me/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-protonmail.png"
+  },
+  {
+    "id": "web-yahoo-mail",
+    "name": "Yahoo Mail",
+    "url": "https://mail.yahoo.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-yahoo-mail.png"
+  },
+  {
+    "id": "web-zoho-mail",
+    "name": "Zoho Mail",
+    "url": "https://www.zoho.com/mail/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-zoho-mail.png"
+  },
+  {
+    "id": "web-slack",
+    "name": "Slack",
+    "url": "https://app.slack.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-slack.png"
+  },
+  {
+    "id": "web-microsoft-teams",
+    "name": "Microsoft Teams",
+    "url": "https://teams.microsoft.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-teams.png"
+  },
+  {
+    "id": "web-discord",
+    "name": "Discord",
+    "url": "https://discord.com/app",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-discord.png"
+  },
+  {
+    "id": "web-whatsapp",
+    "name": "WhatsApp",
+    "url": "https://web.whatsapp.com/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-whatsapp.png"
+  },
+  {
+    "id": "web-telegram",
+    "name": "Telegram",
+    "url": "https://telegram.org/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-telegram.png"
+  },
+  {
+    "id": "web-hangouts-chat",
+    "name": "Google Chat",
+    "url": "https://chat.google.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-hangouts-chat.png"
+  },
+  {
+    "id": "web-hangouts-meet",
+    "name": "Google Meet",
+    "url": "https://meet.google.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-hangouts-meet.png"
+  },
+  {
+    "id": "web-zoom",
+    "name": "Zoom",
+    "url": "https://zoom.us/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-zoom.png"
+  },
+  {
+    "id": "web-messenger",
+    "name": "Messenger",
+    "url": "https://messenger.com/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-messenger.png"
+  },
+  {
+    "id": "web-google-calendar",
+    "name": "Google Calendar",
+    "url": "https://calendar.google.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-calendar.png"
+  },
+  {
+    "id": "web-cron",
+    "name": "Notion Calendar",
+    "url": "https://www.notion.com/product/calendar",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-cron.png"
+  },
+  {
+    "id": "web-calendly",
+    "name": "Calendly",
+    "url": "https://calendly.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-calendly.png"
+  },
+  {
+    "id": "web-notion",
+    "name": "Notion",
+    "url": "https://www.notion.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-notion.png"
+  },
+  {
+    "id": "web-trello",
+    "name": "Trello",
+    "url": "https://trello.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-trello.png"
+  },
+  {
+    "id": "web-clickup",
+    "name": "ClickUp",
+    "url": "https://clickup.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-clickup.png"
+  },
+  {
+    "id": "web-mondaycom",
+    "name": "monday.com",
+    "url": "https://monday.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-mondaycom.png"
+  },
+  {
+    "id": "web-airtable",
+    "name": "Airtable",
+    "url": "https://airtable.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-airtable.png"
+  },
+  {
+    "id": "web-miro",
+    "name": "Miro",
+    "url": "https://miro.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-miro.png"
+  },
+  {
+    "id": "web-google-keep",
+    "name": "Google Keep",
+    "url": "https://www.google.com/keep/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-keep.png"
+  },
+  {
+    "id": "web-microsoft-todo",
+    "name": "Microsoft To Do",
+    "url": "https://to-do.live.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-todo.png"
+  },
+  {
+    "id": "web-evernote",
+    "name": "Evernote",
+    "url": "https://www.evernote.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-evernote.png"
+  },
+  {
+    "id": "web-google-tasks",
+    "name": "Google Tasks",
+    "url": "https://tasks.google.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-tasks.png"
+  },
+  {
+    "id": "web-google-drive",
+    "name": "Google Drive",
+    "url": "https://drive.google.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-drive.png"
+  },
+  {
+    "id": "web-dropbox",
+    "name": "Dropbox",
+    "url": "https://dropbox.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-dropbox.png"
+  },
+  {
+    "id": "web-microsoft-onedrive",
+    "name": "Microsoft OneDrive",
+    "url": "https://onedrive.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-onedrive.png"
+  },
+  {
+    "id": "web-box",
+    "name": "Box",
+    "url": "https://www.box.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-box.png"
+  },
+  {
+    "id": "web-icloud",
+    "name": "iCloud",
+    "url": "https://www.icloud.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-icloud.png"
+  },
+  {
+    "id": "web-google-docs",
+    "name": "Google Docs",
+    "url": "https://docs.google.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-docs.png"
+  },
+  {
+    "id": "web-google-sheets",
+    "name": "Google Sheets",
+    "url": "https://sheets.google.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-sheets.png"
+  },
+  {
+    "id": "web-google-slides",
+    "name": "Google Slides",
+    "url": "https://slides.google.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-slides.png"
+  },
+  {
+    "id": "web-google-forms",
+    "name": "Google Forms",
+    "url": "https://docs.google.com/forms/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-forms.png"
+  },
+  {
+    "id": "web-microsoft-word",
+    "name": "Microsoft Word Online",
+    "url": "https://word.cloud.microsoft/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-word.png"
+  },
+  {
+    "id": "web-microsoft-excel",
+    "name": "Microsoft Excel Online",
+    "url": "https://excel.cloud.microsoft/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-excel.png"
+  },
+  {
+    "id": "web-microsoft-powerpoint",
+    "name": "Microsoft PowerPoint Online",
+    "url": "https://powerpoint.cloud.microsoft/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-powerpoint.png"
+  },
+  {
+    "id": "web-microsoft-onenote",
+    "name": "Microsoft OneNote",
+    "url": "https://www.onenote.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-onenote.png"
+  },
+  {
+    "id": "web-microsoft-sharepoint",
+    "name": "Microsoft Sharepoint",
+    "url": "https://www.microsoft.com/en-us/microsoft-365/sharepoint/collaboration",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-sharepoint.png"
+  },
+  {
+    "id": "web-chatgpt",
+    "name": "ChatGPT",
+    "url": "https://chatgpt.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-chatgpt.png"
+  },
+  {
+    "id": "web-claude",
+    "name": "Claude",
+    "url": "https://claude.ai/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-claude.png"
+  },
+  {
+    "id": "web-google-bard",
+    "name": "Google Gemini",
+    "url": "https://gemini.google.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-bard.png"
+  },
+  {
+    "id": "web-perplexity-ai",
+    "name": "Perplexity",
+    "url": "https://www.perplexity.ai/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-perplexity-ai.png"
+  },
+  {
+    "id": "web-deepseek",
+    "name": "DeepSeek",
+    "url": "https://deepseek.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-deepseek.png"
+  },
+  {
+    "id": "web-canva",
+    "name": "Canva",
+    "url": "https://www.canva.com/",
+    "category": "Graphics & Design",
+    "kind": "web",
+    "icon": "assets/app-icons/web-canva.png"
+  },
+  {
+    "id": "web-figma",
+    "name": "Figma",
+    "url": "https://www.figma.com/",
+    "category": "Graphics & Design",
+    "kind": "web",
+    "icon": "assets/app-icons/web-figma.png"
+  },
+  {
+    "id": "web-adobe-spark",
+    "name": "Adobe Express",
+    "url": "https://www.adobe.com/express/",
+    "category": "Photo & Video",
+    "kind": "web",
+    "icon": "assets/app-icons/web-adobe-spark.png"
+  },
+  {
+    "id": "web-adobe-acrobat",
+    "name": "Adobe Acrobat",
+    "url": "https://acrobat.adobe.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-adobe-acrobat.png"
+  },
+  {
+    "id": "web-photopea",
+    "name": "Photopea",
+    "url": "https://www.photopea.com/",
+    "category": "Graphics & Design",
+    "kind": "web",
+    "icon": "assets/app-icons/web-photopea.png"
+  },
+  {
+    "id": "web-grammarly",
+    "name": "Grammarly",
+    "url": "https://grammarly.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-grammarly.png"
+  },
+  {
+    "id": "web-github",
+    "name": "GitHub",
+    "url": "https://github.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-github.png"
+  },
+  {
+    "id": "web-gitlab",
+    "name": "GitLab",
+    "url": "https://about.gitlab.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-gitlab.png"
+  },
+  {
+    "id": "web-replit",
+    "name": "Replit",
+    "url": "https://replit.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-replit.png"
+  },
+  {
+    "id": "web-vercel",
+    "name": "Vercel",
+    "url": "https://vercel.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-vercel.png"
+  },
+  {
+    "id": "web-netlify",
+    "name": "Netlify",
+    "url": "https://netlify.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-netlify.png"
+  },
+  {
+    "id": "web-cloudflare",
+    "name": "Cloudflare",
+    "url": "https://cloudflare.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-cloudflare.png"
+  },
+  {
+    "id": "web-supabase",
+    "name": "Supabase",
+    "url": "https://supabase.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-supabase.png"
+  },
+  {
+    "id": "web-aws-console",
+    "name": "AWS Console",
+    "url": "https://aws.amazon.com/console/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-aws-console.png"
+  },
+  {
+    "id": "web-google-cloud-console",
+    "name": "Google Cloud",
+    "url": "https://cloud.google.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-cloud-console.png"
+  },
+  {
+    "id": "web-microsoft-azure",
+    "name": "Microsoft Azure",
+    "url": "https://azure.microsoft.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-microsoft-azure.png"
+  },
+  {
+    "id": "web-jira",
+    "name": "Jira",
+    "url": "https://www.atlassian.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-jira.png"
+  },
+  {
+    "id": "web-salesforce",
+    "name": "Salesforce",
+    "url": "https://salesforce.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-salesforce.png"
+  },
+  {
+    "id": "web-hubspot",
+    "name": "Hubspot",
+    "url": "https://hubspot.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-hubspot.png"
+  },
+  {
+    "id": "web-zoho-crm",
+    "name": "Zoho CRM",
+    "url": "https://www.zoho.com/crm/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-zoho-crm.png"
+  },
+  {
+    "id": "web-shopify",
+    "name": "Shopify",
+    "url": "https://www.shopify.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-shopify.png"
+  },
+  {
+    "id": "web-stripe",
+    "name": "Stripe",
+    "url": "https://stripe.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-stripe.png"
+  },
+  {
+    "id": "web-paypal",
+    "name": "PayPal",
+    "url": "https://paypal.com/",
+    "category": "Finance",
+    "kind": "web",
+    "icon": "assets/app-icons/web-paypal.png"
+  },
+  {
+    "id": "web-quickbooks",
+    "name": "QuickBooks Online",
+    "url": "https://quickbooks.intuit.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-quickbooks.png"
+  },
+  {
+    "id": "web-google-analytics",
+    "name": "Google Analytics",
+    "url": "https://marketingplatform.google.com/about/analytics/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-analytics.png"
+  },
+  {
+    "id": "web-google-ads",
+    "name": "Google Ads",
+    "url": "https://ads.google.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-ads.png"
+  },
+  {
+    "id": "web-mailchimp",
+    "name": "Mailchimp",
+    "url": "https://mailchimp.com/",
+    "category": "Business",
+    "kind": "web",
+    "icon": "assets/app-icons/web-mailchimp.png"
+  },
+  {
+    "id": "web-zapier",
+    "name": "Zapier",
+    "url": "https://zapier.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-zapier.png"
+  },
+  {
+    "id": "web-make",
+    "name": "Make",
+    "url": "https://www.make.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-make.png"
+  },
+  {
+    "id": "web-wordpress-com",
+    "name": "WordPress.com",
+    "url": "https://wordpress.com/",
+    "category": "Productivity",
+    "kind": "web",
+    "icon": "assets/app-icons/web-wordpress-com.png"
+  },
+  {
+    "id": "web-squarespace",
+    "name": "Squarespace",
+    "url": "https://www.squarespace.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-squarespace.png"
+  },
+  {
+    "id": "web-wix",
+    "name": "Wix",
+    "url": "https://www.wix.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-wix.png"
+  },
+  {
+    "id": "web-webflow",
+    "name": "Webflow",
+    "url": "https://webflow.com/",
+    "category": "Software Development",
+    "kind": "web",
+    "icon": "assets/app-icons/web-webflow.png"
+  },
+  {
+    "id": "web-linkedin",
+    "name": "LinkedIn",
+    "url": "https://www.linkedin.com/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-linkedin.png"
+  },
+  {
+    "id": "web-facebook",
+    "name": "Facebook",
+    "url": "https://facebook.com/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-facebook.png"
+  },
+  {
+    "id": "web-instagram",
+    "name": "Instagram",
+    "url": "https://www.instagram.com/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-instagram.png"
+  },
+  {
+    "id": "web-twitter",
+    "name": "X",
+    "url": "https://x.com/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-twitter.png"
+  },
+  {
+    "id": "web-reddit",
+    "name": "Reddit",
+    "url": "https://reddit.com/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-reddit.png"
+  },
+  {
+    "id": "web-pinterest",
+    "name": "Pinterest",
+    "url": "https://www.pinterest.com/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-pinterest.png"
+  },
+  {
+    "id": "web-tiktok",
+    "name": "TikTok",
+    "url": "https://www.tiktok.com/",
+    "category": "Entertainment",
+    "kind": "web",
+    "icon": "assets/app-icons/web-tiktok.png"
+  },
+  {
+    "id": "web-threads-net",
+    "name": "Threads",
+    "url": "https://www.threads.com/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-threads-net.png"
+  },
+  {
+    "id": "web-bluesky",
+    "name": "Bluesky",
+    "url": "https://bsky.app/",
+    "category": "Social Networking",
+    "kind": "web",
+    "icon": "assets/app-icons/web-bluesky.png"
+  },
+  {
+    "id": "web-youtube",
+    "name": "YouTube",
+    "url": "https://youtube.com/",
+    "category": "Entertainment",
+    "kind": "web",
+    "icon": "assets/app-icons/web-youtube.png"
+  },
+  {
+    "id": "web-spotify",
+    "name": "Spotify",
+    "url": "https://open.spotify.com/",
+    "category": "Entertainment",
+    "kind": "web",
+    "icon": "assets/app-icons/web-spotify.png"
+  },
+  {
+    "id": "web-apple-music",
+    "name": "Apple Music",
+    "url": "https://music.apple.com/",
+    "category": "Entertainment",
+    "kind": "web",
+    "icon": "assets/app-icons/web-apple-music.png"
+  },
+  {
+    "id": "web-netflix",
+    "name": "Netflix",
+    "url": "https://www.netflix.com/",
+    "category": "Entertainment",
+    "kind": "web",
+    "icon": "assets/app-icons/web-netflix.png"
+  },
+  {
+    "id": "web-twitch",
+    "name": "Twitch",
+    "url": "https://www.twitch.tv/",
+    "category": "Entertainment",
+    "kind": "web",
+    "icon": "assets/app-icons/web-twitch.png"
+  },
+  {
+    "id": "web-amazon",
+    "name": "Amazon Shopping",
+    "url": "https://www.amazon.com/",
+    "category": "Shopping",
+    "kind": "web",
+    "icon": "assets/app-icons/web-amazon.png"
+  },
+  {
+    "id": "web-ebay",
+    "name": "eBay",
+    "url": "https://ebay.com/",
+    "category": "Shopping",
+    "kind": "web",
+    "icon": "assets/app-icons/web-ebay.png"
+  },
+  {
+    "id": "web-aliexpress",
+    "name": "AliExpress",
+    "url": "https://www.aliexpress.com/",
+    "category": "Shopping",
+    "kind": "web",
+    "icon": "assets/app-icons/web-aliexpress.png"
+  },
+  {
+    "id": "web-bookingcom",
+    "name": "Booking.com",
+    "url": "https://www.booking.com/",
+    "category": "Travel",
+    "kind": "web",
+    "icon": "assets/app-icons/web-bookingcom.png"
+  },
+  {
+    "id": "web-google-maps",
+    "name": "Google Maps",
+    "url": "https://www.google.com/maps/about/",
+    "category": "Travel",
+    "kind": "web",
+    "icon": "assets/app-icons/web-google-maps.png"
+  },
+  {
+    "id": "web-duolingo",
+    "name": "Duolingo",
+    "url": "https://www.duolingo.com/",
+    "category": "Education",
+    "kind": "web",
+    "icon": "assets/app-icons/web-duolingo.png"
+  },
+  {
+    "id": "web-wikipedia",
+    "name": "Wikipedia",
+    "url": "https://www.wikipedia.org/",
+    "category": "Reference",
+    "kind": "web",
+    "icon": "assets/app-icons/web-wikipedia.png"
+  }
+]
