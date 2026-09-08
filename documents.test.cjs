@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {promisify}=require('node:util'),exec=promisify(require('node:child_process').execFile);
 const {PDFDocument}=require('pdf-lib'),{createDocuments}=require('./documents.cjs');
-test('local document copies support TXT, DOCX, RTF and annotated PDF without changing originals',async()=>{
+test('local document copies support TXT, DOCX, RTF and annotated PDF without changing originals',{skip:process.platform!=='darwin'},async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'zen-doc-test-'));try{
   for(const type of ['txt','docx','rtf','pdf']){
    const original=path.join(dir,'source.'+type),dest=path.join(dir,'copy.'+type);

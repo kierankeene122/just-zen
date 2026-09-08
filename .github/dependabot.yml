@@ -8,15 +8,24 @@ updates:
     cooldown:
       default-days: 7
       semver-patch-days: 3
+    # One pull request per week for all minor and patch updates means one signed release per week, not one per dependency.
     groups:
-      electron-runtime:
+      weekly-minor-and-patch:
         patterns:
-          - electron
-          - electron-updater
-          - electron-builder
+          - "*"
+        update-types:
+          - minor
+          - patch
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      weekly-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

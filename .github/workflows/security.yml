@@ -10,9 +10,10 @@ on:
 permissions:
   contents: read
 
+# Linux runners cost a tenth of macOS ones. Only the macOS-specific tests (textutil, sandbox-exec, Seatbelt) run on macOS.
 jobs:
-  dependencies-and-tests:
-    runs-on: macos-15
+  tests:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -22,16 +23,27 @@ jobs:
       - run: npm ci
       - run: npm audit --omit=dev
       - run: npm test
+
+  macos-tests:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --test documents.test.cjs document-isolation.test.cjs
       - run: RUN_SRT=1 node --test sandbox-integration.test.cjs
 
   codeql:
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: github/codeql-action/init@5ba2889ada762081db2c4f32a729827dce632c7b # v3
+      - uses: github/codeql-action/init@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         with:
           languages: javascript-typescript
           config-file: ./.github/codeql/codeql-config.yml

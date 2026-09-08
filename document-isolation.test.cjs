@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises');
 const {promisify}=require('node:util'),exec=promisify(require('node:child_process').execFile),{profile}=require('./document-helper.cjs');
-test('converter sandbox denies unrelated file reads, writes and network',async()=>{
+test('converter sandbox denies unrelated file reads, writes and network',{skip:process.platform!=='darwin'},async()=>{
  const job=await fs.mkdtemp('/private/tmp/zen-isolation-'),outside=await fs.mkdtemp('/private/tmp/zen-private-');
  try{
   await fs.writeFile(outside+'/secret','private');await fs.writeFile(job+'/sandbox.sb',profile(job));
