@@ -13,7 +13,7 @@
   <div>
     <div class="eyebrow">A calm workspace for Mac</div>
     <h1 style="margin-top:18px">Everything you work in.<br><span class="stroke">One window.<svg viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true"><path d="M4 16 C 60 6, 120 20, 180 10 S 270 12, 296 8"/></svg></span></h1>
-    <p class="lede">Your apps, your files, your notes and tasks, with Claude Code working alongside you. Nothing to switch to, nowhere else to go.</p>
+    <p class="lede">Your apps, your files, your notes and tasks, with Claude Code working alongside you. Select anything, anywhere, and send it to Claude. Nothing to switch to, nowhere else to go.</p>
     <div class="cta">
       <a class="btn btn-primary" href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg" download>Download for Mac</a>
       <a class="btn btn-secondary" href="security.html">How it keeps things private</a>
@@ -26,7 +26,7 @@
   <div class="tour-head"><h2>Five things you do all day. One window.</h2><div class="tabs" role="tablist" aria-label="Parts of the window"></div></div>
   <div class="frame">
     <div class="bar"><i></i><i></i><i></i></div>
-    <div class="pic"><img src="hero.png" alt="Just Zen: a sidebar of web apps on the left, the whiteboard in the centre, and Claude Code in a pane on the right, all in one window" width="1622" height="932">
+    <div class="pic"><img src="hero.png" alt="Just Zen: web apps down the left, a page open in the centre with text selected and a right-click menu offering Send Selection to Claude, and the selection sitting in the Claude pane on the right with Summarise, Draft a reply and Turn into tasks actions" width="1435" height="933">
     <div class="spot" aria-hidden="true" hidden></div></div>
   </div>
   <div class="caption" aria-live="polite"><b></b><p></p></div>
@@ -35,11 +35,11 @@
 (()=>{
   // Regions are percentages of the screenshot, so the highlight lands on the same part at any size.
   const stops=[
-    ['Whiteboard',{x:4.1,y:6.9,w:66.6,h:89.9},'Think out loud on an infinite canvas: sketches, sticky notes and rough plans, in the centre of everything.'],
-    ['Claude',{x:70.7,y:6.9,w:24.1,h:89.9},'Claude Code lives in the right-hand pane. It reads the folder you connect and works while your apps stay open.'],
-    ['Apps',{x:0,y:6.9,w:4.1,h:89.9},'Gmail, Outlook, Slack, WhatsApp, Teams and any website you add sit down the left, each with its own login.'],
-    ['Tasks',{x:94.8,y:6.9,w:2.5,h:89.9},'Your task list slides out from the right rail and stays one click away, whatever you are doing.'],
-    ['Documents',{x:97.3,y:6.9,w:2.7,h:89.9},'Open PDFs and Word files beside your apps, annotate them and save a copy, without leaving the window.']
+    ['Centre pane',{x:4.3,y:6,w:61.6,h:91},'Whatever you are working in sits in the centre: a web app, the whiteboard, your notes or a document. Select any text here and send it to Claude.'],
+    ['Claude',{x:66.8,y:6,w:27.2,h:91},'Claude Code lives in the right-hand pane. It reads the folder you connect and works while your apps stay open.'],
+    ['Apps',{x:0,y:6,w:4.3,h:91},'Gmail, Outlook, Slack, WhatsApp, Teams and any website you add sit down the left, each with its own login.'],
+    ['Tasks',{x:94.2,y:6,w:2.9,h:91},'Your task list slides out from the right rail and stays one click away, whatever you are doing.'],
+    ['Documents',{x:97.2,y:6,w:2.8,h:91},'Open PDFs and Word files beside your apps, annotate them and save a copy, without leaving the window.']
   ];
   const tabs=document.querySelector('#tour .tabs'),spot=document.querySelector('#tour .spot'),title=document.querySelector('#tour .caption b'),text=document.querySelector('#tour .caption p');
   let current=0;
@@ -66,13 +66,14 @@
 <section class="copilot" id="copilot">
   <div class="panel">
     <div>
-      <div class="eyebrow">Claude, right there</div>
-      <h2 style="margin-top:14px">It reads what you're reading and works where you're working.</h2>
-      <p>Because Claude sits in the same window as your apps and files, there's no copying and pasting between tools. Point it at your vault or a project folder, keep Slack open on the left, and let it get on with it while you carry on.</p>
+      <div class="eyebrow">Send anything, from anywhere, to Claude</div>
+      <h2 style="margin-top:14px">Select it. Right-click. Summarise, reply, or turn it into tasks.</h2>
+      <p>An email in Gmail, a thread in Slack, a paragraph in a PDF, a note you're writing, output in the terminal: select any of it, right-click or press ⌘⇧A, and it lands in front of Claude with one-click actions. Summarise it, draft a reply, turn it into tasks, or ask your own question. No copying and pasting between tools, and nothing is sent until you choose.</p>
       <p>You stay in control. Claude only sees the folder you connect, runs inside an operating-system sandbox, and asks before it runs a command or touches anything outside your notes.</p>
     </div>
     <div class="chat" aria-label="Example conversation">
-      <div class="you">Summarise this week's meeting notes and draft a status update for the team.</div>
+      <div class="tool"><span>Selected text from Gmail · 199 characters</span><span>Draft a reply</span></div>
+      <div class="you">Draft a reply. Keep my tone plain and friendly.</div>
       <div class="tool"><span>Read · notes/2026-09-week-36.md</span><span>Done</span></div>
       <div class="tool"><span>Write · updates/week-36-status.md</span><span>Waiting for you</span></div>
       <div class="allow"><span>Deny</span><span class="on">Allow once</span></div>
