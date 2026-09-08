@@ -1,0 +1,6 @@
+name: Just Zen CodeQL
+# Test and smoke scripts build throwaway JavaScript from locally generated paths; they never ship.
+paths-ignore:
+  - "**/*.test.cjs"
+  - "smoke*.cjs"
+  - "scripts/**"

@@ -305,7 +305,9 @@ app.whenReady().then(async () => {
       updateServiceBadge('badge-smoke',0);
       await win.webContents.executeJavaScript(`(async()=>{await new Promise(r=>setTimeout(r,100));if(!document.querySelector('[data-badge-key="badge-smoke"]').hidden)throw Error('Read badge not cleared');})()`);
       const connectedBefore=root;const nextFolder=path.join(root,'second-folder');await fs.mkdir(nextFolder,{recursive:true});config.connectedFolders=[connectedBefore,nextFolder];
-      await win.webContents.executeJavaScript(`(async()=>{const state=await window.hearth.call('select-files-folder',${JSON.stringify(nextFolder)});if(state.root!==state.claudeRoot || !state.connectedFolders.includes(${JSON.stringify(connectedBefore)}))throw Error('Folder switch lost history or left Claude stale');})()`);
+      // Paths cross into page script as base64 so no path character can alter the script.
+      const b64=value=>Buffer.from(String(value),'utf8').toString('base64');
+      await win.webContents.executeJavaScript(`(async()=>{const decode=v=>new TextDecoder().decode(Uint8Array.from(atob(v),c=>c.charCodeAt(0)));const state=await window.hearth.call('select-files-folder',decode('${b64(nextFolder)}'));if(state.root!==state.claudeRoot || !state.connectedFolders.includes(decode('${b64(connectedBefore)}')))throw Error('Folder switch lost history or left Claude stale');})()`);
       const pdfTest=await require('pdf-lib').PDFDocument.create();pdfTest.addPage([200,200]);const {PDFName,PDFString}=require('pdf-lib');pdfTest.catalog.set(PDFName.of('OpenAction'),pdfTest.context.obj({S:'JavaScript',JS:PDFString.of('globalThis.__pdfAttack=1')}));
       const pdfBytes=Buffer.from(await pdfTest.save()).toString('base64');
       await win.webContents.executeJavaScript(`document.getElementById('documents-rail').click()`);
