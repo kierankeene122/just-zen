@@ -34,11 +34,18 @@ jobs:
           number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
           test -n "$number"
           echo "number=$number" >> "$GITHUB_OUTPUT"
-      - name: Refuse major version bumps
+      - name: Check for major version bumps
+        id: check
+        continue-on-error: true
         run: node .github/scripts/check-dependency-update.cjs "origin/$BRANCH"
+      - name: Leave the pull request for manual review
+        if: steps.check.outcome == 'failure'
+        run: gh pr comment "${{ steps.pr.outputs.number }}" --body "Not auto-merged: this update crosses a major version. Review it manually; merging it will not trigger a release until the next tag."
       - name: Merge
+        if: steps.check.outcome == 'success'
         run: gh pr merge "${{ steps.pr.outputs.number }}" --squash --delete-branch
       - name: Bump the patch version and tag
+        if: steps.check.outcome == 'success'
         id: tag
         run: |
           git config user.name "github-actions[bot]"
@@ -51,6 +58,7 @@ jobs:
           echo "tag=$version" >> "$GITHUB_OUTPUT"
   release:
     needs: merge
+    if: needs.merge.outputs.tag != ''
     uses: ./.github/workflows/release.yml
     with:
       ref: ${{ needs.merge.outputs.tag }}
