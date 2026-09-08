@@ -1,0 +1,186 @@
+<title>Just Zen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#f7f6f1;--paper-2:#efede6;--line:#dcd9cf;--ink:#26364a;--ink-2:#54627a;--muted:#8a94a6;
+  --coral:#e8875b;--sage:#5d8f77;--violet:#6f74b8;--note:#fff0a8;--note-ink:#4a4118;
+  --grid:rgba(38,54,74,.16);--frame:#ffffff;--shadow:0 30px 70px -30px rgba(38,54,74,.45);
+  --display:"Fraunces",Georgia,"Times New Roman",serif;--body:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#151816;--paper-2:#1d211e;--line:#2e332f;--ink:#e6ebdf;--ink-2:#b7c0ad;--muted:#7f8a78;
+  --coral:#f0966b;--sage:#7fb597;--violet:#9aa0dd;--note:#e9d97a;--note-ink:#2b2610;
+  --grid:rgba(213,221,204,.16);--frame:#22272a;--shadow:0 30px 70px -30px rgba(0,0,0,.8);
+}}
+:root[data-theme="dark"]{
+  --paper:#151816;--paper-2:#1d211e;--line:#2e332f;--ink:#e6ebdf;--ink-2:#b7c0ad;--muted:#7f8a78;
+  --coral:#f0966b;--sage:#7fb597;--violet:#9aa0dd;--note:#e9d97a;--note-ink:#2b2610;
+  --grid:rgba(213,221,204,.16);--frame:#22272a;--shadow:0 30px 70px -30px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;
+  background-image:radial-gradient(var(--grid) 1.1px,transparent 1.2px);background-size:26px 26px}
+a{color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+h1,h2,h3{font-family:var(--display);font-weight:400;letter-spacing:-.01em;text-wrap:balance;margin:0}
+.eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+p{margin:0}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:13px 20px;border-radius:999px;font-weight:600;text-decoration:none;font-size:15px;border:1px solid transparent}
+.btn:focus-visible,a:focus-visible{outline:2px solid var(--coral);outline-offset:3px}
+.btn-primary{background:var(--ink);color:var(--paper)}
+.btn-secondary{border-color:var(--line);background:var(--frame);color:var(--ink)}
+
+header.top{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.14em;font-size:13px}
+.brand i{width:26px;height:26px;border-radius:50%;background:var(--sage);display:inline-block;position:relative}
+.brand i::after{content:"";position:absolute;inset:7px;border-radius:50%;border:2.5px solid var(--paper);border-right-color:transparent;transform:rotate(-30deg)}
+nav a{text-decoration:none;font-size:14px;color:var(--ink-2);margin-left:22px}
+
+.hero{padding:56px 0 24px;display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:40px;align-items:end}
+.hero h1{font-size:clamp(44px,6.4vw,84px);line-height:.98;font-variation-settings:"opsz" 144,"SOFT" 40}
+.hero h1 .stroke{position:relative;white-space:nowrap}
+.hero h1 .stroke svg{position:absolute;left:-2%;bottom:-.12em;width:104%;height:.36em;overflow:visible}
+.hero h1 .stroke path{fill:none;stroke:var(--coral);stroke-width:7;stroke-linecap:round;stroke-dasharray:600;stroke-dashoffset:600;animation:draw 1s .35s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.lede{font-size:20px;color:var(--ink-2);max-width:34ch;margin-top:22px}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px;align-items:center}
+.cta small{color:var(--muted);font-size:13px}
+.note{background:var(--note);color:var(--note-ink);padding:22px 24px 26px;border-radius:4px;font-family:var(--display);font-size:22px;line-height:1.25;font-variation-settings:"SOFT" 60;transform:rotate(-1.4deg);box-shadow:0 14px 28px -18px rgba(38,54,74,.5);max-width:340px;justify-self:end}
+.note small{display:block;font-family:var(--body);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;opacity:.7}
+
+.shot{margin:34px 0 0;position:relative}
+.shot .frame{background:var(--frame);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.shot .bar{display:flex;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.shot .bar i{width:11px;height:11px;border-radius:50%;background:var(--line)}
+.shot img{display:block;width:100%;height:auto}
+.callouts{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:26px}
+.callout{display:flex;gap:12px;align-items:flex-start;font-size:15px;color:var(--ink-2)}
+.callout b{color:var(--ink);font-weight:600;display:block}
+.callout .dot{flex:0 0 12px;width:12px;height:12px;border-radius:50%;margin-top:6px}
+
+section.pillars{padding:110px 0 40px}
+.pillars h2{font-size:clamp(34px,4.2vw,54px);max-width:18ch;font-variation-settings:"opsz" 144}
+.pillars .sub{color:var(--ink-2);font-size:19px;max-width:52ch;margin-top:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:54px}
+.pillar{border-top:2px solid var(--line);padding-top:22px}
+.pillar .tag{display:inline-block;width:38px;height:6px;border-radius:3px;margin-bottom:20px}
+.pillar h3{font-size:26px;line-height:1.15;font-variation-settings:"opsz" 60}
+.pillar p{color:var(--ink-2);margin-top:12px;font-size:16px}
+.pillar ul{margin:16px 0 0;padding:0;list-style:none;font-size:15px;color:var(--ink-2);display:grid;gap:8px}
+.pillar li{padding-left:18px;position:relative}
+.pillar li::before{content:"";position:absolute;left:0;top:.62em;width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.45}
+
+section.copilot{padding:70px 0}
+.copilot .panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:center;background:var(--paper-2);border:1px solid var(--line);border-radius:18px;padding:52px}
+.copilot h2{font-size:clamp(30px,3.6vw,46px);font-variation-settings:"opsz" 144}
+.copilot p{color:var(--ink-2);margin-top:16px;font-size:17px}
+.chat{background:var(--frame);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px;font-size:15px}
+.chat .you{justify-self:end;background:var(--ink);color:var(--paper);padding:11px 15px;border-radius:14px 14px 4px 14px;max-width:88%}
+.chat .claude{background:var(--paper-2);padding:12px 15px;border-radius:14px 14px 14px 4px;max-width:92%;color:var(--ink)}
+.chat .tool{font-size:13px;color:var(--muted);border:1px dashed var(--line);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;gap:12px}
+.chat .tool span:last-child{color:var(--sage);font-weight:600}
+.chat .allow{display:flex;gap:8px;justify-content:flex-end}
+.chat .allow span{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line)}
+.chat .allow span.on{background:var(--violet);color:#fff;border-color:transparent}
+
+section.private{padding:60px 0 90px}
+.private h2{font-size:clamp(30px,3.6vw,46px);font-variation-settings:"opsz" 144;max-width:20ch}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-top:40px}
+.fact{border-top:2px solid var(--line);padding-top:16px}
+.fact b{display:block;font-weight:600;font-size:16px}
+.fact p{color:var(--ink-2);font-size:15px;margin-top:8px}
+.private .more{margin-top:34px;color:var(--ink-2);font-size:15px}
+
+footer{border-top:1px solid var(--line);padding:34px 0 60px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;color:var(--muted);font-size:14px}
+footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
+
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr;gap:28px}.note{justify-self:start;transform:rotate(-1deg)}
+  .callouts,.grid3,.facts{grid-template-columns:1fr}
+  .copilot .panel{grid-template-columns:1fr;padding:30px}
+  nav{display:none}
+}
+@media (prefers-reduced-motion:reduce){.hero h1 .stroke path{animation:none;stroke-dashoffset:0}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="brand"><i></i>JUST ZEN</div>
+  <nav><a href="#apps">Apps</a><a href="#copilot">Claude</a><a href="#private">Privacy</a><a href="https://github.com/kierankeene122/just-zen/releases/latest">Download</a></nav>
+</header>
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">A calm workspace for Mac</div>
+    <h1 style="margin-top:18px">Everything you work in.<br><span class="stroke">One window.<svg viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true"><path d="M4 16 C 60 6, 120 20, 180 10 S 270 12, 296 8"/></svg></span></h1>
+    <p class="lede">Your apps, your files, your notes and tasks, with Claude Code working alongside you. Nothing to switch to, nowhere else to go.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/kierankeene122/just-zen/releases/latest">Download for Mac</a>
+      <a class="btn btn-secondary" href="#private">How it keeps things private</a>
+      <small>Apple silicon · macOS 13 or later · signed and notarized</small>
+    </div>
+  </div>
+  <aside class="note"><small>From the whiteboard</small>Gmail on the left, Claude on the right, the notes in the middle. I haven't opened another app since lunch.</aside>
+</section>
+
+<div class="shot">
+  <div class="frame">
+    <div class="bar"><i></i><i></i><i></i></div>
+    <img src="hero.png" alt="Just Zen: a sidebar of web apps on the left, the whiteboard in the centre, and Claude Code in a pane on the right, all in one window" width="1622" height="932">
+  </div>
+  <div class="callouts">
+    <div class="callout"><span class="dot" style="background:var(--coral)"></span><div><b>Left: your apps</b>Gmail, Outlook, Slack, WhatsApp, Teams, and any website you add. Each keeps its own login.</div></div>
+    <div class="callout"><span class="dot" style="background:var(--sage)"></span><div><b>Centre: your thinking</b>Scribble on an infinite whiteboard, open your notes vault, or read a PDF. It all stays on this Mac.</div></div>
+    <div class="callout"><span class="dot" style="background:var(--violet)"></span><div><b>Right: Claude</b>Claude Code sees the folder you choose, and works while your apps stay open beside it.</div></div>
+  </div>
+</div>
+
+<section class="pillars" id="apps">
+  <div class="eyebrow">Why one window</div>
+  <h2 style="margin-top:14px">Switching between apps is where the day disappears.</h2>
+  <p class="sub">Just Zen puts the things you actually use next to each other, so a message, the file it's about, the note you're writing and the assistant helping you are all on screen at once.</p>
+  <div class="grid3">
+    <div class="pillar"><span class="tag" style="background:var(--coral)"></span><h3>All your apps in one place</h3><p>Pick from a library of a hundred web apps or add any website. Every one lives in the sidebar with unread counts and notifications, and opens in its own pane inside Just Zen.</p>
+      <ul><li>Each app keeps its own login and cookies unless you choose to share them</li><li>Personal and Work profiles for the accounts you keep apart</li><li>Links that try to launch a desktop app stay inside instead</li></ul></div>
+    <div class="pillar"><span class="tag" style="background:var(--violet)"></span><h3>Claude as your copilot</h3><p>Claude Code runs in a pane beside your apps with access to the folder you give it. Ask it to read your notes, draft a reply, change a file or build something, and it does it right there.</p>
+      <ul><li>Chat for everyday work, Terminal when you want the real thing</li><li>Read-only, Notes-only or Full access, your choice per folder</li><li>Every command it wants to run is shown to you first</li></ul></div>
+    <div class="pillar"><span class="tag" style="background:var(--sage)"></span><h3>Notes, documents and tasks, same window</h3><p>An infinite whiteboard for thinking out loud, a Files pane that previews Markdown with wiki links, a Documents pane for PDFs and Word files, and a task list that stays visible.</p>
+      <ul><li>Annotate a PDF and save a copy without touching the original</li><li>Edit DOCX, RTF and text files in place</li><li>Everything is stored locally and encrypted with your Mac's Keychain</li></ul></div>
+  </div>
+</section>
+
+<section class="copilot" id="copilot">
+  <div class="panel">
+    <div>
+      <div class="eyebrow">Claude, right there</div>
+      <h2 style="margin-top:14px">It reads what you're reading and works where you're working.</h2>
+      <p>Because Claude sits in the same window as your apps and files, there's no copying and pasting between tools. Point it at your vault or a project folder, keep Slack open on the left, and let it get on with it while you carry on.</p>
+      <p>You stay in control. Claude only sees the folder you connect, runs inside an operating-system sandbox, and asks before it runs a command or touches anything outside your notes.</p>
+    </div>
+    <div class="chat" aria-label="Example conversation">
+      <div class="you">Summarise this week's meeting notes and draft a status update for the team.</div>
+      <div class="tool"><span>Read · notes/2026-09-week-36.md</span><span>Done</span></div>
+      <div class="tool"><span>Write · updates/week-36-status.md</span><span>Waiting for you</span></div>
+      <div class="allow"><span>Deny</span><span class="on">Allow once</span></div>
+      <div class="claude">Draft saved as <b>updates/week-36-status.md</b>. Three decisions, two open risks, and the launch date moved to the 19th. Want me to paste it into Slack?</div>
+    </div>
+  </div>
+</section>
+
+<section class="private" id="private">
+  <div class="eyebrow">Built to stay private</div>
+  <h2 style="margin-top:14px">Local first. Sandboxed by default. Updated on its own.</h2>
+  <div class="facts">
+    <div class="fact"><b>Nothing to sync</b><p>There is no Just Zen cloud. Your notes, tasks, whiteboard and settings live on your Mac, encrypted with the Keychain.</p></div>
+    <div class="fact"><b>Apps can't see each other</b><p>Every website runs in Chromium's sandbox in its own profile, with no route to your files or to Claude.</p></div>
+    <div class="fact"><b>Claude is boxed in</b><p>Chat runs inside Anthropic Sandbox Runtime and macOS Seatbelt. It reads the folder you chose and talks only to Anthropic.</p></div>
+    <div class="fact"><b>Signed and self-updating</b><p>Releases are signed with a Developer ID and notarized by Apple. Security patches are tested, built and installed without you doing anything.</p></div>
+  </div>
+  <p class="more">The full picture, including what still depends on you, is on the Security page inside the app and in the project's security review.</p>
+</section>
+
+<footer>
+  <div><a href="https://github.com/kierankeene122/just-zen/releases/latest">Download</a><a href="https://github.com/kierankeene122/just-zen">GitHub</a><a href="#apps">Features</a></div>
+  <div>Just Zen · macOS · version 0.3</div>
+</footer>
+</div>
