@@ -52,7 +52,8 @@
       "!release/**",
       "!SECURITY-REVIEW*.md",
       "!ADVERSARIAL-RESULTS.md",
-      "!AUDIT-SCOPE.md"
+      "!AUDIT-SCOPE.md",
+      "!site/**"
     ],
     "mac": {
       "icon": "assets/justzen.icns",
