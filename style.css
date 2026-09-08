@@ -104,3 +104,9 @@ header{position:relative}
 [data-theme=dark] .jump{background:#1c211f;border-color:#2b302d}
 
 #claude-login{margin-right:6px}
+
+.chat-signin{margin:0 0 10px;border:1px solid var(--line,#e3e7ee);border-radius:12px;padding:16px 16px 14px;background:#f6f8fb;text-align:center}
+[data-theme=dark] .chat-signin{background:#1c211f}
+.chat-signin strong{display:block;font-size:14px}
+.chat-signin p{margin:6px 0 12px;font-size:12.5px;line-height:1.45;opacity:.75}
+.chat-signin .primary{font-size:14px;padding:9px 18px}
