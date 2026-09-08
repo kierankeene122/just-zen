@@ -17,8 +17,6 @@ on:
         type: string
     # Only the signing and notarization secrets are accepted; callers pass them explicitly.
     secrets:
-      RELEASES_TOKEN:
-        required: false
       CSC_LINK:
         required: false
       CSC_KEY_PASSWORD:
@@ -39,8 +37,7 @@ jobs:
   release:
     runs-on: macos-15
     env:
-      # Releases are published to the separate public releases repository, which needs a token that can write there.
-      GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       HEARTH_GITHUB_OWNER: ${{ vars.HEARTH_GITHUB_OWNER }}
       HEARTH_GITHUB_REPO: ${{ vars.HEARTH_GITHUB_REPO }}
       CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -61,7 +58,6 @@ jobs:
         run: |
           test -n "$HEARTH_GITHUB_OWNER"
           test -n "$HEARTH_GITHUB_REPO"
-          test -n "$GH_TOKEN"
           test -n "$CSC_LINK"
           test -n "$CSC_KEY_PASSWORD"
           test -n "$APPLE_API_KEY_ID"
@@ -92,7 +88,7 @@ jobs:
           cp release/Just-Zen-*-arm64.dmg release/Just-Zen-arm64.dmg
           gh release upload "$TAG" release/Just-Zen-arm64.dmg -R "$HEARTH_GITHUB_OWNER/$HEARTH_GITHUB_REPO" --clobber
       - name: Attest released installers
-        # Build provenance is not offered on user-owned private repositories; it switches on if the repository becomes public or moves to an organisation.
+        # Build provenance is only offered on public repositories.
         if: ${{ !github.event.repository.private }}
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
