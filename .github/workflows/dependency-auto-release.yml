@@ -40,7 +40,9 @@ jobs:
         run: node .github/scripts/check-dependency-update.cjs "origin/$BRANCH"
       - name: Leave the pull request for manual review
         if: steps.check.outcome == 'failure'
-        run: gh pr comment "${{ steps.pr.outputs.number }}" --body "Not auto-merged: this update crosses a major version. Review it manually; merging it will not trigger a release until the next tag."
+        run: >-
+          gh pr comment "${{ steps.pr.outputs.number }}"
+          --body "Not auto-merged because this update crosses a major version. Review it manually. Merging it will not trigger a release until the next tag."
       - name: Merge
         if: steps.check.outcome == 'success'
         run: gh pr merge "${{ steps.pr.outputs.number }}" --squash --delete-branch
