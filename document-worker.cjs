@@ -1,6 +1,7 @@
 const fs=require('node:fs/promises'),path=require('node:path');
 const {promisify}=require('node:util'),execFile=promisify(require('node:child_process').execFile);
 const {PDFDocument,StandardFonts,rgb}=require('pdf-lib');
+const {sanitizeFormattedHtml}=require('./document-sanitize.cjs');
 (async()=>{const job=process.argv[2];const {type,input,action}=JSON.parse(await fs.readFile(path.join(job,'request.json'),'utf8'));const data=await fs.readFile(path.join(job,'input'));let output;
 if(action==='open'){output=(await execFile('/usr/bin/textutil',['-convert','html','-stdout',path.join(job,'source.'+type)],{maxBuffer:20*1024*1024,timeout:15000})).stdout;}else{
   if(type==='pdf'){
@@ -19,8 +20,8 @@ if(action==='open'){output=(await execFile('/usr/bin/textutil',['-convert','html
     const temp=job;
     try{
      const source=path.join(temp,'edit.html'),destination=path.join(temp,'edit.'+type);
-     // Only formatted text is exported; no remote resources or active HTML.
-     const html=input.content.replace(/<(script|style|iframe|object)[\s\S]*?<\/\1>/gi,'').replace(/<(?!\/?(?:p|br|b|strong|i|em|u|s|ul|ol|li|h[1-6]|table|tbody|tr|td|th|blockquote)\b)[^>]*>/gi,'').replace(/<([a-z0-9]+)\b[^>]*>/gi,'<$1>');
+     // Only bare formatted-text tags are exported; no attributes, remote resources or active HTML.
+     const html=sanitizeFormattedHtml(input.content);
      await fs.writeFile(source,'<!doctype html><meta charset="utf-8">'+html);
      output=(await execFile('/usr/bin/textutil',['-convert',type,'-stdout',source],{timeout:15000,encoding:'buffer',maxBuffer:50*1024*1024})).stdout;
     }finally{}

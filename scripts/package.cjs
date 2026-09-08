@@ -9,7 +9,7 @@ const root=path.resolve(__dirname,'..');
  const [out]=await packager({
   dir:root,name:'Just Zen',platform:'darwin',arch:'arm64',appBundleId:'com.hearth.workspace',
   icon:path.join(root,'assets','justzen.icns'),out:process.env.ZEN_PACKAGE_OUT || path.resolve(root,'../../outputs'),overwrite:true,
-  asar:{unpackDir:'node_modules',unpack:'document-worker.cjs'},
+  asar:{unpackDir:'node_modules',unpack:'{document-worker.cjs,document-sanitize.cjs}'},
   ignore:[/^\/smoke/,/^\/README\.md$/,/\.test\.cjs$/,/^\/\.github/,/^\/scripts/,/^\/release/,/^\/SECURITY-REVIEW/,/^\/ADVERSARIAL-RESULTS\.md$/,/^\/AUDIT-SCOPE\.md$/]
  });
  const app=path.join(out,'Just Zen.app');

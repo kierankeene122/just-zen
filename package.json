@@ -26,7 +26,8 @@
     "asar": true,
     "asarUnpack": [
       "node_modules/**/*",
-      "document-worker.cjs"
+      "document-worker.cjs",
+      "document-sanitize.cjs"
     ],
     "electronFuses": {
       "runAsNode": false,
