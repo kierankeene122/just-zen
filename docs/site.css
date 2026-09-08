@@ -101,10 +101,17 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
 }
 
 /* long-form pages */
-.page-hero{padding:88px 0 40px;max-width:820px}
+.page-hero{padding:88px 0 40px}
 .page-hero h1{font-size:clamp(40px,5.2vw,64px);line-height:1.05;font-variation-settings:"opsz" 144,"SOFT" 30}
 .page-hero .lede{margin-top:22px}
-.prose{max-width:72ch}
+.prose{max-width:none}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
+.two h2{margin-top:72px}
+.grid3.tight{margin-top:28px}
+.grid3.tight .pillar h3{margin-top:0;font-size:22px}
+.grid3.tight .pillar ul{margin-top:12px;font-size:15px;color:var(--ink-2)}
+.page-hero{max-width:900px}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
 .prose h2{font-size:clamp(28px,3.2vw,38px);font-variation-settings:"opsz" 144;margin-top:72px}
 .prose h3{font-size:22px;font-variation-settings:"opsz" 60;margin-top:36px}
 .prose p{color:var(--ink-2);margin-top:14px}
