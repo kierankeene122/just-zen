@@ -40,8 +40,8 @@ class ChatSession {
     const task=this.consume(prompt.trim(),cwd,savedSession,executable);
     this.task=task;return task;
   }
-  async consume(prompt,cwd,resume,executable){
-    let streamed=null,streamText='',assistantTextSeen=false;
+  async consume(prompt,cwd,resume,executable,retried=false){
+    let streamed=null,streamText='',assistantTextSeen=false,staleSession=false;
     const tools=new Map();
     try{
       if(!this.queryFactory){
@@ -78,7 +78,9 @@ class ChatSession {
           }
         }
         if(message.type==='result'){
-          if(message.is_error)this.add('error',(message.errors || [message.result || 'Claude could not finish this turn.']).join('\n'));
+          const errorText=message.is_error?(message.errors || [message.result || '']).join('\n'):'';
+          if(message.is_error && resume && /No conversation found with session ID/i.test(errorText)){staleSession=true;}
+          else if(message.is_error)this.add('error',errorText || 'Claude could not finish this turn.');
           else if(!assistantTextSeen && message.result)this.add('assistant',message.result);
         }
       }
@@ -86,6 +88,8 @@ class ChatSession {
     finally{
       this.active?.close();this.active=null;
       for(const request of [...this.pending.values()])request.finish({behavior:'deny',message:'Turn ended'});
+      if(staleSession && !retried){this.state.sessionId=null;this.state.busy=true;this.aborter=new AbortController();return this.consume(prompt,cwd,null,executable,true);}
+      if(staleSession)this.add('error','The saved conversation could not be resumed. Start a new chat.');
       this.state.busy=false;
       try{await this.save({sessionId:this.state.sessionId,messages:this.state.messages.slice(-200)});}catch{this.add('error','Could not save chat history on this Mac.');}
       this.publish();

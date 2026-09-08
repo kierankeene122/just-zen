@@ -110,3 +110,5 @@ header{position:relative}
 .chat-signin strong{display:block;font-size:14px}
 .chat-signin p{margin:6px 0 12px;font-size:12.5px;line-height:1.45;opacity:.75}
 .chat-signin .primary{font-size:14px;padding:9px 18px}
+
+#claude-logout{margin-right:6px}
