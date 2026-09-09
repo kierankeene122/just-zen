@@ -73,16 +73,16 @@
 </div>
 </div>
 <div class="two">
-<div><h2>Security tooling pass, 9 September 2026</h2>
-<p>Five independent tools were run against the signed v0.3.6 build and the source, one at a time. Full method and output in <a href="https://github.com/kierankeene122/just-zen/blob/main/SECURITY-TOOLING-2026-09-09.md">SECURITY-TOOLING-2026-09-09.md</a>.</p>
+<div><h2>We tried to break it. Here is what happened.</h2>
+<p>On 9 September 2026 we ran five well-known security tools against Just Zen, the kind a professional tester would reach for. The technical detail is in the <a href="https://github.com/kierankeene122/just-zen/blob/main/SECURITY-TOOLING-2026-09-09.md">full write-up</a>; this is the plain-English version.</p>
 <ul>
-<li><strong>1. Promptfoo, red-teaming Chat.</strong> A suite that drives the real pipeline (SDK, policy hook, Seatbelt) with a poisoned note, canary secrets, a symlink trap, and a simulated user who approves everything. All 8 cases hold: Claude flagged the hidden instruction instead of following it, <code>.env</code> reads got EPERM, writes in Read-only never happened, the symlink write was refused, the home-folder shell command and the fetch to example.com were blocked by the sandbox, and the sibling-folder read was refused. Anyone can rerun it with <code>npm run security:redteam</code>.</li>
-<li><strong>2. mitmproxy.</strong> With interception on, the app refused every connection rather than accept a forged certificate. With TLS passed through, all 29 destinations belonged to the sites opened, none was plain HTTP, and the sandboxed Claude only ever spoke to its local egress proxy.</li>
-<li><strong>3. Native audit.</strong> Every binary in the bundle is signed by the developer's Team ID with the hardened runtime and no debugging entitlements; Gatekeeper accepts it as notarized. A live sandboxed Claude had nothing open under the home folder. <code>fs_usage</code> and the kernel denial log need root; the exact commands are in the report.</li>
-<li><strong>4. Ghidra.</strong> The two native components Just Zen ships, <code>pty.node</code> and <code>spawn-helper</code>, contain only standard-library calls and no secrets. Nothing key-shaped anywhere in the bundle or repository history.</li>
-<li><strong>5. Frida.</strong> Cannot attach to or spawn-instrument the signed app. It can attach to the unsigned development run, which is expected and why releases are signed.</li>
+<li><strong>1. Tricking Claude (Promptfoo).</strong> We planted notes with hidden instructions telling Claude to steal secrets, dropped fake passwords around the workspace, set symlink traps, and pretended to be a user who clicks "Allow" on everything. Claude spotted the hidden instructions and refused to follow them, and every attempt to read a secret, change a protected file, reach the home folder or send data to an outside website was blocked. Eight attacks, eight stopped.</li>
+<li><strong>2. Spying on its internet traffic (mitmproxy).</strong> We put a fake "middleman" between the app and the internet. When it tried to impersonate real websites, the app refused to connect at all. When we just watched where traffic went, the app only ever talked to the websites you had opened, nothing was sent unencrypted, and Claude's connection went through a gate that only allows Anthropic.</li>
+<li><strong>3. Checking the app is what it says it is (Apple's own tools).</strong> Every part of the app is signed by the developer and approved by Apple, with the extra hardening switched on and no back doors for debuggers. While Claude was working, we watched what files it had open: nothing from the home folder.</li>
+<li><strong>4. Taking the app apart (Ghidra).</strong> We decompiled the two small pieces of native code Just Zen ships and searched the whole app and its history for hidden keys or passwords. Nothing suspicious, nothing hardcoded.</li>
+<li><strong>5. Trying to read its memory while running (Frida).</strong> A tool that lets you reach inside a running program could not get into Just Zen at all. It could get into the unsigned developer version, which is exactly why what you download is signed.</li>
 </ul>
-<p>Two bugs surfaced during the pass and were fixed before the next release: Chat could not refresh an expired Claude login from inside the sandbox, and the app depended on a Homebrew-installed Node.js that can break under it. It now refreshes the login outside the sandbox and ships its own verified Node.js.</p>
+<p>Doing this found two real problems, both fixed in the next release: Claude's sign-in could expire after a few hours and not renew itself, and the app relied on a separately installed copy of Node.js that could break. It now renews the sign-in on its own and carries everything it needs.</p>
 
 <h2>Risks specific to Just Zen</h2>
 <ul>
