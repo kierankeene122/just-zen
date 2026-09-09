@@ -6,13 +6,19 @@ const {packager}=require('@electron/packager');
 const {flipFuses,FuseVersion,FuseV1Options}=require('@electron/fuses');
 const root=path.resolve(__dirname,'..');
 (async()=>{
+ // The current Node binary ships in Contents/Resources/node so helpers never depend on a Homebrew install.
+ const nodeBinary=require('node:fs').realpathSync(require('node:child_process').execFileSync('/bin/sh',['-c','command -v node'],{encoding:'utf8'}).trim());
  const [out]=await packager({
+  extraResource:[nodeBinary],
   dir:root,name:'Just Zen',platform:'darwin',arch:'arm64',appBundleId:'com.hearth.workspace',
   icon:path.join(root,'assets','justzen.icns'),out:process.env.ZEN_PACKAGE_OUT || path.resolve(root,'../../outputs'),overwrite:true,
   asar:{unpackDir:'node_modules',unpack:'{document-worker.cjs,document-sanitize.cjs}'},
   ignore:[/^\/smoke/,/^\/README\.md$/,/\.test\.cjs$/,/^\/\.github/,/^\/scripts/,/^\/docs/,/^\/release/,/^\/SECURITY-REVIEW/,/^\/ADVERSARIAL-RESULTS\.md$/,/^\/AUDIT-SCOPE\.md$/]
  });
  const app=path.join(out,'Just Zen.app');
+ const bundledNode=path.join(app,'Contents','Resources','node');
+ if(path.basename(nodeBinary)!=='node')fs.renameSync(path.join(app,'Contents','Resources',path.basename(nodeBinary)),bundledNode);
+ fs.chmodSync(bundledNode,0o755);
  // Recorded before signing so the local updater can tell which Electron a build contains.
  fs.writeFileSync(path.join(app,'Contents','Resources','build-info.json'),JSON.stringify({electron:require('electron/package.json').version,app:require(path.join(root,'package.json')).version,builtAt:new Date().toISOString()}));
  await flipFuses(app,{

@@ -4,3 +4,4 @@ smoke.png
 smoke-vault/
 *.log
 .DS_Store
+build/
