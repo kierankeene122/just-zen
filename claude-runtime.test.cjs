@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),os=require('node:os');
 const {findClaude}=require('./claude-runtime.cjs');
-test('the Claude CLI bundled with the Agent SDK is preferred over system installs',()=>{
+test('the Claude CLI bundled with the Agent SDK is preferred over system installs',{skip:process.platform!=='darwin' || process.arch!=='arm64'},()=>{
  const found=findClaude({candidates:['/nonexistent/claude']});
  assert.ok(found.endsWith(path.join('claude-agent-sdk-darwin-arm64','claude')),found);
 });
