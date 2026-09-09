@@ -6,7 +6,7 @@ function reorder(items,keys){
 function cleanIcon(icon){const value=typeof icon==='string'?icon.trim():'';return [...value].slice(0,4).join('') || '◫';}
 function createFolder(folders,name,id,icon){
  if(typeof name!=='string' || !name.trim())throw Error('Group name is required');
- return [...folders,{id,name:name.trim().slice(0,40),icon:cleanIcon(icon),collapsed:false}];
+ return [...folders,{id,name:name.trim().slice(0,40),icon:cleanIcon(icon),collapsed:true}];
 }
 function updateFolder(folders,id,{name,icon}={}){
  let found=false;

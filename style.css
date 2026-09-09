@@ -172,3 +172,14 @@ header .theme-toggle{margin-left:0}
 .nav-collapsed .service-group .nav>.group-icon{display:flex}
 /* The jump box sits in the header flow, centred in whatever space is free, so it never overlaps the layout switch. */
 .jump{position:static;left:auto;transform:none;margin:0 auto;flex:0 1 360px;min-width:120px;width:auto}
+
+.mega-remove{position:absolute;top:6px;left:8px;width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:400;font-size:15px;color:var(--muted);opacity:0}.mega-tile:hover .mega-remove{opacity:.7}.mega-remove:hover{opacity:1!important;background:#e3e8f0}[data-theme=dark] .mega-remove:hover{background:#30392d}.service-group.dragging{opacity:.4}
+
+/* Groups open inline in the sidebar as a tile grid, so nothing has to cover the centre. */
+.service-group{flex-direction:column;align-items:stretch}.group-head{display:flex;align-items:center}.group-head .nav{min-width:0;flex:1}.group-chevron{font-size:9px;color:var(--muted);margin-left:6px}
+.group-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px 4px 8px 12px}
+.group-tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px 8px;border-radius:10px;font-size:10px;min-width:0;color:var(--muted)}.group-tile:hover{background:#edf1f7;color:inherit}[data-theme=dark] .group-tile:hover{background:#2a302c}
+.group-tile .site-favicon,.group-tile .site-fallback{width:28px;height:28px;flex-basis:28px!important;font-size:12px}.group-tile>span:not(.site-fallback){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.group-tile .service-badge{position:absolute;top:4px;right:6px;min-width:14px;height:14px;padding:0 3px;font-size:8px;line-height:14px}
+.group-empty{grid-column:1/-1;color:var(--muted);font-size:10px;line-height:1.5;padding:6px 8px;margin:0}
+.nav-collapsed .group-grid{grid-template-columns:1fr;padding:0 0 6px}.nav-collapsed .group-tile{padding:8px 0}.nav-collapsed .group-tile>span:not(.site-fallback),.nav-collapsed .group-chevron,.nav-collapsed .mega-remove{display:none}
+.mega-menu{display:none}
