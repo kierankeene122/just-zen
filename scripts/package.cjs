@@ -6,8 +6,8 @@ const {packager}=require('@electron/packager');
 const {flipFuses,FuseVersion,FuseV1Options}=require('@electron/fuses');
 const root=path.resolve(__dirname,'..');
 (async()=>{
- // The current Node binary ships in Contents/Resources/node so helpers never depend on a Homebrew install.
- const nodeBinary=require('node:fs').realpathSync(require('node:child_process').execFileSync('/bin/sh',['-c','command -v node'],{encoding:'utf8'}).trim());
+ // A standalone official Node build ships in Contents/Resources/node so helpers never depend on a Homebrew install.
+ const nodeBinary=await require('./fetch-node.cjs').fetchNode(path.join(root,'build'));
  const [out]=await packager({
   extraResource:[nodeBinary],
   dir:root,name:'Just Zen',platform:'darwin',arch:'arm64',appBundleId:'com.hearth.workspace',
