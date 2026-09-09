@@ -498,5 +498,10 @@
     "id": "web-bookingcom",
     "source": "https://www.google.com/s2/favicons?domain=www.booking.com&sz=128",
     "bytes": 1023
+  },
+  {
+    "id": "web-youtube-music",
+    "source": "https://www.google.com/s2/favicons?domain=music.youtube.com&sz=128",
+    "bytes": 1489
   }
 ]

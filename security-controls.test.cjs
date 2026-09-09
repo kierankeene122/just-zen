@@ -8,10 +8,15 @@ const {createSecureStore}=require('./secure-store.cjs');
 
 test('Claude sandbox denies the home directory and only writes the selected workspace',()=>{
  const root='/Users/person/Vault',home='/Users/person';
- const full=settings({root,mode:'full',userData:'/Users/person/Library/Hearth',home});
+ const full=settings({root,mode:'full',userData:'/Users/person/Library/Hearth',home,otherProjects:['-Users-person-Other','-Users-person-Vault']});
  assert.equal(full.filesystem.denyRead[0],home);
  for(const blocked of ['/Users','/Volumes','/private/var/folders','/private/tmp','/tmp'])assert(full.filesystem.denyRead.includes(blocked),blocked);
- assert(full.filesystem.denyRead.some(value=>value.endsWith('/claude-config/projects')));
+ assert(full.filesystem.denyRead.includes('/Users/person/Library/Hearth/claude-config/projects/-Users-person-Other'),'other workspaces\' transcripts are denied');
+ assert(full.filesystem.denyWrite.includes('/Users/person/Library/Hearth/claude-config/projects/-Users-person-Other'));
+ assert(!full.filesystem.denyRead.some(value=>value.endsWith('/claude-config/projects')),'the transcript root is not denied as a whole, or the workspace could not resume its own conversations');
+ assert(!full.filesystem.denyRead.includes('/Users/person/Library/Hearth/claude-config/projects/-Users-person-Vault'),'the workspace keeps its own transcripts');
+ assert(full.filesystem.allowRead.includes('/Users/person/Library/Hearth/claude-config/projects/-Users-person-Vault'));
+ assert(full.filesystem.allowWrite.includes('/Users/person/Library/Hearth/claude-config/projects/-Users-person-Vault'));
  assert(full.filesystem.allowRead.includes(root));
  assert(!full.filesystem.allowRead.some(value=>value.startsWith(home+'/.claude')),'the personal ~/.claude is never shared with Chat');
  assert(full.filesystem.allowRead.includes('/Users/person/Library/Hearth/claude-config'));

@@ -19,11 +19,13 @@ test('the Just Zen sandbox settings deny personal Claude state, volumes and temp
  const base=await fs.mkdtemp(path.join(os.tmpdir(),'hearth-srt-app-')),workspace=path.join(base,'workspace'),userData=path.join(base,'data'),config=path.join(base,'settings.json');
  t.after(()=>fs.rm(base,{recursive:true,force:true}));
  await fs.mkdir(workspace);await fs.mkdir(path.join(userData,'claude-config','projects','other'),{recursive:true});await fs.writeFile(path.join(userData,'claude-config','projects','other','transcript.jsonl'),'x');
- const rules=settings({root:workspace,mode:'readOnly',userData});rules.filesystem.allowRead.push(config);
+ const rules=settings({root:workspace,mode:'readOnly',userData,otherProjects:['other']});rules.filesystem.allowRead.push(config);
+ const own=path.join(userData,'claude-config','projects',workspace.replace(/[^a-zA-Z0-9_-]/g,'-'));await fs.mkdir(own,{recursive:true});await fs.writeFile(path.join(own,'session.jsonl'),'x');
  await fs.writeFile(config,JSON.stringify(rules));
  const cli=path.join(__dirname,'node_modules','@anthropic-ai','sandbox-runtime','dist','cli.js');
  const inside=(command,...args)=>run(process.execPath,[cli,'--settings',config,'--',command,...args],{timeout:20000});
  await inside('/bin/ls',workspace);
+ await inside('/bin/cat',path.join(own,'session.jsonl'));
  for(const denied of [os.homedir(),'/Volumes','/Users/Shared','/private/tmp',path.join(os.homedir(),'.claude'),path.join(userData,'claude-config','projects','other')])await assert.rejects(inside('/bin/ls',denied),undefined,denied+' must be denied');
  await assert.rejects(inside('/bin/cat',path.join(os.homedir(),'.claude.json')));
 });

@@ -46,6 +46,14 @@ class ChatSession {
     const execFile=require('node:util').promisify(require('node:child_process').execFile);
     await execFile(this.claudePath,['-p','Reply with OK.','--max-turns','1'],{env:this.env(),cwd:require('node:os').tmpdir(),timeout:60000});
   }
+  // When Claude Code cannot resume a saved conversation, the next turn starts a fresh session with a short recap of
+  // what was said, so the user does not lose the thread.
+  withRecap(prompt){
+    const history=this.state.messages.filter(m=>(m.role==='user' || m.role==='assistant') && m.text && m.text!==prompt).slice(-8);
+    if(!history.length)return prompt;
+    const recap=history.map(m=>(m.role==='user'?'User: ':'Assistant: ')+String(m.text).replace(/\s+/g,' ').slice(0,600)).join('\n');
+    return 'Earlier in this conversation (the saved session could not be resumed, so this is a recap):\n\n'+recap+'\n\nContinue from there. My next message:\n\n'+prompt;
+  }
   async consume(prompt,cwd,resume,executable,retried=false){
     let streamed=null,streamText='',assistantTextSeen=false,staleSession=false,expiredToken=false;
     const tools=new Map();
@@ -91,7 +99,13 @@ class ChatSession {
           else if(!assistantTextSeen && message.result)this.add('assistant',message.result);
         }
       }
-    }catch(error){this.add(this.aborter.signal.aborted?'system':'error',this.aborter.signal.aborted?'Stopped. You can continue this conversation.':error.message);}
+    }catch(error){
+      // The SDK surfaces some error results as exceptions rather than result messages; classify those the same way.
+      const text=String(error?.message || '');
+      if(resume && /No conversation found with session ID/i.test(text))staleSession=true;
+      else if(/access token has expired|authentication_failed|\b401\b/i.test(text))expiredToken=true;
+      else this.add(this.aborter.signal.aborted?'system':'error',this.aborter.signal.aborted?'Stopped. You can continue this conversation.':text);
+    }
     finally{
       this.active?.close();this.active=null;
       for(const request of [...this.pending.values()])request.finish({behavior:'deny',message:'Turn ended'});
@@ -99,7 +113,7 @@ class ChatSession {
         if(refreshed){this.state.busy=true;this.aborter=new AbortController();return this.consume(prompt,cwd,resume,executable,true);}
         this.add('error','Your Claude login has expired and could not be refreshed. Click Sign in to sign in again.');}
       else if(expiredToken)this.add('error','Your Claude login has expired. Click Sign in to sign in again.');
-      if(staleSession && !retried){this.state.sessionId=null;this.state.busy=true;this.aborter=new AbortController();return this.consume(prompt,cwd,null,executable,true);}
+      if(staleSession && !retried){this.state.sessionId=null;this.state.busy=true;this.aborter=new AbortController();return this.consume(this.withRecap(prompt),cwd,null,executable,true);}
       if(staleSession)this.add('error','The saved conversation could not be resumed. Start a new chat.');
       this.state.busy=false;
       try{await this.save({sessionId:this.state.sessionId,messages:this.state.messages.slice(-200)});}catch{this.add('error','Could not save chat history on this Mac.');}

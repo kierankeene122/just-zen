@@ -2,13 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {catalogue,addApp,isAdded,bundledIcon} = require('./app-catalog.cjs');
 const {sharedWebPreferences,configureWebContents} = require('./web-session.cjs');
-test('library has 100 distinct web services across business and personal categories',()=>{
- assert.equal(catalogue.length,100);
- assert.equal(new Set(catalogue.map(a=>a.id)).size,100);
- assert.equal(new Set(catalogue.map(a=>a.url.toLowerCase().replace(/\/$/,''))).size,100);
+test('library has 101 distinct web services across business and personal categories',()=>{
+ assert.equal(catalogue.length,101);
+ assert.equal(new Set(catalogue.map(a=>a.id)).size,101);
+ assert.equal(new Set(catalogue.map(a=>a.url.toLowerCase().replace(/\/$/,''))).size,101);
  assert.ok(new Set(catalogue.map(a=>a.category)).size>=5);
  for(const a of catalogue){assert.ok(a.name);assert.ok(require('node:fs').readFileSync(require('node:path').join(__dirname,a.icon)).subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])));assert.match(a.url,/^https?:\/\//);assert.ok(new URL(a.url).hostname);}
- for(const name of ['Gmail','Slack','YouTube','ChatGPT','Google Drive','WhatsApp'])assert.ok(catalogue.some(a=>a.name===name),name);
+ for(const name of ['Gmail','Slack','YouTube','YouTube Music','ChatGPT','Google Drive','WhatsApp'])assert.ok(catalogue.some(a=>a.name===name),name);
 });
 test('one-click adds preserve existing apps and reject duplicates or unknown ids',()=>{
  const app=catalogue.find(a=>a.name==='Gmail');const existing=[{id:'vault',kind:'vault'}];

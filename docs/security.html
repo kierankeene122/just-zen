@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Just Zen Security</title>
 <meta name="description" content="What protects you in Just Zen, how security updates reach you, what was tested, and what still depends on you.">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="light">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="site.css">
@@ -33,7 +33,8 @@
 <div class="grid3 tight">
 <div class="pillar"><span class="tag" style="background:var(--accent)"></span><h3>Websites</h3><ul><li>Every site runs in Chromium's sandbox with Node.js disabled and no bridge into Just Zen, your files or Claude.</li>
 <li>New apps get their own isolated cookie and storage profile. Shared, Personal and Work profiles share logins only when you choose them.</li>
-<li>Addresses opened from the URL bar, notes or chat use an in-memory profile that is discarded when the view closes.</li>
+<li>The pinned Browser tab has its own profile, separate from every saved app; links from notes and chat open there. It can be cleared from Privacy &amp; data like any other profile.</li>
+<li>Apps you are not looking at can be put to sleep after a quiet period: the page is closed and its memory released, then it reloads when you open it again.</li>
 <li>Camera, microphone, screen capture, native-app launches and other permissions are refused. Saved apps may send notifications only from the address they were saved at.</li>
 <li>Downloads always go through a native save dialog. Sites with invalid certificates are refused.</li></ul></div>
 <div class="pillar"><span class="tag" style="background:var(--sage)"></span><h3>Encrypted state and app lock</h3><ul><li>Settings, tasks, whiteboard and Claude chat history are encrypted with a key held in the macOS Keychain. Website cookies are encrypted too.</li>
@@ -75,7 +76,7 @@
 <li><strong>Static analysis.</strong> CodeQL and Semgrep run on every change and block the merge on any finding.</li>
 <li><strong>Dependencies.</strong> Dependabot version and security updates, npm audit on every build, and a cooldown before new releases are adopted.</li>
 <li><strong>Adversarial tests.</strong> Forged IPC from a foreign renderer, path traversal, symlink chains, hostile HTML and PDFs, popup containment and profile separation, run in CI on macOS.</li>
-<li><strong>Sandbox tests.</strong> The Seatbelt profiles are executed for real and asserted to deny the home folder, external volumes, temporary folders and other Claude projects.</li>
+<li><strong>Sandbox tests.</strong> The Seatbelt profiles are executed for real and asserted to deny the home folder, external volumes, temporary folders and other Claude projects. Chat keeps only its own workspace's transcripts, so conversations resume.</li>
 <li><strong>Review.</strong> A full code review on 8 September 2026 found and fixed thirteen issues, from Electron fuses to a Notes-only bypass. The report is in the repository.</li>
 <li><strong>Red-teaming.</strong> A Promptfoo suite drives the real Chat pipeline with hostile workspace content, a careless user who approves everything, and canary secrets. Eight cases, from hidden instructions in notes to symlink tricks and exfiltration by fetch, all held on 9 September 2026.</li>
 <li><strong>Network interception.</strong> Run through mitmproxy, the app refuses forged certificates outright; with TLS passed through, every destination belonged to the sites you opened, none was plain HTTP, and the sandboxed Claude only ever talked to its local egress proxy.</li>

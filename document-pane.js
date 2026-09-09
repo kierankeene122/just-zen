@@ -54,6 +54,6 @@ export function createDocumentPane({call,resize}){
   if(!$('document-editor').hidden)return $('document-editor').innerText.trim();
   return '';
  }
- window.documents.onCaptureSelection?.(()=>run(async()=>{const text=await selectedText();if(!text){status('Select some text first, or open a document.');return;}window.documents.sendToClaude(text);status('Sent to Claude: choose what to do with it in the Claude pane.');}));
+ window.documents.onCaptureSelection?.(target=>run(async()=>{const text=await selectedText();if(!text){status('Select some text first, or open a document.');return;}window.documents.sendSelection(target,text);status(target==='task'?'Added to your tasks.':'Sent to Claude: choose what to do with it in the Claude pane.');}));
  window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='Unsaved document edits';}});
 }

@@ -712,6 +712,14 @@
     "icon": "assets/app-icons/web-youtube.png"
   },
   {
+    "id": "web-youtube-music",
+    "name": "YouTube Music",
+    "url": "https://music.youtube.com/",
+    "category": "Entertainment",
+    "kind": "web",
+    "icon": "assets/app-icons/web-youtube-music.png"
+  },
+  {
     "id": "web-spotify",
     "name": "Spotify",
     "url": "https://open.spotify.com/",

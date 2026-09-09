@@ -24,3 +24,13 @@ test('tool waits for explicit approval and uses original input',async()=>{
 test('denial and cancellation fail closed',async()=>{
  const chat=new ChatSession({env:()=>({}),save:async()=>{},emit:()=>{}});const controller=new AbortController();const denied=chat.permission('Bash',{command:'test'},{signal:controller.signal});const id=[...chat.pending.keys()][0];chat.respond({id,allow:false});assert.equal((await denied).behavior,'deny');const cancelled=chat.permission('Bash',{command:'test'},{signal:controller.signal});controller.abort();assert.equal((await cancelled).behavior,'deny');assert.equal(chat.pending.size,0);assert.throws(()=>chat.respond({id,allow:true}));
 });
+test('a stale saved session thrown by the SDK is retried once without resume and with a recap',async()=>{
+ const seen=[];
+ const chat=new ChatSession({env:()=>({}),emit:()=>{},save:async()=>{},query:fake(async function*({prompt,options}){seen.push({prompt,resume:options.resume});if(options.resume)throw Error('Claude Code returned an error result: No conversation found with session ID: 2facbfac-5aa5-41e6-91ee-ea9158f4fc13');yield {type:'result',result:'Fresh reply',is_error:false};})});
+ chat.restore({sessionId:'old-session',messages:[{id:'1',role:'user',text:'What is the plan?'},{id:'2',role:'assistant',text:'Three steps.'}]});
+ await chat.run('Go on','/tmp');
+ assert.equal(seen.length,2);assert.equal(seen[0].resume,'old-session');assert.equal(seen[1].resume,undefined);
+ assert.match(seen[1].prompt,/recap/);assert.match(seen[1].prompt,/Three steps/);assert.match(seen[1].prompt,/Go on$/);
+ assert.equal(chat.state.sessionId,null);assert.ok(!chat.state.messages.some(m=>m.role==='error'),'no error is shown when the retry succeeds');
+ assert.equal(chat.state.messages.at(-1).text,'Fresh reply');assert.equal(chat.state.busy,false);
+});
