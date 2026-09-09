@@ -40,8 +40,14 @@ class ChatSession {
     const task=this.consume(prompt.trim(),cwd,savedSession,executable);
     this.task=task;return task;
   }
+  // The sandbox can read the Keychain but cannot write a refreshed token back, so an expired token is refreshed
+  // by a minimal unsandboxed call (no workspace, no tools) and the turn is retried once.
+  async refreshLogin(){
+    const execFile=require('node:util').promisify(require('node:child_process').execFile);
+    await execFile('/opt/homebrew/bin/claude',['-p','Reply with OK.','--max-turns','1'],{env:this.env(),cwd:require('node:os').tmpdir(),timeout:60000});
+  }
   async consume(prompt,cwd,resume,executable,retried=false){
-    let streamed=null,streamText='',assistantTextSeen=false,staleSession=false;
+    let streamed=null,streamText='',assistantTextSeen=false,staleSession=false,expiredToken=false;
     const tools=new Map();
     try{
       if(!this.queryFactory){
@@ -80,6 +86,7 @@ class ChatSession {
         if(message.type==='result'){
           const errorText=message.is_error?(message.errors || [message.result || '']).join('\n'):'';
           if(message.is_error && resume && /No conversation found with session ID/i.test(errorText)){staleSession=true;}
+          else if(message.is_error && /access token has expired|authentication_failed|401/i.test(errorText)){expiredToken=true;}
           else if(message.is_error)this.add('error',errorText || 'Claude could not finish this turn.');
           else if(!assistantTextSeen && message.result)this.add('assistant',message.result);
         }
@@ -88,6 +95,10 @@ class ChatSession {
     finally{
       this.active?.close();this.active=null;
       for(const request of [...this.pending.values()])request.finish({behavior:'deny',message:'Turn ended'});
+      if(expiredToken && !retried){let refreshed=false;try{await this.refreshLogin();refreshed=true;}catch{}
+        if(refreshed){this.state.busy=true;this.aborter=new AbortController();return this.consume(prompt,cwd,resume,executable,true);}
+        this.add('error','Your Claude login has expired and could not be refreshed. Click Sign in to sign in again.');}
+      else if(expiredToken)this.add('error','Your Claude login has expired. Click Sign in to sign in again.');
       if(staleSession && !retried){this.state.sessionId=null;this.state.busy=true;this.aborter=new AbortController();return this.consume(prompt,cwd,null,executable,true);}
       if(staleSession)this.add('error','The saved conversation could not be resumed. Start a new chat.');
       this.state.busy=false;
