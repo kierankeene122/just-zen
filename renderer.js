@@ -4,7 +4,7 @@ import {rank} from './palette-match.mjs';
 const $=id=>document.getElementById(id);
 let homeDir='';const pretty=value=>value && homeDir && value.startsWith(homeDir)?'~'+value.slice(homeDir.length):value;
 const call=(name,...args)=>window.hearth.call(name,...args);
-let root,claudeRoot=null,claudePolicy='full',claudeWorkspaces=[],currentFile,original='',directory='',page='overview',running=false,mode='chat',theme='light';
+let root,claudeRoot=null,claudePolicy='notes',claudeWorkspaces=[],currentFile,original='',directory='',page='overview',running=false,mode='chat',theme='light';
 let layout={agentCollapsed:false,centreCollapsed:false,navCollapsed:true},catalog=[],catalogPage=0,noteMode='preview';
 let serviceFolders=[],todos=[],taskTab='todo';
 let chatState={messages:[],busy:false,pending:[]};

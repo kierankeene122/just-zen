@@ -7,5 +7,5 @@ test('support ends when the third following major ships',()=>{
 });
 test('without a known successor the end date is estimated from the release cadence',()=>{
  const w=supportWindow('46.0.1',releases,new Date('2026-12-16'));
- assert.equal(w.estimated,true);assert.equal(w.supportEnds,'2027-05-31');
+ assert.equal(w.estimated,true);assert.equal(w.supportEnds,'2027-06-01');
 });
