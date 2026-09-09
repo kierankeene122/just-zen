@@ -62,7 +62,7 @@
 <li><strong>Detection.</strong> Dependabot checks weekly for new Electron and dependency versions, waiting three days for patches and seven for larger changes so bad releases surface first. Security advisories trigger a fix immediately.</li>
 <li><strong>Verification.</strong> Each proposed update runs the unit tests, the Seatbelt sandbox test and CodeQL static analysis.</li>
 <li><strong>Merge.</strong> If everything passes and it is not a major version change, the update is merged into the codebase. Major versions wait for a human.</li>
-<li><strong>Release.</strong> When the maintainer cuts a release, one command tags a version and builds a signed, notarized DMG. Merged updates ship in the next release.</li>
+<li><strong>Release.</strong> The merge is tagged as a new version and a signed, notarized DMG is built and published automatically.</li>
 <li><strong>Install.</strong> Every copy of Just Zen picks it up on next open and installs it on quit.</li>
 </ul>
 

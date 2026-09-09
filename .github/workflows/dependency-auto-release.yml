@@ -1,7 +1,7 @@
-name: Dependency auto-merge
+name: Dependency auto-release
 
-# After "Security checks" passes on a Dependabot branch, merge it (patch and minor updates only).
-# Nothing is built here: a signed release happens only when someone runs `npm run release`.
+# After "Security checks" passes on a Dependabot branch, merge it (patch and minor updates only), bump the patch
+# version, tag it, and build the signed release so the fix reaches installed apps without anyone touching it.
 on:
   workflow_run:
     workflows: ["Security checks"]
@@ -10,11 +10,15 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
+  attestations: write
 
 jobs:
   merge:
     if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'dependabot/')
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BRANCH: ${{ github.event.workflow_run.head_branch }}
@@ -42,3 +46,27 @@ jobs:
       - name: Merge
         if: steps.check.outcome == 'success'
         run: gh pr merge "${{ steps.pr.outputs.number }}" --squash --delete-branch
+      - name: Bump the patch version and tag
+        if: steps.check.outcome == 'success'
+        id: tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --ff-only origin main
+          version=$(npm version patch --no-git-tag-version)
+          git commit -am "chore(release): $version"
+          git tag "$version"
+          git push origin main "$version"
+          echo "tag=$version" >> "$GITHUB_OUTPUT"
+  release:
+    needs: merge
+    if: needs.merge.outputs.tag != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      ref: ${{ needs.merge.outputs.tag }}
+    secrets:
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
