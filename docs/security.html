@@ -73,7 +73,18 @@
 </div>
 </div>
 <div class="two">
-<div><h2>Risks specific to Just Zen</h2>
+<div><h2>Security tooling pass, 9 September 2026</h2>
+<p>Five independent tools were run against the signed v0.3.6 build and the source, one at a time. Full method and output in <a href="https://github.com/kierankeene122/just-zen/blob/main/SECURITY-TOOLING-2026-09-09.md">SECURITY-TOOLING-2026-09-09.md</a>.</p>
+<ul>
+<li><strong>1. Promptfoo, red-teaming Chat.</strong> A suite that drives the real pipeline (SDK, policy hook, Seatbelt) with a poisoned note, canary secrets, a symlink trap, and a simulated user who approves everything. All 8 cases hold: Claude flagged the hidden instruction instead of following it, <code>.env</code> reads got EPERM, writes in Read-only never happened, the symlink write was refused, the home-folder shell command and the fetch to example.com were blocked by the sandbox, and the sibling-folder read was refused. Anyone can rerun it with <code>npm run security:redteam</code>.</li>
+<li><strong>2. mitmproxy.</strong> With interception on, the app refused every connection rather than accept a forged certificate. With TLS passed through, all 29 destinations belonged to the sites opened, none was plain HTTP, and the sandboxed Claude only ever spoke to its local egress proxy.</li>
+<li><strong>3. Native audit.</strong> Every binary in the bundle is signed by the developer's Team ID with the hardened runtime and no debugging entitlements; Gatekeeper accepts it as notarized. A live sandboxed Claude had nothing open under the home folder. <code>fs_usage</code> and the kernel denial log need root; the exact commands are in the report.</li>
+<li><strong>4. Ghidra.</strong> The two native components Just Zen ships, <code>pty.node</code> and <code>spawn-helper</code>, contain only standard-library calls and no secrets. Nothing key-shaped anywhere in the bundle or repository history.</li>
+<li><strong>5. Frida.</strong> Cannot attach to or spawn-instrument the signed app. It can attach to the unsigned development run, which is expected and why releases are signed.</li>
+</ul>
+<p>Two bugs surfaced during the pass and were fixed before the next release: Chat could not refresh an expired Claude login from inside the sandbox, and the app depended on a Homebrew-installed Node.js that can break under it. It now refreshes the login outside the sandbox and ships its own verified Node.js.</p>
+
+<h2>Risks specific to Just Zen</h2>
 <ul>
 <li><strong>Browser vulnerabilities.</strong> Just Zen bundles its own copy of Chromium through Electron, so a new Chromium flaw can exist here until the next Electron patch ships. Sandboxing limits the impact; the automated update chain keeps that window to days.</li>
 <li><strong>No independent audit yet.</strong> CodeQL and Semgrep scans, the adversarial and sandbox test suites and the code review all pass, but no third party has tested the running app. For regulated or highly sensitive work, commission an external assessment first.</li>

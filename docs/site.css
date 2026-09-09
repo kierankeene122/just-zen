@@ -126,3 +126,5 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
 .callout-box{margin-top:28px;background:var(--paper-2);border-radius:14px;padding:22px 26px;color:var(--ink-2)}
 .callout-box b{color:var(--ink);font-weight:600}
 .pagefoot{margin-top:90px}
+
+.prose code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;background:var(--paper-2);padding:1px 5px;border-radius:4px}
