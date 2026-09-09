@@ -28,7 +28,8 @@ p{margin:0}
 
 header.top{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.14em;font-size:13px}
-.brand img{width:28px;height:28px;display:block}
+.brand img{width:44px;height:44px;display:block}
+.brand{font-size:15px}
 nav a{text-decoration:none;font-size:14px;color:var(--ink-2);margin-left:22px}
 
 .hero{padding:88px 0 30px;max-width:760px}
