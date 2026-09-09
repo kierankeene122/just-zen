@@ -183,3 +183,9 @@ header .theme-toggle{margin-left:0}
 .group-empty{grid-column:1/-1;color:var(--muted);font-size:10px;line-height:1.5;padding:6px 8px;margin:0}
 .nav-collapsed .group-grid{grid-template-columns:1fr;padding:0 0 6px}.nav-collapsed .group-tile{padding:8px 0}.nav-collapsed .group-tile>span:not(.site-fallback),.nav-collapsed .group-chevron,.nav-collapsed .mega-remove{display:none}
 .mega-menu{display:none}
+
+/* Group icons match the app icons: 30px, square, inline with the label, no pill. */
+.service-group .nav>.group-icon,.nav-collapsed .service-group .nav>.group-icon{flex:0 0 30px;width:30px;height:30px;background:transparent;border-radius:0;font-size:24px;line-height:1;display:flex}
+.service-group .nav{padding:10px 4px;gap:9px}.nav-collapsed .service-group .nav{padding:11px 0}
+.icon-grid{max-height:132px;overflow:auto;padding:2px}
+.service-group:hover .reorder-handle,.service-group .reorder-handle:focus{opacity:1}
