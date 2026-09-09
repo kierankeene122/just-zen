@@ -40,6 +40,7 @@
 <li>Optional Touch ID or passcode lock after inactivity. Passcode attempts back off after three failures.</li>
 <li>Any browser profile, Claude history or all Just Zen data can be cleared from the Privacy &amp; data panel in the app.</li></ul></div>
 <div class="pillar"><span class="tag" style="background:var(--violet)"></span><h3>Claude Chat</h3><ul><li>Runs inside Anthropic Sandbox Runtime and macOS Seatbelt. It can read only the workspace you choose plus its own login, and write only where the access mode allows.</li>
+<li>The Claude Code program it runs is the signed copy that ships inside Just Zen, not whatever happens to be installed on the Mac, so nothing on the machine can stand in for it.</li>
 <li>Uses a Claude login and history owned by Just Zen. Your personal ~/.claude, home folder, other users, external volumes and temporary folders are denied. The only other home-folder path it may read is the encrypted Keychain database, so it can use that login; the system's security daemon does the unlocking, not Claude.</li>
 <li>Network access is limited to Anthropic's servers. Chat refuses to start if the sandbox is not active.</li>
 <li>Text from a website, note or document reaches Claude only when you select it and press ⌘⇧A, and then only after you choose what to do with it. Nothing is sent automatically.</li>
@@ -51,6 +52,7 @@
 <li>Save copy refuses symbolic and hard links so the original can never be overwritten.</li></ul></div>
 <div class="pillar"><span class="tag" style="background:var(--violet)"></span><h3>App integrity and updates</h3><ul><li>Releases are signed with a Developer ID and notarized by Apple.</li>
 <li>The app code ships in a single archive whose integrity is verified at launch. Node.js entry points into the app binary (run-as-node, NODE_OPTIONS, inspector) are disabled.</li>
+<li>Everything the app needs to run travels with it: its own signed, checksum-verified Node.js runtime and its own copy of Claude Code. It does not depend on Homebrew or any separately installed tool, so a broken or tampered install elsewhere on the Mac cannot affect it.</li>
 <li>Website favicons are decoded in a sandboxed renderer, never in the main process.</li>
 <li>Updates are checked 15 seconds after opening and every six hours, downloaded in the background, signature-verified and installed when you quit. Downgrades and pre-releases are refused.</li>
 <li>Electron only fixes Chromium flaws in its three newest major versions. The Privacy &amp; data panel shows the date the bundled Electron stops receiving them, and a weekly check in the repository raises an issue a month before.</li></ul></div>
