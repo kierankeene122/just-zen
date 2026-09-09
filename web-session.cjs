@@ -35,7 +35,9 @@ function slackWebURL(value){
  if(u.pathname==='/ssb/redirect' || u.pathname.startsWith('/ssb/redirect/')){u.pathname='/messages';u.search='';u.hash='';}
  return u.href;}catch{return null;}
 }
-function configureWebContents(contents,parent,notify=()=>{},rootContents=contents,preferences=sharedWebPreferences()){
+// createTab, when given, receives Electron's window options for a permitted popup and returns the WebContents that should
+// host it (a tab in the same pane); the opener relationship is kept so OAuth popups can still talk back and close themselves.
+function configureWebContents(contents,parent,notify=()=>{},rootContents=contents,preferences=sharedWebPreferences(),createTab=null){
  let pending=null,lastLaunch=null;
  function openInRoot(target){
   if(pending===target || rootContents.getURL?.()===target)return;
@@ -65,6 +67,7 @@ function configureWebContents(contents,parent,notify=()=>{},rootContents=content
   const slack=slackWebURL(url);
   if(slack){openInRoot(slack);return {action:'deny'};}
   if(!permitted(url) && url!=='about:blank'){keepInside(url);return {action:'deny'};}
+  if(createTab)return {action:'allow',overrideBrowserWindowOptions:{webPreferences:preferences},createWindow:options=>createTab({...options,webPreferences:{...(options.webPreferences || {}),...preferences}})};
   return {action:'allow',overrideBrowserWindowOptions:{parent,width:1000,height:780,autoHideMenuBar:true,webPreferences:preferences}};
  });
  contents.on('did-create-window',child=>configureWebContents(child.webContents,parent,notify,rootContents,preferences));

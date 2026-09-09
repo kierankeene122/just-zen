@@ -170,3 +170,5 @@ header .theme-toggle{margin-left:0}
 .brain-done{text-align:center;padding:20px 0}.brain-done strong{display:block;font:400 54px Georgia,serif;letter-spacing:-2px}.brain-done p{font-size:16px;margin:8px 0 2px}.brain-done small{color:var(--muted)}.brain-done .dialog-actions{justify-content:center;margin-top:24px}
 @media(max-width:1100px){.brain-hero{flex-direction:column;align-items:flex-start}}
 .nav-collapsed .service-group .nav>.group-icon{display:flex}
+/* The jump box sits in the header flow, centred in whatever space is free, so it never overlaps the layout switch. */
+.jump{position:static;left:auto;transform:none;margin:0 auto;flex:0 1 360px;min-width:120px;width:auto}

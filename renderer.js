@@ -95,8 +95,8 @@ function renderTiles(){
    tile.append(bar,surface);host.append(tile);continue;
   }
   const browser=slot.serviceKey===BROWSER_KEY;
-  const showBar=browser || group.items.length>1 || n>1;
-  bar.classList.toggle('hidden',!showBar);
+  // The tab strip is always visible: it is where new tabs and extra Slack workspaces are added.
+  bar.classList.remove('hidden');
   if(!browser){const label=el('button','tile-app');const img=el('img','site-favicon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback',item.name.slice(0,1).toUpperCase());label.append(img,fallback,el('span',null,item.name));label.title=item.name;label.onclick=()=>{tiles.focus=i;};call('favicon',slot.serviceKey).then(icon=>paintIcon(img,icon)).catch(()=>{});bar.append(label);}
   const strip=el('div','tile-tabs');
   for(const tab of group.items){
@@ -161,6 +161,7 @@ function resumeViews(){viewsSuspended=Math.max(0,viewsSuspended-1);placeViews();
 for(const b of document.querySelectorAll('#layout-switch button'))b.onclick=()=>attempt(()=>setTilesMode(b.dataset.tiles));
 $('browser-nav').onclick=()=>attempt(()=>openBrowser());
 window.hearth.on('tab-update',info=>{tabLive.set(liveKey(info.serviceKey,info.tabId),info);const group=tabs[info.serviceKey];const tab=group?.items.find(t=>t.id===info.tabId);if(tab){if(info.url)tab.current=info.url;if(info.title)tab.title=info.title;}refreshTileBars();});
+window.hearth.on('tabs-changed',({serviceKey,tabs:group})=>{tabs[serviceKey]=group;for(const key of [...tabLive.keys()])if(key.startsWith(serviceKey+'\n') && !group.items.some(t=>key===liveKey(serviceKey,t.id)))tabLive.delete(key);if(page==='browser-page')renderTiles();});
 window.hearth.on('tab-opened',({serviceKey,tabId,tabs:group})=>{tabs[serviceKey]=group;const n=slotCount();const index=tiles.slots.findIndex((s,i)=>i<n && s && s.serviceKey===serviceKey);if(index>=0){tiles.slots[index]={serviceKey,tabId};renderTiles();saveLayout();}});
 window.hearth.on('tab-command',command=>attempt(async()=>{
  if(command==='new'){const slot=page==='browser-page'?focusedSlot():null;await newTab(slot?slot.serviceKey:BROWSER_KEY);return;}

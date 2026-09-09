@@ -154,25 +154,43 @@ function announceTab(entry){if(entry.view.webContents.isDestroyed())return;send(
 function destroyView(key){const entry=views.get(key);if(!entry)return;views.delete(key);try{win.contentView.removeChildView(entry.view);}catch{}try{entry.view.webContents.close();}catch{}}
 function closeServiceViews(serviceKey){for(const [key,entry] of views)if(entry.serviceKey===serviceKey)destroyView(key);updateServiceBadge(serviceKey,0);}
 function hideAllViews(){for(const entry of views.values())if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}}
+function preferencesFor(serviceKey){const item=serviceItem(serviceKey);if(!item)throw Error('App not found');return {...(serviceKey===BROWSER_KEY?browserWebPreferences():webPreferences(item.profile || 'isolated',serviceKey)),backgroundThrottling:false};}
 function ensureView(serviceKey,tabId){
-  const item=serviceItem(serviceKey);if(!item)throw Error('App not found');
   const tab=tabOf(serviceKey,tabId);
   const key=viewKey(serviceKey,tabId);
-  let entry=views.get(key);
-  if(entry)return entry;
+  const existing=views.get(key);
+  if(existing)return existing;
   const url=tab.current || tab.url;
   if(!url)return null;
+  const view=new WebContentsView({webPreferences:preferencesFor(serviceKey)});
+  const entry=attachView(serviceKey,tabId,view,url);
+  view.webContents.loadURL(url).catch(()=>{});
+  return entry;
+}
+// A popup (window.open, target=_blank, OAuth) becomes a new tab in the same pane; Chromium loads it and keeps the opener.
+function popupAsTab(serviceKey,options){
+  const tabs=tabsFor(serviceKey);if(tabs.items.length>=20)return null;
+  const tab={id:crypto.randomUUID(),url:'',current:'',title:''};tabs.items.push(tab);tabs.active=tab.id;persist();
+  const view=new WebContentsView({...options,webPreferences:{...(options.webPreferences || {}),...preferencesFor(serviceKey)}});
+  const entry=attachView(serviceKey,tab.id,view,'');
+  entry.view.webContents.once('destroyed',()=>{views.delete(viewKey(serviceKey,tab.id));const live=tabsFor(serviceKey);const index=live.items.findIndex(t=>t.id===tab.id);if(index<0)return;live.items.splice(index,1);if(!live.items.length)live.items.push({id:crypto.randomUUID(),url:serviceKey===BROWSER_KEY?'':serviceItem(serviceKey)?.url || '',current:'',title:''});if(live.active===tab.id)live.active=live.items[Math.max(0,index-1)].id;persist();send('tabs-changed',{serviceKey,tabs:live});});
+  send('tab-opened',{serviceKey,tabId:tab.id,tabs});
+  return view.webContents;
+}
+function attachView(serviceKey,tabId,view,url){
+  const item=serviceItem(serviceKey);if(!item)throw Error('App not found');
+  const key=viewKey(serviceKey,tabId);
   const isBrowser=serviceKey===BROWSER_KEY;
-  const preferences={...(isBrowser?browserWebPreferences():webPreferences(item.profile || 'isolated',serviceKey)),backgroundThrottling:false};
-  const view=new WebContentsView({webPreferences:preferences});
-  entry={view,serviceKey,tabId,visible:false,hiddenSince:Date.now()};
+  const preferences=preferencesFor(serviceKey);
+  const entry={view,serviceKey,tabId,visible:false,hiddenSince:Date.now()};
   views.set(key,entry);win.contentView.addChildView(view);view.setVisible(false);
   const contents=view.webContents;
+  contents.once('destroyed',()=>{if(views.get(key)===entry){views.delete(key);try{win.contentView.removeChildView(view);}catch{}}});
   const notificationSource={contents,saved:!isBrowser,key:serviceKey,name:item.name,notificationPermission:false,badgeInitialized:false,origins:new Set(),landed:false};
   notificationSources.set(contents,notificationSource);
   hardenWebSession(contents.session);
   const origins=notificationOrigins.get(contents.session);try{if(!isBrowser && secureOrigin(url)){origins.add(new URL(url).origin);notificationSource.origins.add(new URL(url).origin);}}catch{}
-  configureWebContents(contents,win,message=>send('notice',message),contents,preferences);
+  configureWebContents(contents,win,message=>send('notice',message),contents,preferences,options=>popupAsTab(serviceKey,options) || undefined);
   attachContextMenu(contents,()=>item.name,params=>params.linkURL && /^https?:/i.test(params.linkURL)?[{label:'Open Link in New Tab',click:()=>openTab(serviceKey,params.linkURL,true)}]:[]);
   contents.on('page-favicon-updated',async (_e,urls)=>{if(!urls.length || isBrowser || bundledIcon(item))return;const icon=await favicon(item.url,urls[0]);if(icon)send('favicon',{url:item.url,icon});});
   // Origins reached by the app's initial redirect chain may notify; later navigations (open redirects, links) may not.
@@ -193,7 +211,6 @@ function ensureView(serviceKey,tabId){
     }
     notificationSource.badgeInitialized=true;
   });
-  contents.loadURL(url).catch(()=>{});
   send('service-asleep',{key:serviceKey,asleep:false});
   return entry;
 }
