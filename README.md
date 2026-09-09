@@ -3,7 +3,7 @@
 A calm local workspace for Mac: your web apps, your files and notes, your documents and tasks, and Claude Code as a copilot, all in one window.
 
 - Download: https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg (Apple silicon, macOS 13 or later, signed and notarized)
-- Security: see `SECURITY.md`, `SECURITY-REVIEW-2026-09-08.md`, `SECURITY-TOOLING-2026-09-09.md` and https://kierankeene122.github.io/just-zen/security.html
+- Security: see `SECURITY.md`, `SECURITY-REVIEW-2026-09-08.md`, `SECURITY-TOOLING-2026-09-09.md` and https://justzen.co/security.html
 
 ## Licence and warranty
 

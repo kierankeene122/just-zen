@@ -1,6 +1,6 @@
 # Just Zen security
 
-The maintained security explanation lives on the website: https://kierankeene122.github.io/just-zen/security.html (source: `docs/security.html`). The app's Privacy & data panel shows the live build status and holds the app lock and data controls.
+The maintained security explanation lives on the website: https://justzen.co/security.html (source: `docs/security.html`). The app's Privacy & data panel shows the live build status and holds the app lock and data controls.
 
 
 Assessment date: 7 September 2026. Scope: Just Zen 0.3.0 for macOS, compared with the maintained Rambox product.
