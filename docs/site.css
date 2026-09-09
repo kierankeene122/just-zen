@@ -128,3 +128,21 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
 .pagefoot{margin-top:90px}
 
 .prose code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;background:var(--paper-2);padding:1px 5px;border-radius:4px}
+
+/* phones */
+@media (max-width:640px){
+  .wrap{padding:0 18px}
+  header.top{padding:16px 0}
+  .hero{padding:40px 0 20px}
+  .hero h1{font-size:38px}
+  .lede,.page-hero .lede{font-size:17px}
+  .cta .btn{width:100%;justify-content:center}
+  .tour-head{flex-direction:column;align-items:flex-start;gap:12px}
+  .tabs button{padding:8px 12px;font-size:13px}
+  .caption{grid-template-columns:1fr;gap:6px}
+  section.pillars{padding:70px 0 20px}
+  .copilot .panel{padding:22px}
+  .facts{gap:16px}
+  footer{flex-direction:column;gap:12px}
+  .prose table{display:block;overflow-x:auto}
+}
