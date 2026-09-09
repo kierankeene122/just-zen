@@ -15,7 +15,8 @@
     "fuses:check": "npx @electron/fuses read --app '../../outputs/Just Zen-darwin-arm64/Just Zen.app'",
     "update:electron": "node scripts/update-electron.cjs",
     "update:agent": "node scripts/install-update-agent.cjs",
-    "release": "node scripts/release.cjs"
+    "release": "node scripts/release.cjs",
+    "security:redteam": "cd security/promptfoo && npx --yes promptfoo@latest eval -c promptfooconfig.yaml -o results.json --no-cache --max-concurrency 1"
   },
   "keywords": [],
   "author": "",

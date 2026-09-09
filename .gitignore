@@ -5,3 +5,4 @@ smoke-vault/
 *.log
 .DS_Store
 build/
+security/promptfoo/results.json

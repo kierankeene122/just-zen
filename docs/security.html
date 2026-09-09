@@ -64,7 +64,10 @@
 <li><strong>Adversarial tests.</strong> Forged IPC from a foreign renderer, path traversal, symlink chains, hostile HTML and PDFs, popup containment and profile separation, run in CI on macOS.</li>
 <li><strong>Sandbox tests.</strong> The Seatbelt profiles are executed for real and asserted to deny the home folder, external volumes, temporary folders and other Claude projects.</li>
 <li><strong>Review.</strong> A full code review on 8 September 2026 found and fixed thirteen issues, from Electron fuses to a Notes-only bypass. The report is in the repository.</li>
-<li><strong>Open source.</strong> The code, the review and every automated check are public, so anyone can inspect what runs on their Mac.</li>
+<li><strong>Red-teaming.</strong> A Promptfoo suite drives the real Chat pipeline with hostile workspace content, a careless user who approves everything, and canary secrets. Eight cases, from hidden instructions in notes to symlink tricks and exfiltration by fetch, all held on 9 September 2026.</li>
+<li><strong>Network interception.</strong> Run through mitmproxy, the app refuses forged certificates outright; with TLS passed through, every destination belonged to the sites you opened, none was plain HTTP, and the sandboxed Claude only ever talked to its local egress proxy.</li>
+<li><strong>Binary and runtime checks.</strong> Every executable in the signed bundle carries the hardened runtime and no debugging entitlements; Frida cannot attach to it. Ghidra found nothing beyond standard library calls in the native terminal components, and no secrets anywhere in the bundle or repository.</li>
+<li><strong>Open source.</strong> The code, the review, the tooling results and every automated check are public, so anyone can inspect what runs on their Mac.</li>
 </ul>
 
 </div>
