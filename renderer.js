@@ -198,6 +198,8 @@ palette.addEventListener('click',e=>{if(e.target===palette)palette.close();});
 paletteInput.oninput=()=>attempt(updatePalette);
 paletteInput.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();paletteIndex=Math.min(paletteIndex+1,paletteItems.length-1);renderPalette();}else if(e.key==='ArrowUp'){e.preventDefault();paletteIndex=Math.max(paletteIndex-1,0);renderPalette();}else if(e.key==='Enter'){e.preventDefault();runPaletteItem(paletteIndex);}};
 window.hearth.on('open-palette',()=>attempt(openPalette));
+window.hearth.on('update-ready',version=>{$('restart-update').classList.remove('hidden');$('restart-update').textContent='Restart to update to '+version;});
+$('restart-update').onclick=()=>attempt(async()=>{if(dirty() && !confirm('Save your note first? Unsaved edits will be lost when the app restarts.'))return;await call('install-update');});
 $('jump').onclick=()=>attempt(openPalette);
 
 // ---- Send this to Claude (⌘⇧A) ----

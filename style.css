@@ -114,3 +114,5 @@ header{position:relative}
 #claude-logout{margin-right:6px}
 
 .engine-support{display:block;margin-top:4px;font-size:11px;opacity:.7;line-height:1.35}
+
+#restart-update{font-size:12px;padding:5px 12px;margin-right:10px}

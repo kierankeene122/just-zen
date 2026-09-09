@@ -311,7 +311,8 @@ app.whenReady().then(async () => {
   if(locked)await win.webContents.executeJavaScript("document.body.classList.add('is-locked');document.getElementById('lock-screen').classList.remove('hidden')");
   win.show();
   if(!locked)scheduleLock();
-  startAutoUpdates(message=>send('notice',message));
+  const updates=startAutoUpdates(message=>send('notice',message),version=>send('update-ready',version));
+  handle('install-update',()=>{if(!updates.install)throw Error('No update is ready');updates.install();return true;});
   if(!smoke){let index=0;const warm=()=>{if(!win || win.isDestroyed())return;const sites=(config.services || []).filter(s=>s.url);if(index>=sites.length)return;if(!locked){const item=sites[index++];browse({url:item.url,serviceKey:item.id || item.url,background:true}).catch(()=>{});}setTimeout(warm,1500);};setTimeout(warm,1500);}
   if(smoke) {
     try {
