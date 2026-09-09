@@ -112,3 +112,5 @@ header{position:relative}
 .chat-signin .primary{font-size:14px;padding:9px 18px}
 
 #claude-logout{margin-right:6px}
+
+.engine-support{display:block;margin-top:4px;font-size:11px;opacity:.7;line-height:1.35}

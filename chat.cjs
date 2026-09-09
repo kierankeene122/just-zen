@@ -4,7 +4,7 @@ const {hook:policyHook}=require('./claude-policy.cjs');
 // The official SDK owns the Claude Code transport and authentication.
 // Just Zen owns presentation and one-use permission responses.
 class ChatSession {
-  constructor({emit,save,query,env,policy=()=>({mode:'full',root:null})}) { this.emit=emit;this.save=save;this.queryFactory=query;this.env=env;this.policy=policy;this.state={messages:[],sessionId:null,busy:false};this.pending=new Map(); }
+  constructor({emit,save,query,env,policy=()=>({mode:'full',root:null}),claudePath='/opt/homebrew/bin/claude'}) { this.claudePath=claudePath;this.emit=emit;this.save=save;this.queryFactory=query;this.env=env;this.policy=policy;this.state={messages:[],sessionId:null,busy:false};this.pending=new Map(); }
   restore(value) {if(this.state.busy)throw Error('Stop chat before changing folders');this.state={messages:value?.messages || [],sessionId:value?.sessionId || null,busy:false};}
   snapshot(){return {...this.state,pending:[...this.pending.values()].map(p=>p.public)};}
   publish(){clearTimeout(this.publishTimer);this.publishTimer=null;this.emit(this.snapshot());}
@@ -44,7 +44,7 @@ class ChatSession {
   // by a minimal unsandboxed call (no workspace, no tools) and the turn is retried once.
   async refreshLogin(){
     const execFile=require('node:util').promisify(require('node:child_process').execFile);
-    await execFile('/opt/homebrew/bin/claude',['-p','Reply with OK.','--max-turns','1'],{env:this.env(),cwd:require('node:os').tmpdir(),timeout:60000});
+    await execFile(this.claudePath,['-p','Reply with OK.','--max-turns','1'],{env:this.env(),cwd:require('node:os').tmpdir(),timeout:60000});
   }
   async consume(prompt,cwd,resume,executable,retried=false){
     let streamed=null,streamText='',assistantTextSeen=false,staleSession=false,expiredToken=false;
@@ -54,8 +54,8 @@ class ChatSession {
         const execFile=require('node:util').promisify(require('node:child_process').execFile);
         // `claude auth status` exits non-zero when signed out, so read its JSON from either outcome.
         let auth={loggedIn:false};
-        try{auth=JSON.parse((await execFile('/opt/homebrew/bin/claude',['auth','status','--json'],{env:this.env(),timeout:15000})).stdout);}
-        catch(error){try{auth=JSON.parse(String(error.stdout || '{}'));}catch{if(error.code==='ENOENT')throw Error('Claude Code is not installed at /opt/homebrew/bin/claude. Install it with "npm install -g @anthropic-ai/claude-code" and try again.');}}
+        try{auth=JSON.parse((await execFile(this.claudePath,['auth','status','--json'],{env:this.env(),timeout:15000})).stdout);}
+        catch(error){try{auth=JSON.parse(String(error.stdout || '{}'));}catch{if(error.code==='ENOENT')throw Error('Claude Code could not be started. Reinstall Just Zen and try again.');}}
         if(!auth.loggedIn || auth.authMethod!=='claude.ai')throw Error('Sign in to Claude first: click Sign in above the workspace picker. Just Zen keeps its own Claude login, separate from any other Claude Code setup on this Mac, so this is needed once.');
       }
       const query=this.queryFactory || (await import('@anthropic-ai/claude-agent-sdk')).query;

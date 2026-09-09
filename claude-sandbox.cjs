@@ -3,7 +3,7 @@ const os=require('node:os');
 const {externalPath}=require('./bundle-paths.cjs');
 
 function quote(value){return "'"+String(value).replaceAll("'","'\\''")+"'";}
-function settings({root,mode,userData,home=os.homedir(),configDir=path.join(userData,'claude-config')}){
+function settings({root,mode,userData,home=os.homedir(),configDir=path.join(userData,'claude-config'),claudePath='/opt/homebrew/bin/claude'}){
  if(!path.isAbsolute(root))throw Error('Claude sandbox requires an absolute workspace');
  const stateDir=path.join(userData,'claude-sandbox');
  const projectSlug=root.replace(/[^a-zA-Z0-9_-]/g,'-');
@@ -18,7 +18,7 @@ function settings({root,mode,userData,home=os.homedir(),configDir=path.join(user
   filesystem:{
    denyRead:[home,'/Users','/Volumes','/private/var/folders','/private/tmp','/tmp','/Library/Keychains',projectsDir,path.join(root,'**','.env'),path.join(root,'**','.env.*')],
    // The login token lives in the macOS Keychain; the security framework needs to locate the (encrypted) keychain database files to use it.
-   allowRead:[root,configDir,projectDir,stateDir,path.join(home,'Library','Keychains')],
+   allowRead:[root,configDir,projectDir,stateDir,path.join(home,'Library','Keychains'),path.dirname(claudePath)],
    allowWrite,
    denyWrite:[projectsDir,...(mode==='readOnly'?[root]:[])]
   },
@@ -34,7 +34,7 @@ async function prepareClaudeSandbox({fs,root,mode,userData,packageRoot,nodePath=
  const wrapperPath=path.join(stateDir,'claude-sandboxed');
  const cliPath=externalPath(path.join(packageRoot,'node_modules','@anthropic-ai','sandbox-runtime','dist','cli.js'));
  for(const dir of [stateDir,tmpDir,configDir])await fs.mkdir(dir,{recursive:true,mode:0o700});
- await fs.writeFile(settingsPath,JSON.stringify(settings({root,mode,userData,home,configDir}),null,2),{mode:0o600});
+ await fs.writeFile(settingsPath,JSON.stringify(settings({root,mode,userData,home,configDir,claudePath}),null,2),{mode:0o600});
  // Fail closed: the probe runs inside the sandbox and refuses to start Claude if the home directory is still listable.
  const probe=`#!/bin/sh\nif /bin/ls ${quote(home)} >/dev/null 2>&1; then echo 'Just Zen: the Claude sandbox is not active. Refusing to start Claude.' >&2; exit 97; fi\nexec ${quote(claudePath)} "$@"\n`;
  await fs.writeFile(probePath,probe,{mode:0o700});await fs.chmod(probePath,0o700);

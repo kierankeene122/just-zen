@@ -73,6 +73,10 @@ jobs:
           cp "$(node -p 'process.execPath')" build/node
           chmod +x build/node
           build/node -v
+      - name: Record build information, including the Electron support window
+        run: |
+          node -e "(async()=>{const v=require('electron/package.json').version;let s=null;try{s=await require('./scripts/electron-support.cjs').electronSupport(v);}catch{}require('fs').writeFileSync('build/build-info.json',JSON.stringify({electron:v,app:require('./package.json').version,builtAt:new Date().toISOString(),electronSupport:s}));})()"
+          cat build/build-info.json
       - name: Prepare App Store Connect key
         env:
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}

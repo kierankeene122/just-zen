@@ -1,0 +1,34 @@
+name: Electron support window
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Check the Electron major against its support window
+        id: check
+        continue-on-error: true
+        run: node scripts/electron-support.cjs --check
+      - name: Raise an issue when fewer than 30 days remain
+        if: steps.check.outcome == 'failure'
+        run: |
+          title="Electron major nearing end of Chromium security support"
+          existing=$(gh issue list --search "$title in:title" --state open --json number --jq '.[0].number')
+          body="The bundled Electron major stops receiving Chromium fixes within 30 days. Upgrade to a supported major, run the tests and smoke, and cut a release."
+          if [ -z "$existing" ]; then gh issue create --title "$title" --body "$body"; else gh issue comment "$existing" --body "Still within 30 days of end of support."; fi

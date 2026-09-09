@@ -16,7 +16,8 @@
     "update:electron": "node scripts/update-electron.cjs",
     "update:agent": "node scripts/install-update-agent.cjs",
     "release": "node scripts/release.cjs",
-    "security:redteam": "cd security/promptfoo && npx --yes promptfoo@latest eval -c promptfooconfig.yaml -o results.json --no-cache --max-concurrency 1"
+    "security:redteam": "cd security/promptfoo && npx --yes promptfoo@latest eval -c promptfooconfig.yaml -o results.json --no-cache --max-concurrency 1",
+    "electron:support": "node scripts/electron-support.cjs --check"
   },
   "keywords": [],
   "author": "",
@@ -35,6 +36,10 @@
       {
         "from": "build/node",
         "to": "node"
+      },
+      {
+        "from": "build/build-info.json",
+        "to": "build-info.json"
       }
     ],
     "electronFuses": {

@@ -20,7 +20,8 @@ const root=path.resolve(__dirname,'..');
  if(path.basename(nodeBinary)!=='node')fs.renameSync(path.join(app,'Contents','Resources',path.basename(nodeBinary)),bundledNode);
  fs.chmodSync(bundledNode,0o755);
  // Recorded before signing so the local updater can tell which Electron a build contains.
- fs.writeFileSync(path.join(app,'Contents','Resources','build-info.json'),JSON.stringify({electron:require('electron/package.json').version,app:require(path.join(root,'package.json')).version,builtAt:new Date().toISOString()}));
+ const electronVersion=require('electron/package.json').version;let support=null;try{support=await require('./electron-support.cjs').electronSupport(electronVersion);}catch(e){console.warn('Electron support window unavailable:',e.message);}
+ fs.writeFileSync(path.join(app,'Contents','Resources','build-info.json'),JSON.stringify({electron:electronVersion,app:require(path.join(root,'package.json')).version,builtAt:new Date().toISOString(),electronSupport:support}));
  await flipFuses(app,{
   version:FuseVersion.V1,resetAdHocDarwinSignature:true,
   [FuseV1Options.RunAsNode]:false,

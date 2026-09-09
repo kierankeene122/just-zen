@@ -14,6 +14,7 @@ const {createSecureStore}=require('./secure-store.cjs');
 const {prepareClaudeSandbox}=require('./claude-sandbox.cjs');
 const {canNotify,unreadCount,secureOrigin}=require('./notifications.cjs');
 const {findNode}=require('./node-runtime.cjs');
+const {findClaude}=require('./claude-runtime.cjs');
 const {createImageDecoder}=require('./image-decoder.cjs');
 const {describeUpdateState}=require('./update-state.cjs');
 let favicon;
@@ -114,6 +115,7 @@ async function securityStatus(){
   if(/Signature=adhoc|flags=.*adhoc/.test(signing))result.signature='Ad hoc only';else if(team && team!=='not set')result.signature='Developer ID · '+team;else result.signature='Unsigned or unverifiable';
   let gate='';try{const value=await execFile('/usr/sbin/spctl',['-a','-vv','--type','execute',bundle],{timeout:8000});gate=(value.stdout || '')+(value.stderr || '');}catch(error){gate=(error.stdout || '')+(error.stderr || '');}
   if(/source=Notarized Developer ID|origin=Developer ID/.test(gate) && /accepted/.test(gate))result.gatekeeper='Accepted and notarized';else if(result.signature==='Ad hoc only')result.gatekeeper='Not notarized';else result.gatekeeper='Not verified';
+  try{const info=JSON.parse(await fs.readFile(path.join(process.resourcesPath,'build-info.json'),'utf8'));const s=info.electronSupport;if(s){const when=new Date(s.supportEnds).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});result.engineSupport=s.daysLeft<0?`Electron ${s.major} no longer receives Chromium security fixes (support ended ${when}). An update to a newer Electron is needed.`:`Chromium security fixes for Electron ${s.major} ${s.estimated?'until about':'until'} ${when} (Electron supports its three newest majors).`;}}catch{}
   try{await fs.access(path.join(process.resourcesPath,'app-update.yml'));result.updates='Signed release feed · checks on open and every 6 hours';}catch{result.updates=describeUpdateState(await fs.readFile(path.join(app.getPath('userData'),'update-state.json'),'utf8').then(JSON.parse).catch(()=>null));}
  }
  const profiles={shared:0,personal:0,work:0,isolated:0};for(const item of config.services || [])if(item.url)profiles[item.profile || 'isolated']++;
@@ -190,7 +192,7 @@ function startTerminal(kind = 'claude') {
   if(chat?.state.busy)throw Error('Stop the chat turn before starting a terminal');
   const env=subscriptionEnv();
   // 'login' runs the CLI's browser sign-in against Just Zen's own Claude config directory.
-  terminal = pty.spawn(kind === 'shell' ? '/bin/zsh' : '/opt/homebrew/bin/claude', kind === 'shell' ? ['-l'] : kind==='login' ? ['auth','login','--claudeai'] : [], {name:'xterm-256color',cols:70,rows:32,cwd:claudeRoot || app.getPath('userData'),env});
+  terminal = pty.spawn(kind === 'shell' ? '/bin/zsh' : findClaude(), kind === 'shell' ? ['-l'] : kind==='login' ? ['auth','login','--claudeai'] : [], {name:'xterm-256color',cols:70,rows:32,cwd:claudeRoot || app.getPath('userData'),env});
   const current = terminal;
   current.onData(data => send('terminal-data',data));
   current.onExit(({exitCode}) => { if(terminal === current) terminal = null; send('terminal-exit',exitCode); });
@@ -204,7 +206,7 @@ app.whenReady().then(async () => {
   locked=Boolean(config.appLock);
   favicon=createFaviconCache(path.join(app.getPath('userData'),'favicons'),net,createImageDecoder({BrowserWindow}));
   nativeTheme.themeSource=config.theme || 'light';
-  chat=new ChatSession({emit:state=>send('chat-state',state),policy:()=>({mode:config.claudePolicy || 'full',root:claudeRoot}),env:()=>({...subscriptionEnv(),ANTHROPIC_API_KEY:undefined,ANTHROPIC_AUTH_TOKEN:undefined,ANTHROPIC_BASE_URL:undefined,CLAUDE_CODE_USE_BEDROCK:undefined,CLAUDE_CODE_USE_VERTEX:undefined,CLAUDE_CODE_USE_FOUNDRY:undefined}),save:async state=>{if(!claudeRoot)return;config.chats=config.chats || {};config.chats[claudeRoot]=state;await persist();}});
+  chat=new ChatSession({claudePath:findClaude(),emit:state=>send('chat-state',state),policy:()=>({mode:config.claudePolicy || 'full',root:claudeRoot}),env:()=>({...subscriptionEnv(),ANTHROPIC_API_KEY:undefined,ANTHROPIC_AUTH_TOKEN:undefined,ANTHROPIC_BASE_URL:undefined,CLAUDE_CODE_USE_BEDROCK:undefined,CLAUDE_CODE_USE_VERTEX:undefined,CLAUDE_CODE_USE_FOUNDRY:undefined}),save:async state=>{if(!claudeRoot)return;config.chats=config.chats || {};config.chats[claudeRoot]=state;await persist();}});
   chat.restore(config.chats?.[claudeRoot]);
   win = new BrowserWindow({show:false,width:1440,height:940,minWidth:1100,minHeight:700,title:'Just Zen',icon:path.join(__dirname,'assets','justzen.png'),titleBarStyle:'hiddenInset',backgroundColor:'#ffffff',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
   // Send the current selection, wherever the focus is, to the Claude context card. Nothing is sent to Claude until the user picks an action.
@@ -266,10 +268,10 @@ app.whenReady().then(async () => {
   handle('disconnect-claude-folder',async ()=>{if(terminal || chat.state.busy)throw Error('Stop the current Claude session before disconnecting its workspace');claudeRoot=null;delete config.claudeRoot;chat.restore(null);chat.publish();await persist();return true;});
   handle('set-claude-policy',async mode=>{if(!['full','notes','readOnly'].includes(mode))throw Error('Invalid Claude access mode');if(terminal || chat.state.busy)throw Error('Stop the current Claude session before changing access');config.claudePolicy=mode;await persist();return mode;});
   handle('appearance',async ({theme,mode,layout})=>{if(theme && !['light','dark'].includes(theme))throw Error('Invalid theme');if(mode && !['chat','terminal'].includes(mode))throw Error('Invalid mode');if(layout)config.layout={agentCollapsed:Boolean(layout.agentCollapsed),centreCollapsed:Boolean(layout.centreCollapsed),navCollapsed:Boolean(layout.navCollapsed)};if(theme){config.theme=theme;nativeTheme.themeSource=theme;}if(mode)config.mode=mode;await persist();return true;});
-  handle('chat-send',async prompt=>{if(!claudeRoot)throw Error('Choose a Claude workspace first');if(terminal)throw Error('Stop the terminal session before sending a chat message');if(chat.state.busy)throw Error('Wait for the current reply');const sandbox=await prepareClaudeSandbox({fs,root:claudeRoot,mode:config.claudePolicy || 'full',userData:app.getPath('userData'),packageRoot:__dirname,nodePath:findNode(),configDir:claudeConfigDir});chat.run(prompt,claudeRoot,sandbox.executable).catch(error=>send('notice',error.message));return true;});
+  handle('chat-send',async prompt=>{if(!claudeRoot)throw Error('Choose a Claude workspace first');if(terminal)throw Error('Stop the terminal session before sending a chat message');if(chat.state.busy)throw Error('Wait for the current reply');const sandbox=await prepareClaudeSandbox({fs,root:claudeRoot,mode:config.claudePolicy || 'full',userData:app.getPath('userData'),packageRoot:__dirname,nodePath:findNode(),claudePath:findClaude(),configDir:claudeConfigDir});chat.run(prompt,claudeRoot,sandbox.executable).catch(error=>send('notice',error.message));return true;});
   handle('chat-stop',()=>chat.stop());
-  handle('claude-logout',async()=>{if(terminal || chat.state.busy)throw Error('Stop Claude before signing out');try{await execFile('/opt/homebrew/bin/claude',['auth','logout'],{env:subscriptionEnv(),timeout:15000});}catch(error){if(!/not logged in/i.test(String(error.stdout || '')+String(error.stderr || '')))throw Error('Sign-out failed: '+String(error.stderr || error.message).trim().slice(0,200));}chat.restore(null);chat.publish();config.chats={};await persist();return true;});
-  handle('claude-auth-status',async()=>{let auth={loggedIn:false};try{auth=JSON.parse((await execFile('/opt/homebrew/bin/claude',['auth','status','--json'],{env:subscriptionEnv(),timeout:15000})).stdout);}catch(error){try{auth=JSON.parse(String(error.stdout || '{}'));}catch{}}return {loggedIn:Boolean(auth.loggedIn && auth.authMethod==='claude.ai'),installed:!(auth.loggedIn===false && !auth.authMethod && false)};});
+  handle('claude-logout',async()=>{if(terminal || chat.state.busy)throw Error('Stop Claude before signing out');try{await execFile(findClaude(),['auth','logout'],{env:subscriptionEnv(),timeout:15000});}catch(error){if(!/not logged in/i.test(String(error.stdout || '')+String(error.stderr || '')))throw Error('Sign-out failed: '+String(error.stderr || error.message).trim().slice(0,200));}chat.restore(null);chat.publish();config.chats={};await persist();return true;});
+  handle('claude-auth-status',async()=>{let auth={loggedIn:false};try{auth=JSON.parse((await execFile(findClaude(),['auth','status','--json'],{env:subscriptionEnv(),timeout:15000})).stdout);}catch(error){try{auth=JSON.parse(String(error.stdout || '{}'));}catch{}}return {loggedIn:Boolean(auth.loggedIn && auth.authMethod==='claude.ai'),installed:!(auth.loggedIn===false && !auth.authMethod && false)};});
   handle('chat-permission',value=>chat.respond(value));
   handle('chat-new',async ()=>{if(chat.state.busy)throw Error('Stop the current reply first');chat.restore(null);chat.publish();config.chats=config.chats || {};delete config.chats[claudeRoot];await persist();});
   handle('files',files);
