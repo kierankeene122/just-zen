@@ -67,6 +67,12 @@ jobs:
       - run: npm test
       - run: npm audit --omit=dev
       - run: npm run rebuild
+      - name: Bundle the Node.js runtime for the sandbox supervisor and document worker
+        run: |
+          mkdir -p build
+          cp "$(node -p 'process.execPath')" build/node
+          chmod +x build/node
+          build/node -v
       - name: Prepare App Store Connect key
         env:
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}

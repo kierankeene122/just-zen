@@ -30,6 +30,12 @@
       "document-worker.cjs",
       "document-sanitize.cjs"
     ],
+    "extraResources": [
+      {
+        "from": "build/node",
+        "to": "node"
+      }
+    ],
     "electronFuses": {
       "runAsNode": false,
       "enableCookieEncryption": true,
@@ -54,7 +60,8 @@
       "!SECURITY-REVIEW*.md",
       "!ADVERSARIAL-RESULTS.md",
       "!AUDIT-SCOPE.md",
-      "!docs/**"
+      "!docs/**",
+      "!build/**"
     ],
     "mac": {
       "icon": "assets/justzen.icns",
