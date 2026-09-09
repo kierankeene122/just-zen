@@ -15,6 +15,7 @@ Just Zen is free, open-source software released under the ISC licence (see `LICE
 npm ci
 npm test
 npm run smoke
+npm start              # runs from source against a separate profile (Hearth-dev), never your real one
 npm run package        # local ad hoc build into ../../outputs
 npm run release        # tag a version; GitHub builds the signed release
 ```

@@ -30,8 +30,10 @@ const entry = pathToFileURL(path.join(__dirname, 'index.html')).href;
 // Test hooks are development-only: a packaged app ignores --smoke and HEARTH_DATA.
 const smoke = process.argv.includes('--smoke') && !app.isPackaged;
 // Storage stays stable when the executable is rebuilt or packaged by a different release tool.
-// HEARTH_DATA is reserved for isolated smoke and visual-test profiles.
-app.setPath('userData',(!app.isPackaged && process.env.HEARTH_DATA) || path.join(app.getPath('appData'),'Hearth'));
+// A source checkout (npm start) uses its own profile: its Electron binary carries a different code signature, so the
+// Keychain key that encrypts the real profile's cookies is not available to it and Chromium would drop every login.
+// HEARTH_DATA overrides the profile for smoke and visual tests.
+app.setPath('userData',app.isPackaged?path.join(app.getPath('appData'),'Hearth'):(process.env.HEARTH_DATA || path.join(app.getPath('appData'),'Hearth-dev')));
 // The smoke test mutates state (lock, sidebar, whiteboard, folders), so it always runs in a fresh throwaway profile.
 if(smoke)app.setPath('userData',require('node:fs').mkdtempSync(path.join(require('node:os').tmpdir(),'hearth-smoke-')));
 // Claude Code login, settings and history used by Just Zen live here, separate from the user's own ~/.claude.
