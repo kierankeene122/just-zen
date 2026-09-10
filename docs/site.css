@@ -178,3 +178,6 @@ html{overflow-x:hidden}
 
 .art.photo{object-fit:cover;object-position:left top;border:1px solid var(--line);background:#f5f8fb}
 .art.photo.contain{object-fit:contain;object-position:center;padding:10px;background:linear-gradient(160deg,#eef6fa,#e4f0f6)}
+
+/* Chips can carry a full sentence; they wrap and stay readable. */
+.pillar li{white-space:normal;line-height:1.4;max-width:100%}
