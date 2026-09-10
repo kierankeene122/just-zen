@@ -198,3 +198,12 @@ header .theme-toggle{margin-left:0}
 /* Browser apps show their chosen emoji where other apps show a favicon. */
 .service-row .nav>.group-icon{flex:0 0 30px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1;background:transparent}
 .tile-emoji{font-size:16px;line-height:1;width:18px;text-align:center}
+
+/* Sticky notes: rich text body, formatting strip when selected, and a resize corner. */
+.board-postit{display:flex;flex-direction:column;padding:34px 12px 14px;overflow:hidden}
+.board-note-body{flex:1;min-height:0;overflow:auto;outline:0;color:#34342f;padding:2px 4px;font:16px/1.5 Georgia,serif;overflow-wrap:anywhere;cursor:text}
+.board-note-body:empty::before{content:attr(data-placeholder);color:#8d8a7c;pointer-events:none}
+.board-note-body h3{font:600 20px/1.3 Georgia,serif;margin:0 0 6px}.board-note-body p,.board-note-body div{margin:0}.board-note-body ul,.board-note-body ol{margin:4px 0;padding-left:22px}.board-note-body li{margin:2px 0}
+.board-note-tools{position:absolute;top:5px;left:36px;right:10px;display:none;gap:1px;align-items:center}.board-postit.selected .board-note-tools{display:flex}
+.board-note-tool{width:22px;height:22px;border-radius:5px;font-size:12px;line-height:1;color:#3e4347;background:#ffffff70;padding:0}.board-note-tool:hover{background:#ffffffb0}.board-note-tool-italic{font-style:italic}.board-note-tool-underline{text-decoration:underline}.board-note-tool-strikeThrough{text-decoration:line-through}.board-note-tool-bold{font-weight:700}
+.board-resize{position:absolute;right:2px;bottom:2px;width:18px;height:18px;padding:0;cursor:nwse-resize;border-radius:4px;opacity:.5;background:linear-gradient(135deg,transparent 45%,#3e4347 45%,#3e4347 55%,transparent 55%,transparent 70%,#3e4347 70%,#3e4347 80%,transparent 80%)}.board-postit:hover .board-resize,.board-postit.selected .board-resize{opacity:.8}
