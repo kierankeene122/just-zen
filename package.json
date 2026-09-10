@@ -1,6 +1,6 @@
 {
   "name": "just-zen",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "A calm local workspace for Claude Code, your vault, and web apps",
   "main": "main.cjs",
   "scripts": {
