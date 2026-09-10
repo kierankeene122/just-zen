@@ -194,3 +194,7 @@ header .theme-toggle{margin-left:0}
 
 /* Group rows: the head stretches like an app row so the icon sits exactly where app icons sit, expanded or collapsed. */
 .service-group{display:flex;flex-direction:row;align-items:center;margin:3px 0}.group-head{display:flex;align-items:center;flex:1;min-width:0}.group-head .nav{flex:1;min-width:0;margin:0}.nav-collapsed .group-head .nav{justify-content:center;padding:11px 0}.nav-collapsed .group-head{justify-content:center}
+
+/* Browser apps show their chosen emoji where other apps show a favicon. */
+.service-row .nav>.group-icon{flex:0 0 30px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1;background:transparent}
+.tile-emoji{font-size:16px;line-height:1;width:18px;text-align:center}

@@ -8,7 +8,7 @@ window.popover.onShow(data=>{
   for(const item of data.items){
     const tile=document.createElement('button');tile.className='tile';tile.title=item.name;
     const out=document.createElement('b');out.className='out';out.textContent='×';out.title='Remove from this group';out.onclick=e=>{e.stopPropagation();window.popover.send('popover-remove',{folderId:data.folder.id,key:item.key});};
-    let art;if(item.icon){art=document.createElement('img');art.src=item.icon;art.alt='';}else{art=document.createElement('span');art.className='fallback';art.textContent=item.name.slice(0,1).toUpperCase();}
+    let art;if(item.icon){art=document.createElement('img');art.src=item.icon;art.alt='';}else{art=document.createElement('span');art.className=item.emoji?'emoji':'fallback';art.textContent=item.emoji || item.name.slice(0,1).toUpperCase();}
     const label=document.createElement('span');label.textContent=item.name;
     tile.append(out,art,label);
     if(item.badge){const badge=document.createElement('small');badge.className='badge';badge.textContent=item.badge>99?'99+':String(item.badge);tile.append(badge);}

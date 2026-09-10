@@ -9,7 +9,9 @@ function partitionFor(profile='isolated',key=''){
  return 'persist:profile-'+profile;
 }
 function webPreferences(profile='isolated',key=''){return {partition:partitionFor(profile,key),sandbox:true,contextIsolation:true,nodeIntegration:false,navigateOnDragDrop:false};}
-function browserWebPreferences(){return {...webPreferences(),partition:BROWSER_PARTITION};}
+// The first browser keeps the original partition; every additional browser app gets its own.
+function browserPartition(key='browser'){return key==='browser'?BROWSER_PARTITION:'persist:browser-'+require('node:crypto').createHash('sha256').update(String(key)).digest('hex').slice(0,24);}
+function browserWebPreferences(key='browser'){return {...webPreferences(),partition:browserPartition(key)};}
 // Addresses opened ad hoc (URL bar, links in notes or chat) get an in-memory partition that dies with the view,
 // so no cookies for unsaved sites are left on disk.
 function ephemeralPartition(key=''){return 'ephemeral-'+require('node:crypto').createHash('sha256').update(String(key)).digest('hex').slice(0,24);}
@@ -72,4 +74,4 @@ function configureWebContents(contents,parent,notify=()=>{},rootContents=content
  });
  contents.on('did-create-window',child=>configureWebContents(child.webContents,parent,notify,rootContents,preferences));
 }
-module.exports={SHARED_PARTITION,BROWSER_PARTITION,browserWebPreferences,PROFILES,partitionFor,webPreferences,ephemeralPartition,ephemeralWebPreferences,sharedWebPreferences,configureWebContents,webEquivalent,slackWebURL};
+module.exports={SHARED_PARTITION,BROWSER_PARTITION,browserPartition,browserWebPreferences,PROFILES,partitionFor,webPreferences,ephemeralPartition,ephemeralWebPreferences,sharedWebPreferences,configureWebContents,webEquivalent,slackWebURL};

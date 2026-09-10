@@ -6,7 +6,7 @@ const crypto=require('node:crypto');
 const pty = require('node-pty');
 const {ChatSession} = require('./chat.cjs');
 const {catalogue,findApp,isAdded,addApp,bundledIcon} = require('./app-catalog.cjs');
-const {webPreferences,browserWebPreferences,BROWSER_PARTITION,configureWebContents,PROFILES,partitionFor} = require('./web-session.cjs');
+const {webPreferences,browserWebPreferences,browserPartition,BROWSER_PARTITION,configureWebContents,PROFILES,partitionFor} = require('./web-session.cjs');
 const {reorder,createFolder,updateFolder,removeFolder,setFolder}=require('./sidebar.cjs');
 const {createFaviconCache}=require('./favicons.cjs');
 const {startAutoUpdates}=require('./auto-update.cjs');
@@ -137,24 +137,28 @@ async function securityStatus(){
  return {...result,encrypted:Boolean(secureStore?.available()),profiles,sleep:sleepSettings(),liveViews:views.size,claude:{connected:Boolean(claudeRoot),policy:config.claudePolicy || 'notes',sandboxed:true,terminalSandboxed:false},lock:{enabled:Boolean(config.appLock),locked,touchID:touchIDAvailable(),method:config.appLockMethod || (touchIDAvailable()?'touchID':'passcode'),minutes:Number(config.autoLockMinutes) || 15}};
 }
 // ---- Apps, tabs and on-screen placement ----
-function serviceItem(serviceKey){if(serviceKey===BROWSER_KEY)return {id:BROWSER_KEY,name:'Browser',kind:'browser',url:''};return (config.services || []).find(s=>s.url && (s.id || s.url)===serviceKey) || null;}
+// Browsers are sidebar apps like any other, each with its own isolated profile, tabs, name and icon.
+function isBrowserItem(item){return item?.kind==='browser';}
+function openable(item){return Boolean(item && (item.url || isBrowserItem(item)));}
+function serviceItem(serviceKey){return (config.services || []).find(s=>openable(s) && (s.id || s.url)===serviceKey) || null;}
+function cleanEmoji(icon){const value=typeof icon==='string'?icon.trim():'';return [...value].slice(0,4).join('') || '🌐';}
 function cleanTabs(serviceKey,raw){
  const item=serviceItem(serviceKey);if(!item)return null;
  const items=(Array.isArray(raw?.items)?raw.items:[]).filter(t=>t && typeof t.id==='string' && t.id.length<100).slice(0,20).map(t=>({id:t.id,url:typeof t.url==='string' && t.url?t.url:'',current:typeof t.current==='string' && t.current?t.current:'',title:typeof t.title==='string'?t.title.slice(0,200):''}));
- if(!items.length)items.push({id:'main',url:serviceKey===BROWSER_KEY?'':item.url,current:'',title:''});
+ if(!items.length)items.push({id:'main',url:isBrowserItem(item)?'':item.url,current:'',title:''});
  return {active:items.some(t=>t.id===raw?.active)?raw.active:items[0].id,items};
 }
 function tabsFor(serviceKey){config.tabs=config.tabs || {};const clean=cleanTabs(serviceKey,config.tabs[serviceKey]);if(!clean)throw Error('App not found');config.tabs[serviceKey]=clean;return clean;}
-function allTabs(){const out={};for(const key of [BROWSER_KEY,...(config.services || []).filter(s=>s.url).map(s=>s.id || s.url)])out[key]=tabsFor(key);return out;}
+function allTabs(){const out={};for(const key of (config.services || []).filter(openable).map(s=>s.id || s.url))out[key]=tabsFor(key);return out;}
 function tabOf(serviceKey,tabId){const tab=tabsFor(serviceKey).items.find(t=>t.id===tabId);if(!tab)throw Error('Tab not found');return tab;}
 function viewKey(serviceKey,tabId){return serviceKey+'\n'+tabId;}
-function asleepKeys(){const out=[];for(const key of Object.keys(config.tabs || {})){const item=serviceItem(key);if(!item || key===BROWSER_KEY)continue;if(sleepMinutesFor(key)>0 && ![...views.values()].some(v=>v.serviceKey===key))out.push(key);}return out;}
+function asleepKeys(){const out=[];for(const key of Object.keys(config.tabs || {})){const item=serviceItem(key);if(!item || isBrowserItem(item))continue;if(sleepMinutesFor(key)>0 && ![...views.values()].some(v=>v.serviceKey===key))out.push(key);}return out;}
 function tabInfo(entry){const c=entry.view.webContents;return {serviceKey:entry.serviceKey,tabId:entry.tabId,url:c.getURL(),title:c.getTitle(),loading:c.isLoading(),canGoBack:c.navigationHistory.canGoBack(),canGoForward:c.navigationHistory.canGoForward()};}
 function announceTab(entry){if(entry.view.webContents.isDestroyed())return;send('tab-update',tabInfo(entry));}
 function destroyView(key){const entry=views.get(key);if(!entry)return;views.delete(key);try{win.contentView.removeChildView(entry.view);}catch{}try{entry.view.webContents.close();}catch{}}
 function closeServiceViews(serviceKey){for(const [key,entry] of views)if(entry.serviceKey===serviceKey)destroyView(key);updateServiceBadge(serviceKey,0);}
 function hideAllViews(){for(const entry of views.values())if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}}
-function preferencesFor(serviceKey){const item=serviceItem(serviceKey);if(!item)throw Error('App not found');return {...(serviceKey===BROWSER_KEY?browserWebPreferences():webPreferences(item.profile || 'isolated',serviceKey)),backgroundThrottling:false};}
+function preferencesFor(serviceKey){const item=serviceItem(serviceKey);if(!item)throw Error('App not found');return {...(isBrowserItem(item)?browserWebPreferences(serviceKey):webPreferences(item.profile || 'isolated',serviceKey)),backgroundThrottling:false};}
 function ensureView(serviceKey,tabId){
   const tab=tabOf(serviceKey,tabId);
   const key=viewKey(serviceKey,tabId);
@@ -173,14 +177,14 @@ function popupAsTab(serviceKey,options){
   const tab={id:crypto.randomUUID(),url:'',current:'',title:''};tabs.items.push(tab);tabs.active=tab.id;persist();
   const view=new WebContentsView({...options,webPreferences:{...(options.webPreferences || {}),...preferencesFor(serviceKey)}});
   const entry=attachView(serviceKey,tab.id,view,'');
-  entry.view.webContents.once('destroyed',()=>{views.delete(viewKey(serviceKey,tab.id));const live=tabsFor(serviceKey);const index=live.items.findIndex(t=>t.id===tab.id);if(index<0)return;live.items.splice(index,1);if(!live.items.length)live.items.push({id:crypto.randomUUID(),url:serviceKey===BROWSER_KEY?'':serviceItem(serviceKey)?.url || '',current:'',title:''});if(live.active===tab.id)live.active=live.items[Math.max(0,index-1)].id;persist();send('tabs-changed',{serviceKey,tabs:live});});
+  entry.view.webContents.once('destroyed',()=>{views.delete(viewKey(serviceKey,tab.id));const live=tabsFor(serviceKey);const index=live.items.findIndex(t=>t.id===tab.id);if(index<0)return;live.items.splice(index,1);if(!live.items.length)live.items.push({id:crypto.randomUUID(),url:isBrowserItem(serviceItem(serviceKey))?'':serviceItem(serviceKey)?.url || '',current:'',title:''});if(live.active===tab.id)live.active=live.items[Math.max(0,index-1)].id;persist();send('tabs-changed',{serviceKey,tabs:live});});
   send('tab-opened',{serviceKey,tabId:tab.id,tabs});
   return view.webContents;
 }
 function attachView(serviceKey,tabId,view,url){
   const item=serviceItem(serviceKey);if(!item)throw Error('App not found');
   const key=viewKey(serviceKey,tabId);
-  const isBrowser=serviceKey===BROWSER_KEY;
+  const isBrowser=isBrowserItem(item);
   const preferences=preferencesFor(serviceKey);
   const entry={view,serviceKey,tabId,visible:false,hiddenSince:Date.now()};
   views.set(key,entry);win.contentView.addChildView(view);view.setVisible(false);
@@ -234,7 +238,7 @@ function placeViews(list){
 function openTab(serviceKey,url='',announce=false){
   const item=serviceItem(serviceKey);if(!item)throw Error('App not found');
   const tabs=tabsFor(serviceKey);if(tabs.items.length>=20)throw Error('Close a tab first (20 per app)');
-  const target=url?validURL(url):(serviceKey===BROWSER_KEY?'':item.url);
+  const target=url?validURL(url):(isBrowserItem(item)?'':item.url);
   const tab={id:crypto.randomUUID(),url:target,current:'',title:''};tabs.items.push(tab);tabs.active=tab.id;persist();
   if(announce)send('tab-opened',{serviceKey,tabId:tab.id,tabs});
   return {serviceKey,tabId:tab.id,tabs};
@@ -245,7 +249,7 @@ function sleepSweep(){
   const now=Date.now();
   for(const [key,entry] of [...views]){
     const minutes=sleepMinutesFor(entry.serviceKey);
-    if(entry.serviceKey===BROWSER_KEY || !minutes || entry.visible || !entry.hiddenSince || now-entry.hiddenSince<minutes*60_000)continue;
+    if(isBrowserItem(serviceItem(entry.serviceKey)) || !minutes || entry.visible || !entry.hiddenSince || now-entry.hiddenSince<minutes*60_000)continue;
     const contents=entry.view.webContents;
     if(contents.isDestroyed()){views.delete(key);continue;}
     if(contents.isCurrentlyAudible())continue;
@@ -295,8 +299,8 @@ function popoverTrusted(e){if(!popover || popover.isDestroyed() || e.sender!==po
 function hidePopover(){popoverFolder=null;if(popover && !popover.isDestroyed() && popover.isVisible())popover.hide();}
 async function showPopover({folderId,left,top}){
   const folder=(config.serviceFolders || []).find(f=>f.id===folderId);if(!folder)throw Error('Group not found');
-  const members=(config.services || []).filter(s=>s.url && s.folderId===folderId);
-  const items=await Promise.all(members.map(async item=>({key:item.id || item.url,name:item.name,icon:await iconFor(item),badge:serviceBadges.get(item.id || item.url) || 0})));
+  const members=(config.services || []).filter(s=>openable(s) && s.folderId===folderId);
+  const items=await Promise.all(members.map(async item=>({key:item.id || item.url,name:item.name,icon:isBrowserItem(item)?null:await iconFor(item),emoji:isBrowserItem(item)?item.icon || '🌐':null,badge:serviceBadges.get(item.id || item.url) || 0})));
   const window_=ensurePopover();popoverFolder=folderId;
   if(window_.webContents.isLoading())await new Promise(resolve=>window_.webContents.once('did-finish-load',resolve));
   const cb=win.getContentBounds();
@@ -333,6 +337,7 @@ function startTerminal(kind = 'claude') {
 app.whenReady().then(async () => {
   secureStore=createSecureStore({fs,safeStorage,userData:app.getPath('userData')});
   try { config = await secureStore.load(); if(config.root) root = await fs.realpath(config.root);if(config.claudeRoot)claudeRoot=await fs.realpath(config.claudeRoot);else if(root){claudeRoot=root;config.claudeRoot=root;}if(claudeRoot)config.claudeWorkspaces=[claudeRoot,...(config.claudeWorkspaces || []).filter(value=>value!==claudeRoot)].slice(0,12); } catch(error){console.error(error);config={};}
+  if(!(config.services || []).some(isBrowserItem)){config.services=[{id:BROWSER_KEY,kind:'browser',name:'Browser',icon:'🌐',profile:'isolated'},...(config.services || [])];if(Array.isArray(config.sidebarOrder) && config.sidebarOrder.length)config.sidebarOrder=[BROWSER_KEY,...config.sidebarOrder.filter(e=>e!==BROWSER_KEY)];await persist();}
   const unprofiled=(config.services || []).some(item=>item.url && !item.profile);if(unprofiled){config.services=config.services.map(item=>item.url && !item.profile?{...item,profile:'isolated'}:item);await persist();}
   if(!config.whiteboard && Array.isArray(config.stickyNotes)){config.whiteboard={items:config.stickyNotes.map((note,index)=>({id:note.id || crypto.randomUUID(),type:'note',x:80+(index%4)*245,y:90+Math.floor(index/4)*195,w:220,h:170,text:String(note.text || ''),color:{sun:'#fff0a8',blue:'#dcecff',mint:'#dff2df',rose:'#f7dfe5'}[note.color] || '#fff0a8',rotation:(index%2?1:-1)*.6}))};delete config.stickyNotes;await persist();}
   locked=Boolean(config.appLock);
@@ -423,15 +428,15 @@ app.whenReady().then(async () => {
   handle('tabs',()=>allTabs());
   handle('open-tab',({serviceKey,url}={})=>openTab(serviceKey,typeof url==='string'?url:''));
   handle('activate-tab',async ({serviceKey,tabId}={})=>{const tabs=tabsFor(serviceKey);tabOf(serviceKey,tabId);tabs.active=tabId;await persist();return tabs;});
-  handle('close-tab',async ({serviceKey,tabId}={})=>{const tabs=tabsFor(serviceKey);const index=tabs.items.findIndex(t=>t.id===tabId);if(index<0)throw Error('Tab not found');destroyView(viewKey(serviceKey,tabId));tabs.items.splice(index,1);if(!tabs.items.length)tabs.items.push({id:crypto.randomUUID(),url:serviceKey===BROWSER_KEY?'':serviceItem(serviceKey).url,current:'',title:''});if(tabs.active===tabId)tabs.active=tabs.items[Math.min(index,tabs.items.length-1)].id;await persist();return tabs;});
+  handle('close-tab',async ({serviceKey,tabId}={})=>{const tabs=tabsFor(serviceKey);const index=tabs.items.findIndex(t=>t.id===tabId);if(index<0)throw Error('Tab not found');destroyView(viewKey(serviceKey,tabId));tabs.items.splice(index,1);if(!tabs.items.length)tabs.items.push({id:crypto.randomUUID(),url:isBrowserItem(serviceItem(serviceKey))?'':serviceItem(serviceKey).url,current:'',title:''});if(tabs.active===tabId)tabs.active=tabs.items[Math.min(index,tabs.items.length-1)].id;await persist();return tabs;});
   handle('navigate-tab',async ({serviceKey,tabId,url}={})=>{const tab=tabOf(serviceKey,tabId);const target=validURL(url);tab.current=target;if(!tab.url)tab.url=target;tab.title='';await persist();const entry=views.get(viewKey(serviceKey,tabId));if(entry)entry.view.webContents.loadURL(target).catch(()=>{});else ensureView(serviceKey,tabId);return tabsFor(serviceKey);});
   handle('tab-action',({serviceKey,tabId,action}={})=>{tabOf(serviceKey,tabId);const entry=views.get(viewKey(serviceKey,tabId));if(!entry)return false;const c=entry.view.webContents;if(action==='back' && c.navigationHistory.canGoBack())c.navigationHistory.goBack();else if(action==='forward' && c.navigationHistory.canGoForward())c.navigationHistory.goForward();else if(action==='reload')c.reload();else if(action==='stop')c.stop();else if(action==='home'){const tab=tabOf(serviceKey,tabId);if(tab.url)c.loadURL(tab.url).catch(()=>{});}else if(action==='focus')c.focus();return tabInfo(entry);});
-  handle('set-sleep',async ({defaultMinutes,key,minutes}={})=>{const s=sleepSettings();if(defaultMinutes!==undefined){if(!SLEEP_CHOICES.has(defaultMinutes))throw Error('Invalid sleep delay');s.defaultMinutes=defaultMinutes;}if(typeof key==='string'){if(!serviceItem(key) || key===BROWSER_KEY)throw Error('App not found');if(minutes===null || minutes===undefined)delete s.apps[key];else if(SLEEP_CHOICES.has(minutes))s.apps[key]=minutes;else throw Error('Invalid sleep delay');}config.sleep=s;await persist();return s;});
+  handle('set-sleep',async ({defaultMinutes,key,minutes}={})=>{const s=sleepSettings();if(defaultMinutes!==undefined){if(!SLEEP_CHOICES.has(defaultMinutes))throw Error('Invalid sleep delay');s.defaultMinutes=defaultMinutes;}if(typeof key==='string'){if(!serviceItem(key) || isBrowserItem(serviceItem(key)))throw Error('App not found');if(minutes===null || minutes===undefined)delete s.apps[key];else if(SLEEP_CHOICES.has(minutes))s.apps[key]=minutes;else throw Error('Invalid sleep delay');}config.sleep=s;await persist();return s;});
   handle('set-service-profile',async ({key,profile})=>{if(!PROFILES.has(profile))throw Error('Invalid browser profile');let found=false;config.services=(config.services || []).map(item=>{if((item.id || item.url)!==key)return item;found=true;return {...item,profile};});if(!found)throw Error('App not found');closeServiceViews(key);await persist();return config.services;});
   handle('isolate-all-services',async()=>{for(const item of config.services || [])if(item.url)closeServiceViews(item.id || item.url);config.services=(config.services || []).map(item=>item.url?{...item,profile:'isolated'}:item);await persist();return config.services;});
-  handle('clear-profile-data',async ({profile,key})=>{if(profile===BROWSER_KEY){closeServiceViews(BROWSER_KEY);delete (config.tabs || {})[BROWSER_KEY];await clearSessionData(session.fromPartition(BROWSER_PARTITION));await persist();return true;}if(!PROFILES.has(profile))throw Error('Invalid browser profile');if(profile==='isolated' && !(config.services || []).some(item=>(item.id || item.url)===key))throw Error('App not found');for(const item of config.services || [])if(item.url && (item.profile || 'isolated')===profile && (profile!=='isolated' || (item.id || item.url)===key))closeServiceViews(item.id || item.url);await clearSessionData(session.fromPartition(partitionFor(profile,key)));return true;});
+  handle('clear-profile-data',async ({profile,key})=>{if(profile==='browser'){const item=serviceItem(key);if(!isBrowserItem(item))throw Error('Browser not found');closeServiceViews(key);delete (config.tabs || {})[key];await clearSessionData(session.fromPartition(browserPartition(key)));await persist();return true;}if(!PROFILES.has(profile))throw Error('Invalid browser profile');if(profile==='isolated' && !(config.services || []).some(item=>(item.id || item.url)===key))throw Error('App not found');for(const item of config.services || [])if(item.url && (item.profile || 'isolated')===profile && (profile!=='isolated' || (item.id || item.url)===key))closeServiceViews(item.id || item.url);await clearSessionData(session.fromPartition(partitionFor(profile,key)));return true;});
   handle('clear-claude-history',async()=>{if(chat.state.busy)throw Error('Stop Claude before clearing history');config.chats={};chat.restore(null);chat.publish();await persist();return true;});
-  handle('erase-hearth-data',async()=>{if(chat.state.busy || terminal)throw Error('Stop Claude before erasing Just Zen data');const partitions=new Set([partitionFor('shared'),partitionFor('personal'),partitionFor('work'),BROWSER_PARTITION]);for(const item of config.services || [])if(item.url)partitions.add(partitionFor(item.profile || 'isolated',item.id || item.url));for(const key of [...views.keys()])destroyView(key);for(const name of partitions)await clearSessionData(session.fromPartition(name));config={theme:config.theme || 'light'};root=null;claudeRoot=null;chat.restore(null);chat.publish();await fs.rm(path.join(app.getPath('userData'),'favicons'),{recursive:true,force:true});await fs.rm(path.join(app.getPath('userData'),'claude-sandbox'),{recursive:true,force:true});await fs.rm(claudeConfigDir,{recursive:true,force:true});
+  handle('erase-hearth-data',async()=>{if(chat.state.busy || terminal)throw Error('Stop Claude before erasing Just Zen data');const partitions=new Set([partitionFor('shared'),partitionFor('personal'),partitionFor('work'),BROWSER_PARTITION]);for(const item of config.services || []){if(isBrowserItem(item))partitions.add(browserPartition(item.id));else if(item.url)partitions.add(partitionFor(item.profile || 'isolated',item.id || item.url));}for(const key of [...views.keys()])destroyView(key);for(const name of partitions)await clearSessionData(session.fromPartition(name));config={theme:config.theme || 'light'};root=null;claudeRoot=null;chat.restore(null);chat.publish();await fs.rm(path.join(app.getPath('userData'),'favicons'),{recursive:true,force:true});await fs.rm(path.join(app.getPath('userData'),'claude-sandbox'),{recursive:true,force:true});await fs.rm(claudeConfigDir,{recursive:true,force:true});
   // Remove on-disk partitions left by earlier builds that persisted ad-hoc addresses.
   const known=new Set([...partitions].map(name=>name.replace(/^persist:/,'')));const partitionRoot=path.join(app.getPath('userData'),'Partitions');for(const entry of await fs.readdir(partitionRoot,{withFileTypes:true}).catch(()=>[]))if(entry.isDirectory() && !known.has(decodeURIComponent(entry.name)))await fs.rm(path.join(partitionRoot,entry.name),{recursive:true,force:true});
   await persist();send('data-erased',true);return stateSnapshot();});
@@ -439,13 +444,13 @@ app.whenReady().then(async () => {
   // One ordering for the whole sidebar: 'group:<id>' entries and app keys, as the user arranged them.
   handle('reorder-sidebar',async entries=>{
     if(!Array.isArray(entries) || entries.length>300)throw Error('Invalid sidebar order');
-    const folders=config.serviceFolders || [],apps=(config.services || []).filter(s=>s.url);
+    const folders=config.serviceFolders || [],apps=(config.services || []).filter(openable);
     const clean=[];const seen=new Set();
     for(const entry of entries){if(typeof entry!=='string' || seen.has(entry))continue;if(entry.startsWith('group:')?folders.some(f=>f.id===entry.slice(6)):apps.some(s=>(s.id || s.url)===entry)){clean.push(entry);seen.add(entry);}}
     const groupOrder=clean.filter(e=>e.startsWith('group:')).map(e=>e.slice(6));
     config.serviceFolders=[...groupOrder.map(id=>folders.find(f=>f.id===id)),...folders.filter(f=>!groupOrder.includes(f.id))];
     const appOrder=clean.filter(e=>!e.startsWith('group:'));
-    config.services=[...appOrder.map(key=>apps.find(s=>(s.id || s.url)===key)),...(config.services || []).filter(s=>!s.url || !appOrder.includes(s.id || s.url))];
+    config.services=[...appOrder.map(key=>apps.find(s=>(s.id || s.url)===key)),...(config.services || []).filter(s=>!openable(s) || !appOrder.includes(s.id || s.url))];
     config.sidebarOrder=clean;await persist();return {services:config.services,folders:config.serviceFolders,order:config.sidebarOrder};
   });
   handle('create-service-folder',async ({name,icon,keys}={})=>{const id=crypto.randomUUID();config.serviceFolders=createFolder(config.serviceFolders || [],name,id,icon);if(Array.isArray(keys))for(const key of keys.slice(0,100))if(typeof key==='string')try{config.services=setFolder(config.services || [],key,id,config.serviceFolders);}catch{}await persist();return {services:config.services || [],folders:config.serviceFolders};});
@@ -459,7 +464,9 @@ app.whenReady().then(async () => {
   handle('favicon',async key=>{const item=(config.services || []).find(s=>(s.id || s.url)===key);const local=bundledIcon(item);if(local)return 'data:image/png;base64,'+(await fs.readFile(path.join(__dirname,local))).toString('base64');return item?.url?favicon(item.url):null;});
   handle('web-apps',()=>catalogue.map(item=>({...item,added:isAdded(config.services || [],item)})));
   handle('add-catalog-app',async id=>{config.services=addApp(config.services || [],id);await persist();return config.services;});
-  handle('remove-service',async key=>{if(key===BROWSER_KEY)throw Error('The Browser stays in the sidebar');closeServiceViews(key);config.services=(config.services || []).filter(s=>(s.id || s.url)!==key);delete (config.tabs || {})[key];if(config.sleep?.apps)delete config.sleep.apps[key];await persist();return config.services;});
+  handle('remove-service',async key=>{closeServiceViews(key);config.services=(config.services || []).filter(s=>(s.id || s.url)!==key);delete (config.tabs || {})[key];if(config.sleep?.apps)delete config.sleep.apps[key];await persist();return config.services;});
+  handle('add-browser',async ({name,icon}={})=>{if(typeof name!=='string' || !name.trim())throw Error('Name is required');config.services=config.services || [];const item={id:crypto.randomUUID(),kind:'browser',name:name.trim().slice(0,50),icon:cleanEmoji(icon),profile:'isolated'};config.services.push(item);await persist();return {services:config.services,key:item.id};});
+  handle('update-service',async ({key,name,icon}={})=>{let found=false;config.services=(config.services || []).map(item=>{if((item.id || item.url)!==key)return item;found=true;const next={...item};if(typeof name==='string' && name.trim())next.name=name.trim().slice(0,50);if(icon!==undefined && isBrowserItem(item))next.icon=cleanEmoji(icon);return next;});if(!found)throw Error('App not found');await persist();return config.services;});
   handle('add-service',async ({name,url}) => { url = validURL(url); if(typeof name !== 'string' || !name.trim()) throw Error('Name is required'); config.services=config.services || [];if(!config.services.some(s=>s.url===url))config.services.push({id:require('node:crypto').randomUUID(),name:name.trim().slice(0,50),kind:'web',url,profile:'isolated'}); await persist(); return config.services; });
   handle('start-terminal',kind => { if(!['claude','shell','login'].includes(kind)) throw Error('Invalid session'); return startTerminal(kind); });
   handle('stop-terminal',() => { terminal?.kill(); });
