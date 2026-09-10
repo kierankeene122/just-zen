@@ -7,7 +7,7 @@ const pty = require('node-pty');
 const {ChatSession} = require('./chat.cjs');
 const {catalogue,findApp,isAdded,addApp,bundledIcon} = require('./app-catalog.cjs');
 const {webPreferences,browserWebPreferences,browserPartition,BROWSER_PARTITION,configureWebContents,PROFILES,partitionFor} = require('./web-session.cjs');
-const {reorder,createFolder,updateFolder,removeFolder,setFolder}=require('./sidebar.cjs');
+const {reorder,createFolder,updateFolder,removeFolder,setFolder,cleanIcon}=require('./sidebar.cjs');
 const {createFaviconCache}=require('./favicons.cjs');
 const {startAutoUpdates}=require('./auto-update.cjs');
 const {createSecureStore}=require('./secure-store.cjs');
@@ -141,7 +141,7 @@ async function securityStatus(){
 function isBrowserItem(item){return item?.kind==='browser';}
 function openable(item){return Boolean(item && (item.url || isBrowserItem(item)));}
 function serviceItem(serviceKey){return (config.services || []).find(s=>openable(s) && (s.id || s.url)===serviceKey) || null;}
-function cleanEmoji(icon){const value=typeof icon==='string'?icon.trim():'';return [...value].slice(0,4).join('') || '🌐';}
+function cleanEmoji(icon){const value=cleanIcon(icon);return value==='◫'?'🌐':value;}
 function cleanTabs(serviceKey,raw){
  const item=serviceItem(serviceKey);if(!item)return null;
  const items=(Array.isArray(raw?.items)?raw.items:[]).filter(t=>t && typeof t.id==='string' && t.id.length<100).slice(0,20).map(t=>({id:t.id,url:typeof t.url==='string' && t.url?t.url:'',current:typeof t.current==='string' && t.current?t.current:'',title:typeof t.title==='string'?t.title.slice(0,200):''}));
@@ -287,7 +287,7 @@ function ensurePopover(){
   popover.setWindowButtonVisibility?.(false);
   const pc=popover.webContents;
   pc.session.setPermissionRequestHandler((_c,_p,done)=>done(false));pc.session.setPermissionCheckHandler(()=>false);
-  const allowed=new Set(['popover.html','popover.css','popover.js'].map(f=>pathToFileURL(path.join(__dirname,f)).href));
+  const allowed=new Set(['popover.html','popover.css','popover.js','assets/icons/material-symbols.js'].map(f=>pathToFileURL(path.join(__dirname,f)).href));
   pc.session.webRequest.onBeforeRequest((details,done)=>done({cancel:!allowed.has(details.url)}));
   pc.setWindowOpenHandler(()=>({action:'deny'}));pc.on('will-navigate',e=>e.preventDefault());
   popover.on('blur',()=>hidePopover());

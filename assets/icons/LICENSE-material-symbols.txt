@@ -1,0 +1,3 @@
+Material Symbols icons are copyright Google LLC and distributed under the Apache License, Version 2.0.
+https://github.com/google/material-design-icons/blob/master/LICENSE
+Bundled here as a curated subset (assets/icons/material-symbols.js), taken from the Iconify icon-sets distribution (https://github.com/iconify/icon-sets).

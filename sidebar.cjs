@@ -3,7 +3,8 @@ function reorder(items,keys){
  if(!Array.isArray(keys)||keys.length!==items.length||new Set(keys).size!==items.length||keys.some(k=>!items.some(s=>key(s)===k)))throw Error('Invalid sidebar order');
  return keys.map(k=>items.find(s=>key(s)===k));
 }
-function cleanIcon(icon){const value=typeof icon==='string'?icon.trim():'';return [...value].slice(0,4).join('') || '◫';}
+// An icon is either a short emoji string or 'ms:<name>' pointing at the bundled Material Symbols subset.
+function cleanIcon(icon){const value=typeof icon==='string'?icon.trim():'';if(/^ms:[a-z0-9-]{1,60}$/.test(value))return value;return [...value].slice(0,4).join('') || '◫';}
 function createFolder(folders,name,id,icon){
  if(typeof name!=='string' || !name.trim())throw Error('Group name is required');
  return [...folders,{id,name:name.trim().slice(0,40),icon:cleanIcon(icon),collapsed:true}];

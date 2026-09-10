@@ -9,6 +9,10 @@ A calm local workspace for Mac: your web apps, your files and notes, your docume
 
 Just Zen is free, open-source software released under the ISC licence (see `LICENSE`). It is provided **as is, without warranty of any kind**, and the author accepts no liability for any loss or damage arising from its use. Inspect the code, decide for yourself, and keep backups of anything you connect to it.
 
+## Third-party assets
+
+Group and browser icons include a curated subset of Google's Material Symbols (Apache License 2.0), bundled in `assets/icons/` so icon choices work offline. See `assets/icons/LICENSE-material-symbols.txt`.
+
 ## Development
 
 ```

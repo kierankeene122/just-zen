@@ -15,3 +15,4 @@ button{font:inherit;cursor:pointer;color:inherit;border:0;background:transparent
 .out{position:absolute;top:4px;left:8px;font-size:15px;color:#7b8a9f;opacity:0;padding:2px 4px}.tile:hover .out{opacity:.7}.out:hover{opacity:1}
 .empty{grid-column:1/-1;color:#7b8a9f;font-size:12px;line-height:1.6;padding:10px 6px}
 .tile .emoji{width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:30px}
+.ms-icon{width:26px;height:26px;fill:currentColor;color:#4f5f78}.tile .emoji .ms-icon{width:34px;height:34px}

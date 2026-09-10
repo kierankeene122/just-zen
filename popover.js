@@ -1,14 +1,15 @@
 // The group popover: a small floating window listing the apps in one sidebar group.
 const $=id=>document.getElementById(id);
+function iconNode(icon,cls){if(typeof icon==='string' && icon.startsWith('ms:') && window.MATERIAL_ICONS?.[icon.slice(3)]){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('class','ms-icon'+(cls?' '+cls:''));svg.innerHTML=window.MATERIAL_ICONS[icon.slice(3)];return svg;}const span=document.createElement('span');span.className=cls || '';span.textContent=icon || '◫';return span;}
 let current=null;
 window.popover.onShow(data=>{
   current=data;document.body.dataset.theme=data.theme || 'light';
-  $('icon').textContent=data.folder.icon || '◫';$('name').textContent=data.folder.name;
+  $('icon').replaceChildren(iconNode(data.folder.icon || '◫'));$('name').textContent=data.folder.name;
   const grid=$('grid');grid.replaceChildren();
   for(const item of data.items){
     const tile=document.createElement('button');tile.className='tile';tile.title=item.name;
     const out=document.createElement('b');out.className='out';out.textContent='×';out.title='Remove from this group';out.onclick=e=>{e.stopPropagation();window.popover.send('popover-remove',{folderId:data.folder.id,key:item.key});};
-    let art;if(item.icon){art=document.createElement('img');art.src=item.icon;art.alt='';}else{art=document.createElement('span');art.className=item.emoji?'emoji':'fallback';art.textContent=item.emoji || item.name.slice(0,1).toUpperCase();}
+    let art;if(item.icon){art=document.createElement('img');art.src=item.icon;art.alt='';}else{if(item.emoji){art=document.createElement('span');art.className='emoji';art.append(iconNode(item.emoji));}else{art=document.createElement('span');art.className='fallback';art.textContent=item.name.slice(0,1).toUpperCase();}}
     const label=document.createElement('span');label.textContent=item.name;
     tile.append(out,art,label);
     if(item.badge){const badge=document.createElement('small');badge.className='badge';badge.textContent=item.badge>99?'99+':String(item.badge);tile.append(badge);}
