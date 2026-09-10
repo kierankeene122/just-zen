@@ -1,0 +1,16 @@
+html,body{margin:0;background:transparent;font:13px -apple-system,BlinkMacSystemFont,sans-serif;color:#293548;overflow:hidden;-webkit-user-select:none}
+#card{margin:10px;width:max-content;min-width:260px;max-width:600px;background:#fff;border:1px solid #dfe5ed;border-radius:16px;box-shadow:0 24px 60px -24px rgba(38,54,74,.45);padding:14px 16px 16px}
+body[data-theme=dark]{color:#e9ebe4}body[data-theme=dark] #card{background:#1d221e;border-color:#303630}
+.head{display:flex;align-items:center;gap:10px;margin-bottom:10px}.icon{width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.head strong{flex:1;font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button{font:inherit;cursor:pointer;color:inherit;border:0;background:transparent;border-radius:8px}
+#edit{border:1px solid #dce3ed;padding:5px 10px;font-size:11px;color:#526582}body[data-theme=dark] #edit{border-color:#465041;color:#c4d3ab}
+#close{font-size:20px;color:#7b8a9f;padding:0 6px}
+.grid{display:grid;grid-template-columns:repeat(4,118px);gap:6px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px 12px;border-radius:12px;font-size:11px;min-width:0;color:inherit}
+.tile:hover{background:#edf1f7}body[data-theme=dark] .tile:hover{background:#2a302c}
+.tile img{width:40px;height:40px;object-fit:contain}.tile .fallback{width:40px;height:40px;border-radius:10px;background:#e8eef8;display:flex;align-items:center;justify-content:center;font-size:18px;color:#4265a1}
+.tile span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.badge{position:absolute;top:8px;right:10px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#e45151;color:#fff;font-size:9px;font-weight:700;line-height:18px;text-align:center}
+.out{position:absolute;top:4px;left:8px;font-size:15px;color:#7b8a9f;opacity:0;padding:2px 4px}.tile:hover .out{opacity:.7}.out:hover{opacity:1}
+.empty{grid-column:1/-1;color:#7b8a9f;font-size:12px;line-height:1.6;padding:10px 6px}

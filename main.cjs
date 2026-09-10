@@ -49,7 +49,7 @@ function handle(name, fn) { ipcMain.handle(name, async (e, ...args) => { trusted
 function send(name, value) { if (win && !win.isDestroyed()) win.webContents.send(name, value); }
 function touchIDAvailable(){return process.platform==='darwin' && Boolean(systemPreferences.canPromptTouchID?.());}
 function scheduleLock(){clearTimeout(lockTimer);if(!config.appLock || locked)return;lockTimer=setTimeout(()=>lockApp(),Math.max(1,Number(config.autoLockMinutes) || 15)*60_000);lockTimer.unref?.();}
-function lockApp(){if(!config.appLock || locked)return false;locked=true;hideAllViews();for(const view of win.contentView.children)if(view.webContents?.getURL().endsWith('/document-view.html'))view.setVisible(false);send('app-locked',{locked:true,method:config.appLockMethod});return true;}
+function lockApp(){if(!config.appLock || locked)return false;locked=true;hideAllViews();hidePopover();for(const view of win.contentView.children)if(view.webContents?.getURL().endsWith('/document-view.html'))view.setVisible(false);send('app-locked',{locked:true,method:config.appLockMethod});return true;}
 async function authenticate(reason){if(!touchIDAvailable())throw Error('Touch ID is not available on this Mac');await systemPreferences.promptTouchID(reason);}
 function passcodeHash(passcode,salt){return crypto.scryptSync(String(passcode),salt,32);}
 function verifyPasscode(passcode){if(typeof passcode!=='string' || !config.lockSalt || !config.lockHash)return false;const actual=passcodeHash(passcode,Buffer.from(config.lockSalt,'base64')),expected=Buffer.from(config.lockHash,'base64');return actual.length===expected.length && crypto.timingSafeEqual(actual,expected);}
@@ -274,6 +274,43 @@ function attachContextMenu(contents,sourceName,extra=()=>[]){
     if(items.length)Menu.buildFromTemplate(items).popup({window:win});
   });
 }
+// ---- Group popover: a small frameless window beside the sidebar, above the web views ----
+let popover=null,popoverFolder=null;
+async function iconFor(item){const local=bundledIcon(item);if(local)return 'data:image/png;base64,'+(await fs.readFile(path.join(__dirname,local))).toString('base64');try{return item?.url?await favicon(item.url):null;}catch{return null;}}
+function ensurePopover(){
+  if(popover && !popover.isDestroyed())return popover;
+  popover=new BrowserWindow({parent:win,show:false,frame:false,transparent:true,hasShadow:false,resizable:false,movable:false,minimizable:false,maximizable:false,fullscreenable:false,skipTaskbar:true,width:560,height:200,webPreferences:{preload:path.join(__dirname,'popover-preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,partition:'popover'}});
+  popover.setWindowButtonVisibility?.(false);
+  const pc=popover.webContents;
+  pc.session.setPermissionRequestHandler((_c,_p,done)=>done(false));pc.session.setPermissionCheckHandler(()=>false);
+  const allowed=new Set(['popover.html','popover.css','popover.js'].map(f=>pathToFileURL(path.join(__dirname,f)).href));
+  pc.session.webRequest.onBeforeRequest((details,done)=>done({cancel:!allowed.has(details.url)}));
+  pc.setWindowOpenHandler(()=>({action:'deny'}));pc.on('will-navigate',e=>e.preventDefault());
+  popover.on('blur',()=>hidePopover());
+  popover.on('closed',()=>{popover=null;});
+  pc.loadFile('popover.html');
+  return popover;
+}
+function popoverTrusted(e){if(!popover || popover.isDestroyed() || e.sender!==popover.webContents)throw Error('Untrusted popover request');}
+function hidePopover(){popoverFolder=null;if(popover && !popover.isDestroyed() && popover.isVisible())popover.hide();}
+async function showPopover({folderId,left,top}){
+  const folder=(config.serviceFolders || []).find(f=>f.id===folderId);if(!folder)throw Error('Group not found');
+  const members=(config.services || []).filter(s=>s.url && s.folderId===folderId);
+  const items=await Promise.all(members.map(async item=>({key:item.id || item.url,name:item.name,icon:await iconFor(item),badge:serviceBadges.get(item.id || item.url) || 0})));
+  const window_=ensurePopover();popoverFolder=folderId;
+  if(window_.webContents.isLoading())await new Promise(resolve=>window_.webContents.once('did-finish-load',resolve));
+  const cb=win.getContentBounds();
+  window_.__anchor={x:cb.x+Math.round(left),y:cb.y+Math.round(top)};
+  window_.webContents.send('popover-show',{folder,items,theme:config.theme || 'light'});
+  return true;
+}
+function placePopover(size){
+  if(!popover || popover.isDestroyed() || !popoverFolder)return;
+  const {x,y}=popover.__anchor || {x:0,y:0};const {x:wx,y:wy,width:ww,height:wh}=win.getContentBounds();
+  const width=Math.max(160,Math.min(620,Math.round(size.width))),height=Math.max(80,Math.min(wh,Math.round(size.height)));
+  popover.setBounds({x:Math.max(wx,Math.min(x,wx+ww-width)),y:Math.max(wy,Math.min(y-10,wy+wh-height)),width,height});
+  if(!popover.isVisible())popover.show();else popover.focus();
+}
 function subscriptionEnv(){
   const env={...process.env,TERM:'xterm-256color',COLORTERM:'truecolor',PATH:'/opt/homebrew/bin:/usr/local/bin:'+process.env.PATH,CLAUDE_CONFIG_DIR:claudeConfigDir};
   delete env.ELECTRON_RUN_AS_NODE;
@@ -336,6 +373,14 @@ app.whenReady().then(async () => {
   for(const [name,fn] of [['document-open',()=>documents.open()],['document-save',input=>documents.save(input)],['document-close',()=>documents.close()]])ipcMain.handle(name,(e,...args)=>{documentTrusted(e);return fn(...args);});
   ipcMain.on('document-collapse',e=>{try{documentTrusted(e);documentView.setVisible(false);send('document-collapse');}catch{}});
   ipcMain.on('document-selection',(e,payload)=>{try{documentTrusted(e);const text=payload?.text;if(typeof text!=='string' || !text.trim())return;if(payload.target==='task')taskFromSelection(text);else send('claude-context',{text:text.slice(0,20000),source:'the document'});}catch{}});
+  handle('show-group-popover',input=>{if(!input || typeof input.folderId!=='string' || !Number.isFinite(input.left) || !Number.isFinite(input.top))throw Error('Invalid popover request');return showPopover(input);});
+  handle('hide-group-popover',()=>{hidePopover();return true;});
+  ipcMain.on('popover-size',(e,size)=>{try{popoverTrusted(e);if(size && Number.isFinite(size.width) && Number.isFinite(size.height))placePopover(size);}catch{}});
+  ipcMain.on('popover-open',(e,key)=>{try{popoverTrusted(e);hidePopover();if(typeof key==='string' && (config.services || []).some(s=>(s.id || s.url)===key))send('open-service',key);}catch{}});
+  ipcMain.on('popover-edit',(e,id)=>{try{popoverTrusted(e);hidePopover();if(typeof id==='string' && (config.serviceFolders || []).some(f=>f.id===id))send('edit-group',id);}catch{}});
+  ipcMain.on('popover-close',e=>{try{popoverTrusted(e);hidePopover();}catch{}});
+  ipcMain.on('popover-remove',async (e,input)=>{try{popoverTrusted(e);if(!input || typeof input.key!=='string' || typeof input.folderId!=='string')return;config.services=setFolder(config.services || [],input.key,null,config.serviceFolders || []);await persist();send('sidebar-changed',{services:config.services,folders:config.serviceFolders || []});const cb=win.getContentBounds();await showPopover({folderId:input.folderId,left:popover.__anchor.x-cb.x,top:popover.__anchor.y-cb.y});}catch{}});
+  win.on('move',()=>hidePopover());win.on('resize',()=>hidePopover());
   handle('document-bounds',box=>{const [w,h]=win.getContentSize();if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid document bounds');const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));documentView.setBounds({x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))});documentView.setVisible(Boolean(box.visible)&&!locked);});
   dc.loadURL(documentEntry);
   handle('state',stateSnapshot);

@@ -189,3 +189,5 @@ header .theme-toggle{margin-left:0}
 .service-group .nav{padding:10px 4px;gap:9px}.nav-collapsed .service-group .nav{padding:11px 0}
 .icon-grid{max-height:132px;overflow:auto;padding:2px}
 .service-group:hover .reorder-handle,.service-group .reorder-handle:focus{opacity:1}
+.edit-group{font-size:13px}.service-group .edit-group{opacity:0}.service-group:hover .edit-group{opacity:1}.nav-collapsed .edit-group{display:none}
+.service-group{flex-direction:row;align-items:center}
