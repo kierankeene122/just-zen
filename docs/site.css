@@ -153,7 +153,7 @@ footer a{color:var(--ink-2);text-decoration:none;margin-right:18px}
 .hero h1 .stroke{color:var(--accent)}
 .private{background:linear-gradient(180deg,rgba(226,240,246,0) 0%,#e6f1f6 40%,#e6f1f6 100%);border-radius:36px 36px 0 0;padding:70px 28px 90px!important;margin:60px -28px 0}
 @media (max-width:640px){.private{padding:50px 18px 70px!important;margin:40px -18px 0}}
-html,body{overflow-x:hidden}
+html{overflow-x:hidden}
 .private .fact{border-top-color:#a9cfe0}
 .pagefoot,footer{position:relative}
 
@@ -175,3 +175,6 @@ html,body{overflow-x:hidden}
 
 .hero,.hero>div,.hero .lede{max-width:none;width:100%}
 .tour-head{justify-content:flex-start}
+
+.art.photo{object-fit:cover;object-position:left top;border:1px solid var(--line);background:#f5f8fb}
+.art.photo.contain{object-fit:contain;object-position:center;padding:10px;background:linear-gradient(160deg,#eef6fa,#e4f0f6)}
