@@ -191,3 +191,6 @@ header .theme-toggle{margin-left:0}
 .service-group:hover .reorder-handle,.service-group .reorder-handle:focus{opacity:1}
 .edit-group{font-size:13px}.service-group .edit-group{opacity:0}.service-group:hover .edit-group{opacity:1}.nav-collapsed .edit-group{display:none}
 .service-group{flex-direction:row;align-items:center}
+
+/* Group rows: the head stretches like an app row so the icon sits exactly where app icons sit, expanded or collapsed. */
+.service-group{display:flex;flex-direction:row;align-items:center;margin:3px 0}.group-head{display:flex;align-items:center;flex:1;min-width:0}.group-head .nav{flex:1;min-width:0;margin:0}.nav-collapsed .group-head .nav{justify-content:center;padding:11px 0}.nav-collapsed .group-head{justify-content:center}

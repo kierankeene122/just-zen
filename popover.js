@@ -17,7 +17,8 @@ window.popover.onShow(data=>{
   }
   if(!data.items.length){const p=document.createElement('p');p.className='empty';p.textContent='No apps here yet. Edit the group to add some, or drag apps onto it in the sidebar.';grid.append(p);}
   const cols=Math.max(1,Math.min(4,data.items.length || 1));grid.style.gridTemplateColumns='repeat('+cols+',118px)';
-  requestAnimationFrame(()=>window.popover.send('popover-size',{width:Math.ceil($('card').getBoundingClientRect().width)+20,height:Math.ceil($('card').getBoundingClientRect().height)+20}));
+  // Measured synchronously: a hidden window gets no animation frames, so a deferred measurement would never arrive.
+  const box=$('card').getBoundingClientRect();window.popover.send('popover-size',{width:Math.ceil(box.width)+20,height:Math.ceil(box.height)+20});
 });
 $('edit').onclick=()=>{if(current)window.popover.send('popover-edit',current.folder.id);};
 $('close').onclick=()=>window.popover.send('popover-close');

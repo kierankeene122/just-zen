@@ -279,7 +279,7 @@ let popover=null,popoverFolder=null;
 async function iconFor(item){const local=bundledIcon(item);if(local)return 'data:image/png;base64,'+(await fs.readFile(path.join(__dirname,local))).toString('base64');try{return item?.url?await favicon(item.url):null;}catch{return null;}}
 function ensurePopover(){
   if(popover && !popover.isDestroyed())return popover;
-  popover=new BrowserWindow({parent:win,show:false,frame:false,transparent:true,hasShadow:false,resizable:false,movable:false,minimizable:false,maximizable:false,fullscreenable:false,skipTaskbar:true,width:560,height:200,webPreferences:{preload:path.join(__dirname,'popover-preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,partition:'popover'}});
+  popover=new BrowserWindow({parent:win,show:false,frame:false,transparent:true,hasShadow:false,resizable:false,movable:false,minimizable:false,maximizable:false,fullscreenable:false,skipTaskbar:true,width:560,height:200,webPreferences:{preload:path.join(__dirname,'popover-preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,partition:'popover',backgroundThrottling:false}});
   popover.setWindowButtonVisibility?.(false);
   const pc=popover.webContents;
   pc.session.setPermissionRequestHandler((_c,_p,done)=>done(false));pc.session.setPermissionCheckHandler(()=>false);
