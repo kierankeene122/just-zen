@@ -54,6 +54,7 @@ export function createDocumentPane({call,resize}){
   if(!$('document-editor').hidden)return $('document-editor').innerText.trim();
   return '';
  }
- window.documents.onCaptureSelection?.(target=>run(async()=>{const text=await selectedText();if(!text){status('Select some text first, or open a document.');return;}window.documents.sendSelection(target,text);status(target==='task'?'Added to your tasks.':'Sent to Claude: choose what to do with it in the Claude pane.');}));
+ async function wholeText(){if(pdf){const parts=[];for(let n=1;n<=Math.min(pdf.numPages,40);n++){const sheet=await pdf.getPage(n),content=await sheet.getTextContent();parts.push(content.items.map(item=>item.str).join(' '));}return parts.join('\n\n').replace(/[ \t]+/g,' ').trim();}if(!$('document-text').hidden)return $('document-text').value.trim();if(!$('document-editor').hidden)return $('document-editor').innerText.trim();return '';}
+ window.documents.onCaptureSelection?.(target=>run(async()=>{const text=target==='claude-all'?await wholeText():await selectedText();if(target==='claude-all')target='claude';if(!text){status('Select some text first, or open a document.');return;}window.documents.sendSelection(target,text);status(target==='task'?'Added to your tasks.':'Sent to Claude: choose what to do with it in the Claude pane.');}));
  window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='Unsaved document edits';}});
 }

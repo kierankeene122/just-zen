@@ -6,7 +6,7 @@ module.exports=async function({documentContents}){
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port;
  try{
   const attacker=new BrowserWindow({show:false,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'smoke-adversary-preload.cjs'),partition:'adversary-ipc'}});windows.push(attacker);await attacker.loadURL(url);
-  const denied=await attacker.webContents.executeJavaScript(`(async()=>{const results=[];for(const [channel,args] of [['start-terminal',['shell']],['read',['/etc/passwd']],['state',[]],['document-open',[]],['document-save',[{content:'attack'}]],['select-claude-folder',['/']]]){try{await window.probe.invoke(channel,...args);results.push(false);}catch(e){results.push(/Untrusted/.test(e.message));}}return results;})()`);
+  const denied=await attacker.webContents.executeJavaScript(`(async()=>{const results=[];for(const [channel,args] of [['start-terminal',['shell']],['read',['/etc/passwd']],['state',[]],['document-open',[]],['document-save',[{content:'attack'}]],['select-claude-folder',['/']],['web-password-request',[]]]){try{await window.probe.invoke(channel,...args);results.push(false);}catch(e){results.push(/Untrusted/.test(e.message));}}return results;})()`);
   assert.ok(denied.every(Boolean),'Foreign renderer IPC must be rejected');
   const first=new BrowserWindow({show:false,webPreferences:webPreferences('isolated','attack-a')}),second=new BrowserWindow({show:false,webPreferences:webPreferences('isolated','attack-b')});windows.push(first,second);
   await Promise.all([first.loadURL(url),second.loadURL(url)]);

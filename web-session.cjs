@@ -8,7 +8,9 @@ function partitionFor(profile='isolated',key=''){
  if(profile==='isolated')return 'persist:isolated-'+require('node:crypto').createHash('sha256').update(String(key)).digest('hex').slice(0,24);
  return 'persist:profile-'+profile;
 }
-function webPreferences(profile='isolated',key=''){return {partition:partitionFor(profile,key),sandbox:true,contextIsolation:true,nodeIntegration:false,navigateOnDragDrop:false};}
+// Website views get a sandboxed, isolated preload that exposes nothing to page scripts; it only fills and reports logins (see web-preload.cjs).
+const WEB_PRELOAD=require('node:path').join(__dirname,'web-preload.cjs');
+function webPreferences(profile='isolated',key=''){return {partition:partitionFor(profile,key),sandbox:true,contextIsolation:true,nodeIntegration:false,navigateOnDragDrop:false,preload:WEB_PRELOAD};}
 // The first browser keeps the original partition; every additional browser app gets its own.
 function browserPartition(key='browser'){return key==='browser'?BROWSER_PARTITION:'persist:browser-'+require('node:crypto').createHash('sha256').update(String(key)).digest('hex').slice(0,24);}
 function browserWebPreferences(key='browser'){return {...webPreferences(),partition:browserPartition(key)};}
