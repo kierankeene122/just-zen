@@ -316,13 +316,14 @@ aside #home.selected{background:var(--accent);border-color:transparent}
 aside #home>span,aside #home kbd{display:none}aside #home .nav-tile{width:28px;height:28px;flex-basis:28px;padding:5px;margin:0}
 aside .floating-add-app{position:static;transform:none;width:36px;height:32px;border-radius:9px;font-size:20px;margin:0 0 0 6px;box-shadow:none}
 /* Search is the navigation: a floating ⌕ on every pane and on the canvas opens a visual picker that fills that pane. */
+.tile-surface{position:relative}.tile-surface .pane-search{top:10px;right:10px}
 .pane-search{position:absolute;top:10px;right:14px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(60,70,80,.18);background:rgba(255,255,255,.82);backdrop-filter:blur(8px);box-shadow:0 4px 14px -6px rgba(20,30,40,.45);display:flex;align-items:center;justify-content:center;color:#3a4553;opacity:.85;z-index:20;transition:opacity .15s,transform .15s}.pane-search:hover{opacity:1;transform:scale(1.06)}
 [data-theme=dark] .pane-search{background:rgba(29,34,30,.85);border-color:rgba(255,255,255,.12);color:#d8ded4}
 .pane-search svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
 #overview{position:relative}
 .tile-empty .tile-find{display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:14px;border:1px solid var(--line);font-size:13px;background:transparent;color:inherit}.tile-empty .tile-find svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}.tile-empty .tile-find:hover{border-color:var(--accent)}
-#app-search{width:760px;max-width:calc(100vw - 80px);max-height:82vh;padding:0;border-radius:20px;overflow:hidden;position:fixed;inset:0;margin:auto;height:fit-content;box-shadow:0 30px 80px -30px rgba(10,20,30,.6)}
-#app-search::backdrop{background:rgba(20,26,32,.45);backdrop-filter:blur(6px)}
+#find-app{width:760px;max-width:calc(100vw - 80px);max-height:82vh;padding:0;border-radius:20px;overflow:hidden;position:fixed;inset:0;margin:auto;height:fit-content;box-shadow:0 30px 80px -30px rgba(10,20,30,.6)}
+#find-app::backdrop{background:rgba(20,26,32,.45);backdrop-filter:blur(6px)}
 .app-search-head{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}.app-search-head>svg{width:22px;height:22px;flex:0 0 22px;fill:none;stroke:var(--muted);stroke-width:1.9;stroke-linecap:round}
 #app-search-input{flex:1;font:22px Georgia,serif;border:0;background:transparent;color:inherit;outline:0;min-width:0}#app-search-input::placeholder{color:var(--muted)}
 #app-search-target{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap}#app-search-close{font-size:24px;color:var(--muted);width:32px;height:32px;border-radius:9px}#app-search-close:hover{background:var(--line)}
@@ -407,3 +408,7 @@ header{gap:10px}#jump{flex:0 1 280px;min-width:130px}header .bell{flex:0 0 auto}
 #ctx-menu button{display:flex;align-items:center;gap:14px}.menu-hint{margin-left:auto;font:10px ui-monospace,SFMono-Regular,monospace;color:var(--muted);border:0;background:transparent;padding:0}
 
 .app-tile-extra .art{font-size:24px;background:transparent;border:1px dashed var(--line)}
+
+#app-search-add{font-size:12px;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:transparent;color:inherit;white-space:nowrap}#app-search-add:hover{border-color:var(--accent);background:#c4d3ab33}
+
+.tile-urlbar .tile-tabs{flex:0 1 auto;max-width:45%;margin-left:4px}.tile-urlbar .tile-tab{padding:4px 6px 4px 8px}.tile-urlbar .tile-new{margin-left:2px}
