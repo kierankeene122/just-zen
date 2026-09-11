@@ -31,4 +31,9 @@ if(window===window.top){const probe=Object.entries(UNREAD_PROBES).find(([host])=
 
 // Sites like Slack replace the right-click menu with their own, which also hides Just Zen's. When text is selected the
 // app's menu takes over (Send to Claude, Send to Tasks, Copy); with nothing selected the site's own menu is left alone.
-window.addEventListener('contextmenu',e=>{const text=String(window.getSelection?.() || '').trim();if(!text)return;e.preventDefault();e.stopImmediatePropagation();const t=e.target;const editable=Boolean(t && (t.isContentEditable || ['INPUT','TEXTAREA'].includes(t.tagName)));ipcRenderer.send('web-context-selection',{text:text.slice(0,20000),link:String(t?.closest?.('a')?.href || '').slice(0,2000),editable});},true);
+window.addEventListener('contextmenu',e=>{const text=String(window.getSelection?.() || '').trim();const t=e.target;const link=String(t?.closest?.('a[href]')?.href || '');if(!text && !/^https?:/i.test(link))return;e.preventDefault();e.stopImmediatePropagation();const editable=Boolean(t && (t.isContentEditable || ['INPUT','TEXTAREA'].includes(t.tagName)));ipcRenderer.send('web-context-selection',{text:text.slice(0,20000),link:link.slice(0,2000),editable});},true);
+
+// Shift+Space peeks at the link under the pointer without leaving the page.
+let hoveredLink='';
+document.addEventListener('mouseover',e=>{const a=e.target?.closest?.('a[href]');hoveredLink=a?String(a.href):'';},true);
+document.addEventListener('keydown',e=>{if(e.key===' ' && e.shiftKey && hoveredLink && /^https?:/i.test(hoveredLink) && !(document.activeElement && (document.activeElement.isContentEditable || ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)))){e.preventDefault();e.stopImmediatePropagation();ipcRenderer.send('web-peek-link',hoveredLink);}},true);

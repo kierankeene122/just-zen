@@ -322,3 +322,17 @@ main>section.page-entering{opacity:0;transform:translateY(-3px)}
 .nav-dock-wide aside{max-width:calc(100vw - 24px);z-index:6}
 .nav-dock-wide #agent,.nav-dock-wide #tasks,.nav-dock-wide #documents{bottom:104px}
 .nav-dock-wide #services{max-width:calc(100vw - 190px)}
+
+/* Quick look drawer */
+.peek{position:absolute;top:0;bottom:0;right:0;width:min(58%,760px);min-width:360px;display:flex;flex-direction:column;background:var(--bg);border-left:1px solid var(--line);box-shadow:-24px 0 60px -30px rgba(38,54,74,.5);z-index:7;transform:translateX(102%);transition:transform .18s ease}
+.peek.peek-in{transform:none}.peek.hidden{display:none}
+.peek-head{display:flex;align-items:center;gap:6px;height:44px;padding:0 8px 0 6px;border-bottom:1px solid var(--line);flex-shrink:0}
+.peek-head>button{width:28px;height:28px;border-radius:7px;font-size:16px;color:var(--muted)}.peek-head>button:disabled{opacity:.3}.peek-head>button:hover{background:#edf1f7}[data-theme=dark] .peek-head>button:hover{background:#2a302c}
+.peek-head .secondary{width:auto;height:auto;font-size:10px;padding:5px 9px;color:inherit}
+.peek-title{flex:1;min-width:0;display:flex;flex-direction:column}.peek-title strong{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.peek-title small{font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#peek-surface{flex:1;min-height:0;position:relative}
+.peek-progress{position:absolute;left:0;right:0;top:44px;height:2px;overflow:hidden;opacity:0;transition:opacity .2s}.peek.loading .peek-progress{opacity:1}.peek-progress::before{content:'';position:absolute;top:0;bottom:0;left:-40%;width:40%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:tile-progress 1.1s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.peek{transition:none}}
+
+/* Greyscale applies to dock and sidebar alike; the hovered item and the open app regain colour. */
+.nav-grey aside .group-icon .ms-icon{filter:none}.nav-grey aside .service-row.selected .site-favicon,.nav-grey aside .service-row.selected .site-fallback{filter:none;opacity:1}
