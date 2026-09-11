@@ -37,7 +37,7 @@
   <div class="tour-head"><div class="tabs" role="tablist" aria-label="Parts of the window"></div></div>
   <div class="frame">
     <div class="bar"><i></i><i></i><i></i></div>
-    <div class="pic"><img src="hero.png" alt="Just Zen: apps down the left, the pinned Browser open in the centre with two tabs and a Wikipedia article, a paragraph selected and a right-click menu offering Send Selection to Claude and Send Selection to Tasks, with the Claude, Tasks and Documents rails folded away on the right" width="1432" height="932">
+    <div class="pic"><img src="hero.png?v=3" alt="Just Zen: apps down the left, a browser in the centre with text selected and a right-click menu offering Send Selection to Claude and Send Selection to Tasks, and the selection sitting in the Claude pane on the right with Summarise, Draft a reply and Turn into tasks actions" width="1434" height="933">
     <div class="spot" aria-hidden="true" hidden></div></div>
   </div>
   <div class="caption" aria-live="polite"><b></b><p></p></div>
@@ -46,13 +46,13 @@
 (()=>{
   // Regions are percentages of the screenshot, so the highlight lands on the same part at any size.
   const stops=[
-    ['Centre pane',{x:4.4,y:6,w:86.2,h:91},'Whatever you are working in sits in the centre: a web app, the whiteboard, your notes or a document. Select any text and send it to Claude or straight to your tasks.'],
-    ['Tabs',{x:4.4,y:6.2,w:86.2,h:4.6},'Every app has its own tabs. Here a browser has two open; Slack can hold one per workspace. ⌘T opens a tab, ⌘W closes it.'],
-    ['Layouts',{x:61.5,y:0.8,w:10.3,h:4.6},'Four buttons in the header split the centre into one, two or four apps, so the brief can sit next to the design and the inbox next to the calendar.'],
-    ['Apps',{x:0,y:6,w:4.4,h:91},'Gmail, Slack, Teams and any website you add sit down the left, each with its own login. Add as many separate browsers as you need, one per client, and group related apps behind one icon.'],
-    ['Claude',{x:90.6,y:6,w:3.3,h:91},'Claude Code lives in the right-hand pane, folded away here. It reads the folder you connect and works while your apps stay open.'],
-    ['Tasks',{x:93.9,y:6,w:3.1,h:91},'Your task list slides out from the right rail and stays one click away. Select text anywhere and press ⌘⇧T to make it a task.'],
-    ['Documents',{x:97,y:6,w:3,h:91},'Open PDFs and Word files beside your apps, annotate them and save a copy, without leaving the window.']
+    ['Centre pane',{x:4.3,y:6.5,w:62,h:90},'Whatever you are working in sits in the centre: a web app, the whiteboard, your notes or a document. Select any text and send it to Claude or straight to your tasks.'],
+    ['Tabs',{x:4.3,y:6.5,w:62,h:4.6},'Every app has its own tabs; browsers get an address bar too. ⌘T opens a tab, ⌘W closes it, and the ↻ reloads.'],
+    ['Layouts',{x:61,y:0.8,w:10.6,h:4.8},'Four buttons in the header split the centre into one, two or four apps, and the − 100% + beside them zooms the app you are looking at.'],
+    ['Apps',{x:0,y:6.5,w:4.3,h:90},'Gmail, Slack, Teams and any website you add sit down the left, each with its own login. Add as many separate browsers as you need and group related apps behind one icon.'],
+    ['Claude',{x:66.8,y:6.5,w:27.4,h:90},'Claude Code lives in the right-hand pane. Selected text lands here with one-click actions, and "Ask about…" puts any open tab in front of it without selecting a thing.'],
+    ['Tasks',{x:94.2,y:6.5,w:2.9,h:90},'Your task list slides out from the right rail and stays one click away. Select text anywhere and press ⌘⇧T to make it a task.'],
+    ['Documents',{x:97.1,y:6.5,w:2.9,h:90},'Open PDFs and Word files beside your apps, annotate them and save a copy, without leaving the window.']
   ];
   const tabs=document.querySelector('#tour .tabs'),spot=document.querySelector('#tour .spot'),title=document.querySelector('#tour .caption b'),text=document.querySelector('#tour .caption p');
   let current=0;
