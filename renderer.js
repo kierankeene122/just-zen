@@ -110,7 +110,7 @@ function renderTiles(){
   const tile=el('div','tile');tile.dataset.slot=String(i);if(i>=n){tile.classList.add('hidden');host.append(tile);continue;}
   if(n>1 && i===tiles.focus)tile.classList.add('focused');
   const slot=tiles.slots[i],item=slot?serviceOf(slot.serviceKey):null,group=slot?tabs[slot.serviceKey]:null;
-  const bar=el('div','tile-bar'),surface=el('div','tile-surface');
+  const bar=el('div','tile-bar'),surface=el('div','tile-surface'),progress=el('div','tile-progress');surface.append(progress);
   tile.onmousedown=()=>{if(tiles.focus!==i && n>1){tiles.focus=i;for(const t of host.children)t.classList.toggle('focused',t===tile);saveLayout();updateZoomControl();}};
   if(!slot || !item || !group){
    bar.classList.add('hidden');
@@ -162,7 +162,7 @@ function refreshTileBars(){
  const host=$('tiles');
  for(let i=0;i<slotCount();i++){const tile=host.children[i],slot=tiles.slots[i];if(!tile || !slot)continue;const group=tabs[slot.serviceKey];if(!group)continue;
   for(const b of tile.querySelectorAll('.tile-tab')){const tab=group.items.find(t=>t.id===b.dataset.tab);if(!tab)continue;const live=tabLive.get(liveKey(slot.serviceKey,tab.id));b.firstChild.textContent=tabTitle(slot.serviceKey,tab);b.title=live?.url || tab.current || tab.url || 'New tab';b.classList.toggle('loading',Boolean(live?.loading));}
-  const address=tile.querySelector('.tile-address');const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));
+  const address=tile.querySelector('.tile-address');const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));tile.classList.toggle('loading',Boolean(live?.loading));
   if(address && document.activeElement!==address && live?.url)address.value=live.url;
   const back=tile.querySelector('[data-nav=back]'),forward=tile.querySelector('[data-nav=forward]');if(back)back.disabled=!live?.canGoBack;if(forward)forward.disabled=!live?.canGoForward;
   if(live?.url && tile.querySelector('.tile-empty') && !asleep.has(slot.serviceKey))tile.querySelector('.tile-empty').remove();
