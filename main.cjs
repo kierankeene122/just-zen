@@ -547,6 +547,7 @@ app.whenReady().then(async () => {
   if(!locked)scheduleLock();
   const updates=startAutoUpdates(message=>send('notice',message),version=>send('update-ready',version));
   handle('install-update',()=>{if(!updates.install)throw Error('No update is ready');updates.install();return true;});
+  handle('check-updates',()=>{if(!updates.checkNow)throw Error(updates.reason==='development'?'Update checks are off in a development build.':'Updates are not available in this build.');updates.checkNow();return true;});
   const sleeper=setInterval(()=>{sleepSweep();expireMutes();},30_000);sleeper.unref?.();
   if(!smoke){let index=0;const warm=()=>{if(!win || win.isDestroyed())return;const sites=(config.services || []).filter(s=>s.url);if(index>=sites.length)return;if(!locked){const item=sites[index++];const key=item.id || item.url;try{const tabs=tabsFor(key);ensureView(key,tabs.active);}catch{}}setTimeout(warm,1500);};setTimeout(warm,1500);}
   if(smoke) {

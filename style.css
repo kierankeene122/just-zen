@@ -296,3 +296,5 @@ main>section.page-entering{opacity:0;transform:translateY(-3px)}
 .tile.loading .tile-progress{opacity:1}
 @keyframes tile-progress{to{left:100%}}
 @media (prefers-reduced-motion:reduce){.tile-progress::before{animation:none;left:0;width:100%;opacity:.6}}
+
+#check-updates{font-size:10px;color:var(--muted);border-radius:4px;padding:4px 7px}#check-updates:hover{background:#e8eef8;color:#4265a1}#check-updates:disabled{opacity:.5}
