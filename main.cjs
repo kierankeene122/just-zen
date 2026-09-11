@@ -63,8 +63,8 @@ async function unlockAuthentication(passcode){
 }
 function sleepSettings(){const s=config.sleep || {};const apps={};for(const [key,value] of Object.entries(s.apps || {}))if(SLEEP_CHOICES.has(value))apps[key]=value;return {defaultMinutes:SLEEP_CHOICES.has(s.defaultMinutes)?s.defaultMinutes:0,apps};}
 function sleepMinutesFor(serviceKey){const s=sleepSettings();return serviceKey in s.apps?s.apps[serviceKey]:s.defaultMinutes;}
-function stateSnapshot(){if(locked)return {locked:true,lockMethod:config.appLockMethod || 'touchID',theme:config.theme || 'light',version:app.getVersion()};return {locked:false,home:require('node:os').homedir(),root,claudeRoot,claudePolicy:config.claudePolicy || 'notes',claudeWorkspaces:config.claudeWorkspaces || (claudeRoot?[claudeRoot]:[]),connectedFolders:[...new Set([root,...(config.connectedFolders || []),...(config.claudeWorkspaces || [])].filter(Boolean))],services:config.services || [],serviceFolders:config.serviceFolders || [],sidebarOrder:config.sidebarOrder || [],serviceBadges:Object.fromEntries(serviceBadges),tabs:allTabs(),sleep:sleepSettings(),asleep:asleepKeys(),todos:config.todos || [],whiteboard:config.whiteboard || {items:[]},version:app.getVersion(),theme:config.theme || 'light',mode:config.mode || 'chat',layout:config.layout || {},chat:chat.snapshot()};}
-function validWhiteboard(value){if(!value || !Array.isArray(value.items) || value.items.length>1000)throw Error('Invalid whiteboard');const camera=value.camera || {x:0,y:0,zoom:1};if(![camera.x,camera.y,camera.zoom].every(Number.isFinite) || camera.zoom<.2 || camera.zoom>3)throw Error('Invalid whiteboard view');const raw=JSON.stringify({items:value.items,camera:{x:camera.x,y:camera.y,zoom:camera.zoom}});if(raw.length>2_000_000)throw Error('Whiteboard is too large');const types=new Set(['path','note','text','rectangle','ellipse','arrow']);for(const item of value.items){if(!item || typeof item.id!=='string' || item.id.length>100 || !types.has(item.type))throw Error('Invalid whiteboard item');if(item.html!==undefined && (typeof item.html!=='string' || item.html.length>20000))throw Error('Note is too large');}return JSON.parse(raw);}
+function stateSnapshot(){if(locked)return {locked:true,lockMethod:config.appLockMethod || 'touchID',theme:config.theme || 'light',version:app.getVersion()};return {locked:false,home:require('node:os').homedir(),root,claudeRoot,claudePolicy:config.claudePolicy || 'notes',claudeWorkspaces:config.claudeWorkspaces || (claudeRoot?[claudeRoot]:[]),connectedFolders:[...new Set([root,...(config.connectedFolders || []),...(config.claudeWorkspaces || [])].filter(Boolean))],services:config.services || [],serviceFolders:config.serviceFolders || [],sidebarOrder:config.sidebarOrder || [],serviceBadges:Object.fromEntries([...serviceBadges.keys()].map(key=>[key,visibleBadge(key)])),mutes:mutes(),zoom:config.zoom || {},recent:recentList(),tourDone:Boolean(config.tourDone),tabs:allTabs(),sleep:sleepSettings(),asleep:asleepKeys(),todos:config.todos || [],whiteboard:config.whiteboard || {items:[]},version:app.getVersion(),theme:config.theme || 'light',mode:config.mode || 'chat',layout:config.layout || {},chat:chat.snapshot()};}
+function validWhiteboard(value){if(!value || !Array.isArray(value.items) || value.items.length>1000)throw Error('Invalid whiteboard');const camera=value.camera || {x:0,y:0,zoom:1};if(![camera.x,camera.y,camera.zoom].every(Number.isFinite) || camera.zoom<.2 || camera.zoom>3)throw Error('Invalid whiteboard view');const raw=JSON.stringify({items:value.items,camera:{x:camera.x,y:camera.y,zoom:camera.zoom}});if(raw.length>12_000_000)throw Error('Whiteboard is too large');const types=new Set(['path','note','text','rectangle','ellipse','arrow','image']);for(const item of value.items){if(!item || typeof item.id!=='string' || item.id.length>100 || !types.has(item.type))throw Error('Invalid whiteboard item');if(item.html!==undefined && (typeof item.html!=='string' || item.html.length>20000))throw Error('Note is too large');if(item.type==='image' && (typeof item.src!=='string' || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(item.src) || item.src.length>1_600_000))throw Error('Invalid whiteboard image');}return JSON.parse(raw);}
 function validLayout(layout){
  const out={agentCollapsed:Boolean(layout.agentCollapsed),centreCollapsed:Boolean(layout.centreCollapsed),navCollapsed:Boolean(layout.navCollapsed),navColumns:layout.navColumns===2?2:1,navGrey:Boolean(layout.navGrey)};
  const tiles=layout.tiles;
@@ -77,8 +77,21 @@ function validLayout(layout){
 }
 async function clearSessionData(target){await target.clearStorageData();await target.clearCache();await target.clearAuthCache();await target.cookies.flushStore();}
 const hardenedSessions=new WeakSet();
-function updateAppBadge(){const total=[...serviceBadges.values()].reduce((sum,value)=>sum+value,0);app.setBadgeCount?.(Math.min(9999,total));}
-function updateServiceBadge(key,count){if(count)serviceBadges.set(key,count);else serviceBadges.delete(key);updateAppBadge();send('service-badge',{key,count});}
+// Muted apps: no notifications and no unread count until the mute ends (-1 = forever). Counts are still tracked so they reappear on unmute.
+function mutes(){const out={};const now=Date.now();for(const [key,until] of Object.entries(config.mutes || {}))if(until===-1 || until>now)out[key]=until;return out;}
+function isMuted(key){const until=(config.mutes || {})[key];return until===-1 || (typeof until==='number' && until>Date.now());}
+function visibleBadge(key){return isMuted(key)?0:(serviceBadges.get(key) || 0);}
+function updateAppBadge(){let total=0;for(const key of serviceBadges.keys())total+=visibleBadge(key);app.setBadgeCount?.(Math.min(9999,total));}
+function updateServiceBadge(key,count){if(count)serviceBadges.set(key,count);else serviceBadges.delete(key);updateAppBadge();send('service-badge',{key,count:visibleBadge(key)});}
+// Zoom is remembered per app and applied to every page of that app, whatever site it navigates to.
+const ZOOM_STEPS=[0.5,0.67,0.75,0.8,0.9,1,1.1,1.25,1.5,1.75,2];
+function zoomFor(key){const z=(config.zoom || {})[key];return ZOOM_STEPS.includes(z)?z:1;}
+function applyZoom(serviceKey){const z=zoomFor(serviceKey);for(const entry of views.values())if(entry.serviceKey===serviceKey && !entry.view.webContents.isDestroyed())entry.view.webContents.setZoomFactor(z);}
+// Recent: unread counts that rose while the app's pane was not on screen, so nothing has to be toured.
+const recent=[];
+function recentList(){return recent.slice(0,50);}
+function pushRecent(entry){recent.unshift({id:crypto.randomUUID(),at:Date.now(),...entry});if(recent.length>50)recent.length=50;send('recent-changed',recentList());}
+function expireMutes(){const now=Date.now();let changed=false;for(const [key,until] of Object.entries(config.mutes || {}))if(until!==-1 && until<=now){delete config.mutes[key];changed=true;updateServiceBadge(key,serviceBadges.get(key) || 0);}if(changed){persist();send('mutes-changed',mutes());}}
 // Chromium forgets session cookies (those without an expiry) when the app quits, so logins that rely on them are lost
 // between launches. Like other app-hosting shells, Just Zen gives such cookies a rolling 30-day expiry inside their own profile.
 const KEEP_LOGIN_DAYS=30;
@@ -104,7 +117,7 @@ function hardenWebSession(target){
   });
   target.setPermissionCheckHandler((contents,permission,requestingOrigin)=>{
     if(permission!=='notifications' || !secureOrigin(requestingOrigin))return false;
-    if(contents)return canNotify(notificationSources.get(contents),contents,requestingOrigin);
+    if(contents){const source=notificationSources.get(contents);if(source?.key && isMuted(source.key))return false;return canNotify(source,contents,requestingOrigin);}
     try{return allowedOrigins.has(new URL(requestingOrigin).origin);}catch{return false;}
   });
   target.setDisplayMediaRequestHandler?.((_request,callback)=>callback({}));
@@ -214,6 +227,8 @@ function attachView(serviceKey,tabId,view,url){
   // Origins reached by the app's initial redirect chain may notify; later navigations (open redirects, links) may not.
   contents.on('did-navigate',(_e,target)=>{try{if(!isBrowser && !notificationSource.landed && secureOrigin(target)){origins.add(new URL(target).origin);notificationSource.origins.add(new URL(target).origin);}}catch{}try{const live=tabOf(serviceKey,tabId);live.current=target;if(isBrowser && !live.url)live.url=target;persistSoon();}catch{}announceTab(entry);contents.session.cookies.flushStore().catch(()=>{});});
   contents.on('did-navigate-in-page',(_e,_target,isMainFrame)=>{if(isMainFrame)announceTab(entry);});
+  // Chromium keeps zoom per site; Just Zen keeps it per app, so it is reapplied after every navigation.
+  for(const event of ['dom-ready','did-navigate'])contents.on(event,()=>{if(!contents.isDestroyed())contents.setZoomFactor(zoomFor(serviceKey));});
   for(const event of ['did-start-loading','did-stop-loading'])contents.on(event,()=>announceTab(entry));
   contents.once('did-finish-load',()=>{notificationSource.landed=true;});
   contents.on('did-fail-load',(_e,code,description)=>{if(code!==-3)send('notice','Page could not load: '+description);});
@@ -223,7 +238,8 @@ function attachView(serviceKey,tabId,view,url){
     if(isBrowser)return;
     const count=unreadCount(title),previous=serviceBadges.get(serviceKey) || 0;
     updateServiceBadge(serviceKey,count);
-    if(notificationSource.badgeInitialized && count>previous && !notificationSource.notificationPermission && Notification.isSupported()){
+    if(notificationSource.badgeInitialized && count>previous && !entry.visible && !isMuted(serviceKey))pushRecent({key:serviceKey,name:item.name,added:count-previous,count});
+    if(notificationSource.badgeInitialized && count>previous && !notificationSource.notificationPermission && !isMuted(serviceKey) && Notification.isSupported()){
       const alert=new Notification({title:item.name,body:count===1?'1 unread message':count+' unread messages',silent:false});
       alert.on('click',()=>{win.show();win.focus();send('open-service',serviceKey);});alert.show();
     }
@@ -314,7 +330,7 @@ function hidePopover(){popoverFolder=null;if(popover && !popover.isDestroyed() &
 async function showPopover({folderId,left,top}){
   const folder=(config.serviceFolders || []).find(f=>f.id===folderId);if(!folder)throw Error('Group not found');
   const members=(config.services || []).filter(s=>openable(s) && s.folderId===folderId);
-  const items=await Promise.all(members.map(async item=>({key:item.id || item.url,name:item.name,icon:isBrowserItem(item)?null:await iconFor(item),emoji:isBrowserItem(item)?item.icon || '🌐':null,badge:serviceBadges.get(item.id || item.url) || 0})));
+  const items=await Promise.all(members.map(async item=>({key:item.id || item.url,name:item.name,icon:isBrowserItem(item)?null:await iconFor(item),emoji:isBrowserItem(item)?item.icon || '🌐':null,badge:visibleBadge(item.id || item.url)})));
   const window_=ensurePopover();popoverFolder=folderId;
   if(window_.webContents.isLoading())await new Promise(resolve=>window_.webContents.once('did-finish-load',resolve));
   const cb=win.getContentBounds();
@@ -373,7 +389,7 @@ app.whenReady().then(async () => {
     }
     send('capture-selection',{target});
   }
-  Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'Just Zen',submenu:[{role:'about'},{role:'quit'}]},{label:'Edit',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]},{label:'Go',submenu:[{label:'Command Palette',accelerator:'CmdOrCtrl+Shift+P',click:()=>{if(!locked)send('open-palette',true);}},{label:'Send Selection to Claude',accelerator:'CmdOrCtrl+Shift+A',click:()=>sendSelectionTo('claude')},{label:'Send Selection to Tasks',accelerator:'CmdOrCtrl+Shift+T',click:()=>sendSelectionTo('task')},{type:'separator'},{label:'New Tab',accelerator:'CmdOrCtrl+T',click:()=>{if(!locked)send('tab-command','new');}},{label:'Close Tab',accelerator:'CmdOrCtrl+W',click:()=>{if(!locked)send('tab-command','close');}},{label:'Reload Tab',accelerator:'CmdOrCtrl+R',click:()=>{if(!locked)send('tab-command','reload');}},{label:'Address Bar',accelerator:'CmdOrCtrl+L',click:()=>{if(!locked)send('tab-command','address');}}]},{label:'View',submenu:[{role:'togglefullscreen'},...(!app.isPackaged?[{role:'toggleDevTools'}]:[])]}]));
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'Just Zen',submenu:[{role:'about'},{role:'quit'}]},{label:'Edit',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]},{label:'Go',submenu:[{label:'Command Palette',accelerator:'CmdOrCtrl+Shift+P',click:()=>{if(!locked)send('open-palette',true);}},{label:'Send Selection to Claude',accelerator:'CmdOrCtrl+Shift+A',click:()=>sendSelectionTo('claude')},{label:'Send Selection to Tasks',accelerator:'CmdOrCtrl+Shift+T',click:()=>sendSelectionTo('task')},{type:'separator'},{label:'New Tab',accelerator:'CmdOrCtrl+T',click:()=>{if(!locked)send('tab-command','new');}},{label:'Close Tab',accelerator:'CmdOrCtrl+W',click:()=>{if(!locked)send('tab-command','close');}},{label:'Reload Tab',accelerator:'CmdOrCtrl+R',click:()=>{if(!locked)send('tab-command','reload');}},{label:'Address Bar',accelerator:'CmdOrCtrl+L',click:()=>{if(!locked)send('tab-command','address');}},{type:'separator'},{label:'Zoom In',accelerator:'CmdOrCtrl+=',click:()=>{if(!locked)send('tab-command','zoom-in');}},{label:'Zoom Out',accelerator:'CmdOrCtrl+-',click:()=>{if(!locked)send('tab-command','zoom-out');}},{label:'Actual Size',accelerator:'CmdOrCtrl+0',click:()=>{if(!locked)send('tab-command','zoom-reset');}}]},{label:'View',submenu:[{role:'togglefullscreen'},...(!app.isPackaged?[{role:'toggleDevTools'}]:[])]}]));
   win.webContents.on('will-navigate', e => e.preventDefault());
   attachContextMenu(win.webContents,()=>'your workspace');
   win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
@@ -445,6 +461,10 @@ app.whenReady().then(async () => {
   handle('close-tab',async ({serviceKey,tabId}={})=>{const tabs=tabsFor(serviceKey);const index=tabs.items.findIndex(t=>t.id===tabId);if(index<0)throw Error('Tab not found');destroyView(viewKey(serviceKey,tabId));tabs.items.splice(index,1);if(!tabs.items.length)tabs.items.push({id:crypto.randomUUID(),url:isBrowserItem(serviceItem(serviceKey))?'':serviceItem(serviceKey).url,current:'',title:''});if(tabs.active===tabId)tabs.active=tabs.items[Math.min(index,tabs.items.length-1)].id;await persist();return tabs;});
   handle('navigate-tab',async ({serviceKey,tabId,url}={})=>{const tab=tabOf(serviceKey,tabId);const target=validURL(url);tab.current=target;if(!tab.url)tab.url=target;tab.title='';await persist();const entry=views.get(viewKey(serviceKey,tabId));if(entry)entry.view.webContents.loadURL(target).catch(()=>{});else ensureView(serviceKey,tabId);return tabsFor(serviceKey);});
   handle('tab-action',({serviceKey,tabId,action}={})=>{tabOf(serviceKey,tabId);const entry=views.get(viewKey(serviceKey,tabId));if(!entry)return false;const c=entry.view.webContents;if(action==='back' && c.navigationHistory.canGoBack())c.navigationHistory.goBack();else if(action==='forward' && c.navigationHistory.canGoForward())c.navigationHistory.goForward();else if(action==='reload')c.reload();else if(action==='stop')c.stop();else if(action==='home'){const tab=tabOf(serviceKey,tabId);if(tab.url)c.loadURL(tab.url).catch(()=>{});}else if(action==='focus')c.focus();return tabInfo(entry);});
+  handle('set-zoom',async ({key,step,reset}={})=>{if(typeof key!=='string' || !serviceItem(key))throw Error('App not found');config.zoom=config.zoom || {};let index=ZOOM_STEPS.indexOf(zoomFor(key));if(reset)index=ZOOM_STEPS.indexOf(1);else if(step===1 || step===-1)index=Math.max(0,Math.min(ZOOM_STEPS.length-1,index+step));else throw Error('Invalid zoom step');const factor=ZOOM_STEPS[index];if(factor===1)delete config.zoom[key];else config.zoom[key]=factor;await persist();applyZoom(key);return factor;});
+  handle('recent-clear',()=>{recent.length=0;return [];});
+  handle('tour-done',async()=>{config.tourDone=true;await persist();return true;});
+  handle('set-mute',async ({key,hours}={})=>{if(typeof key!=='string' || !serviceItem(key))throw Error('App not found');config.mutes=config.mutes || {};if(hours===null || hours===undefined)delete config.mutes[key];else if(hours==='forever')config.mutes[key]=-1;else{const h=Number(hours);if(!Number.isFinite(h) || h<=0 || h>24*365)throw Error('Enter a number of hours');config.mutes[key]=Date.now()+Math.round(h*3600000);}await persist();updateServiceBadge(key,serviceBadges.get(key) || 0);return mutes();});
   handle('set-sleep',async ({defaultMinutes,key,minutes}={})=>{const s=sleepSettings();if(defaultMinutes!==undefined){if(!SLEEP_CHOICES.has(defaultMinutes))throw Error('Invalid sleep delay');s.defaultMinutes=defaultMinutes;}if(typeof key==='string'){if(!serviceItem(key) || isBrowserItem(serviceItem(key)))throw Error('App not found');if(minutes===null || minutes===undefined)delete s.apps[key];else if(SLEEP_CHOICES.has(minutes))s.apps[key]=minutes;else throw Error('Invalid sleep delay');}config.sleep=s;await persist();return s;});
   handle('set-service-profile',async ({key,profile})=>{if(!PROFILES.has(profile))throw Error('Invalid browser profile');let found=false;config.services=(config.services || []).map(item=>{if((item.id || item.url)!==key)return item;found=true;return {...item,profile};});if(!found)throw Error('App not found');closeServiceViews(key);await persist();return config.services;});
   handle('isolate-all-services',async()=>{for(const item of config.services || [])if(item.url)closeServiceViews(item.id || item.url);config.services=(config.services || []).map(item=>item.url?{...item,profile:'isolated'}:item);await persist();return config.services;});
@@ -492,7 +512,7 @@ app.whenReady().then(async () => {
   if(!locked)scheduleLock();
   const updates=startAutoUpdates(message=>send('notice',message),version=>send('update-ready',version));
   handle('install-update',()=>{if(!updates.install)throw Error('No update is ready');updates.install();return true;});
-  const sleeper=setInterval(sleepSweep,30_000);sleeper.unref?.();
+  const sleeper=setInterval(()=>{sleepSweep();expireMutes();},30_000);sleeper.unref?.();
   if(!smoke){let index=0;const warm=()=>{if(!win || win.isDestroyed())return;const sites=(config.services || []).filter(s=>s.url);if(index>=sites.length)return;if(!locked){const item=sites[index++];const key=item.id || item.url;try{const tabs=tabsFor(key);ensureView(key,tabs.active);}catch{}}setTimeout(warm,1500);};setTimeout(warm,1500);}
   if(smoke) {
     try {
