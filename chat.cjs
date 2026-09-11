@@ -32,10 +32,10 @@ class ChatSession {
     request.finish(allow?{behavior:'allow',updatedInput}:{behavior:'deny',message:'The user declined this action.'});
   }
   stop(){this.aborter?.abort();this.active?.close();for(const request of [...this.pending.values()])request.finish({behavior:'deny',message:'Chat stopped',interrupt:true});}
-  async run(prompt,cwd,executable='/opt/homebrew/bin/claude'){
+  async run(prompt,cwd,executable='/opt/homebrew/bin/claude',meta={}){
     if(this.state.busy)throw Error('Wait for the current reply, or stop it first');
     if(typeof prompt!=='string' || !prompt.trim() || prompt.length>100000)throw Error('Enter a message up to 100,000 characters');
-    this.state.busy=true;this.add('user',prompt.trim());this.aborter=new AbortController();
+    this.state.busy=true;this.add('user',prompt.trim(),meta?.from?{from:meta.from}:{});this.aborter=new AbortController();
     const savedSession=this.state.sessionId;
     const task=this.consume(prompt.trim(),cwd,savedSession,executable);
     this.task=task;return task;

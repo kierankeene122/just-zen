@@ -34,3 +34,8 @@ test('a stale saved session thrown by the SDK is retried once without resume and
  assert.equal(chat.state.sessionId,null);assert.ok(!chat.state.messages.some(m=>m.role==='error'),'no error is shown when the retry succeeds');
  assert.equal(chat.state.messages.at(-1).text,'Fresh reply');assert.equal(chat.state.busy,false);
 });
+test('a user message keeps the source it came from',async()=>{
+ let saved;const chat=new ChatSession({env:()=>({}),emit:()=>{},save:async s=>{saved=s;},query:fake(async function*(){yield {type:'result',result:'ok',is_error:false};})});
+ await chat.run('Summarise this','/tmp','/usr/bin/true',{from:{kind:'tab',key:'web-gmail',tabId:'main',url:'https://mail.google.com/',name:'Gmail'}});
+ assert.equal(saved.messages[0].from.name,'Gmail');assert.equal(saved.messages[0].from.kind,'tab');
+});

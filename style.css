@@ -336,3 +336,8 @@ main>section.page-entering{opacity:0;transform:translateY(-3px)}
 
 /* Greyscale applies to dock and sidebar alike; the hovered item and the open app regain colour. */
 .nav-grey aside .group-icon .ms-icon{filter:none}.nav-grey aside .service-row.selected .site-favicon,.nav-grey aside .service-row.selected .site-fallback{filter:none;opacity:1}
+
+/* Back-to-source chips and reply actions */
+.from-chip{display:inline-flex;align-items:center;font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);vertical-align:middle;white-space:nowrap;margin-left:2px}.from-chip:hover{color:#4265a1;border-color:#b5c9eb;background:#eef2fb}[data-theme=dark] .from-chip:hover{background:#2a302c;color:#c4d3ab}
+.chat-message.user .from-chip{color:inherit;opacity:.8}
+.reply-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)}.reply-actions button{font-size:10.5px;padding:4px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:transparent}.reply-actions button:hover{color:inherit;background:#eef2fb;filter:none}[data-theme=dark] .reply-actions button:hover{background:#2a302c}
