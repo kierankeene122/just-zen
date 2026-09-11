@@ -182,7 +182,6 @@ async function openInTile(serviceKey,tabId,forceIndex=null){cancelPaneChoice();i
  tabId=group.items.some(t=>t.id===tabId)?tabId:group.active;
  const n=slotCount();let index=Number.isInteger(forceIndex) && forceIndex>=0 && forceIndex<n?forceIndex:tiles.slots.findIndex((s,i)=>i<n && s && s.serviceKey===serviceKey);
  if(index<0)index=tiles.slots.findIndex((s,i)=>i<n && !s);
- if(index<0 && n>1){if(page!=='browser-page'){await show('browser-page');renderTiles();await new Promise(res=>setTimeout(res,180));}const item=serviceOf(serviceKey);const picked=await choosePane(item || {name:'this app'});if(picked===null)return;index=picked;}
  if(index<0)index=Math.min(tiles.focus,n-1);
  tiles.slots[index]={serviceKey,tabId};tiles.focus=index;
  if(group.active!==tabId){group.active=tabId;call('activate-tab',{serviceKey,tabId}).catch(()=>{});}
