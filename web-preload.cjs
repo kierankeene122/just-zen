@@ -27,7 +27,7 @@ const UNREAD_PROBES={
  'web.whatsapp.com':()=>{let n=0;for(const el of document.querySelectorAll('[aria-label$="unread message"],[aria-label$="unread messages"]'))n+=Number(String(el.getAttribute('aria-label')).replace(/\D/g,''))||0;return n;},
  'discord.com':()=>{let n=0;for(const el of document.querySelectorAll('[class*="numberBadge"]'))n+=Number(String(el.textContent).replace(/\D/g,''))||0;return n;}
 };
-if(window===window.top){const probe=Object.entries(UNREAD_PROBES).find(([host])=>location.hostname===host || location.hostname.endsWith('.'+host))?.[1];if(probe){let last=-1;setInterval(()=>{let n=0;try{n=probe();}catch{}if(n!==last){last=n;ipcRenderer.send('web-unread',n);}},4000);}}
+if(window===window.top){const probe=Object.entries(UNREAD_PROBES).find(([host])=>location.hostname===host || location.hostname.endsWith('.'+host))?.[1];if(probe){let last=-1;const run=force=>{let n=0;try{n=probe();}catch{}if(force || n!==last){last=n;ipcRenderer.send('web-unread',n);}};setInterval(()=>run(false),4000);ipcRenderer.on('web-probe-now',()=>run(true));}}
 
 // Sites like Slack replace the right-click menu with their own, which also hides Just Zen's. When text is selected the
 // app's menu takes over (Send to Claude, Send to Tasks, Copy); with nothing selected the site's own menu is left alone.
@@ -70,4 +70,4 @@ const ITEM_PROBES={
  'chat.google.com':()=>[...document.querySelectorAll('[role="listitem"][aria-label]')].filter(el=>/\b[1-9]\d*\s+unread\b/i.test(el.getAttribute('aria-label') || '')).slice(0,8).map(el=>({title:String(el.getAttribute('aria-label')).replace(/,?\s*\d+ unread.*$/i,'').trim().slice(0,80),sub:'unread',url:''})).filter(i=>i.title),
  'teams.microsoft.com':()=>[...document.querySelectorAll('[aria-label]')].filter(el=>/\b[1-9]\d*\s+unread\b/i.test(el.getAttribute('aria-label') || '')).slice(0,8).map(el=>({title:String(el.getAttribute('aria-label')).replace(/,?\s*\d+ unread.*$/i,'').trim().slice(0,80),sub:'unread',url:''})).filter(i=>i.title)
 };
-if(window===window.top){const probe=Object.entries(ITEM_PROBES).find(([host])=>location.hostname===host || location.hostname.endsWith('.'+host))?.[1];if(probe){let last='';setInterval(()=>{let items=[];try{items=probe();}catch{}const sig=JSON.stringify(items);if(sig!==last){last=sig;ipcRenderer.send('web-items',items.slice(0,8));}},8000);}}
+if(window===window.top){const probe=Object.entries(ITEM_PROBES).find(([host])=>location.hostname===host || location.hostname.endsWith('.'+host))?.[1];if(probe){let last='';const run=force=>{let items=[];try{items=probe();}catch{}const sig=JSON.stringify(items);if(force || sig!==last){last=sig;ipcRenderer.send('web-items',items.slice(0,8));}};setInterval(()=>run(false),8000);ipcRenderer.on('web-probe-now',()=>run(true));}}
