@@ -51,7 +51,7 @@ function handle(name, fn) { ipcMain.handle(name, async (e, ...args) => { trusted
 function send(name, value) { if (win && !win.isDestroyed()) win.webContents.send(name, value); }
 function touchIDAvailable(){return process.platform==='darwin' && Boolean(systemPreferences.canPromptTouchID?.());}
 function scheduleLock(){clearTimeout(lockTimer);if(!config.appLock || locked)return;lockTimer=setTimeout(()=>lockApp(),Math.max(1,Number(config.autoLockMinutes) || 15)*60_000);lockTimer.unref?.();}
-function lockApp(){if(!config.appLock || locked)return false;locked=true;hideAllViews();hidePopover();send('calendar-hide');for(const view of win.contentView.children)if(view.webContents?.getURL().endsWith('/document-view.html'))view.setVisible(false);send('app-locked',{locked:true,method:config.appLockMethod});return true;}
+function lockApp(){if(!config.appLock || locked)return false;locked=true;hideAllViews();hidePopover();for(const view of win.contentView.children)if(view.webContents?.getURL().endsWith('/document-view.html'))view.setVisible(false);send('app-locked',{locked:true,method:config.appLockMethod});return true;}
 async function authenticate(reason){if(!touchIDAvailable())throw Error('Touch ID is not available on this Mac');await systemPreferences.promptTouchID(reason);}
 function passcodeHash(passcode,salt){return crypto.scryptSync(String(passcode),salt,32);}
 function verifyPasscode(passcode){if(typeof passcode!=='string' || !config.lockSalt || !config.lockHash)return false;const actual=passcodeHash(passcode,Buffer.from(config.lockSalt,'base64')),expected=Buffer.from(config.lockHash,'base64');return actual.length===expected.length && crypto.timingSafeEqual(actual,expected);}
@@ -321,6 +321,7 @@ function taskFromSelection(text){try{const todos=addTask(text);send('todos-chang
 function attachContextMenu(contents,sourceName,extra=()=>[]){
   contents.on('context-menu',(_event,params)=>{
     if(locked)return;
+    if(Date.now()-(contents.__preloadMenuAt || 0)<600)return;
     const text=String(params.selectionText || '').trim(),items=[];
     if(text)items.push({label:'Send Selection to Claude',click:()=>send('claude-context',{text:text.slice(0,20000),source:sourceName()})},{label:'Send Selection to Tasks',click:()=>taskFromSelection(text)});
     items.push(...extra(params,text));
@@ -457,27 +458,6 @@ app.whenReady().then(async () => {
   handle('document-capture-all',()=>{dc.send('capture-selection','claude-all');return true;});
   handle('document-bounds',box=>{const [w,h]=win.getContentSize();if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid document bounds');const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));documentView.setBounds({x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))});documentView.setVisible(Boolean(box.visible)&&!locked);});
   dc.loadURL(documentEntry);
-  // Calendar side pane: Google Calendar's phone layout fits a 400px column. It shares the login of the Google Calendar app when that is in the sidebar.
-  let calendarView=null;
-  function calendarPartition(){const item=(config.services || []).find(s=>s.id==='web-google-calendar');return item?partitionFor(item.profile || 'isolated','web-google-calendar'):'persist:calendar';}
-  function ensureCalendar(){
-    if(calendarView && !calendarView.webContents.isDestroyed())return calendarView;
-    calendarView=new WebContentsView({webPreferences:{...webPreferences(),partition:calendarPartition(),backgroundThrottling:false}});
-    win.contentView.addChildView(calendarView);calendarView.setVisible(false);
-    const cc=calendarView.webContents;
-    cc.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1');
-    hardenWebSession(cc.session);
-    notificationSources.set(cc,{contents:cc,saved:false,key:'calendar',name:'Calendar',notificationPermission:false,badgeInitialized:false,origins:new Set(),landed:false});
-    configureWebContents(cc,win,message=>send('notice',message),cc,webPreferences());
-    attachContextMenu(cc,()=>'the calendar');
-    cc.on('did-finish-load',()=>darkenIfLight(cc));
-    // Signed out, calendar.google.com bounces to a marketing page; send it to the sign-in flow instead.
-    cc.on('did-navigate',(_e,url)=>{try{const u=new URL(url);if(u.hostname==='workspace.google.com')cc.loadURL('https://accounts.google.com/ServiceLogin?service=cl&continue='+encodeURIComponent('https://calendar.google.com/calendar/r')).catch(()=>{});}catch{}});
-    cc.loadURL('https://calendar.google.com/calendar/r').catch(()=>{});
-    return calendarView;
-  }
-  handle('calendar-bounds',box=>{if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid calendar bounds');if(!box.visible){if(calendarView)calendarView.setVisible(false);return true;}const view=ensureCalendar();view.setBounds(clipBounds(box));view.setVisible(!locked);return true;});
-  handle('calendar-reload',()=>{if(calendarView && !calendarView.webContents.isDestroyed())calendarView.webContents.reload();return true;});
   handle('state',stateSnapshot);
   handle('security-status',securityStatus);
   handle('unlock-app',async passcode=>{if(!locked)return stateSnapshot();await unlockAuthentication(passcode);locked=false;scheduleLock();send('app-locked',{locked:false});return stateSnapshot();});
@@ -524,6 +504,7 @@ app.whenReady().then(async () => {
   handle('set-zoom',async ({key,step,reset}={})=>{if(typeof key!=='string' || !serviceItem(key))throw Error('App not found');config.zoom=config.zoom || {};let index=ZOOM_STEPS.indexOf(zoomFor(key));if(reset)index=ZOOM_STEPS.indexOf(1);else if(step===1 || step===-1)index=Math.max(0,Math.min(ZOOM_STEPS.length-1,index+step));else throw Error('Invalid zoom step');const factor=ZOOM_STEPS[index];if(factor===1)delete config.zoom[key];else config.zoom[key]=factor;await persist();applyZoom(key);return factor;});
   handle('recent-clear',()=>{recent.length=0;return [];});
   handle('tour-done',async()=>{config.tourDone=true;await persist();return true;});
+  ipcMain.on('web-context-selection',(e,payload)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || locked)return;const text=String(payload?.text || '').trim();if(!text)return;e.sender.__preloadMenuAt=Date.now();const name=notificationSources.get(e.sender)?.name || 'the web app';const items=[{label:'Send Selection to Claude',click:()=>send('claude-context',{text:text.slice(0,20000),source:name})},{label:'Send Selection to Tasks',click:()=>taskFromSelection(text)},{type:'separator'}];if(payload.editable)items.push({role:'cut'},{role:'copy'},{role:'paste'});else items.push({role:'copy'});if(typeof payload.link==='string' && /^https?:/i.test(payload.link))items.push({label:'Copy Link',click:()=>clipboard.writeText(payload.link)},{label:'Open Link in New Tab',click:()=>openTab(entry.serviceKey,payload.link,true)});Menu.buildFromTemplate(items).popup({window:win});}catch{}});
   ipcMain.on('web-unread',(e,count)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;const source=notificationSources.get(e.sender);if(!source?.saved)return;const n=Math.max(0,Math.min(9999,Number(count) || 0));if(source.domUnread===n)return;source.domUnread=n;const previous=serviceBadges.get(entry.serviceKey) || 0;const merged=Math.max(unreadCount(e.sender.getTitle()),n);updateServiceBadge(entry.serviceKey,merged);if(merged>previous && !entry.visible && !isMuted(entry.serviceKey))pushRecent({key:entry.serviceKey,name:source.name,count:merged});}catch{}});
   ipcMain.handle('web-password-request',async e=>{const url=webViewOrigin(e);if(!url || locked)return null;const saved=await passwords.get(url);if(saved)passwords.touch(url,saved.username).catch(()=>{});return saved?{username:saved.username,password:saved.password}:null;});
   ipcMain.on('web-password-submitted',async (e,payload)=>{try{const url=webViewOrigin(e);if(!url || locked || !payload || typeof payload.password!=='string' || !payload.password)return;if(await passwords.isNever(url))return;const existing=await passwords.get(url);const username=String(payload.username || '').slice(0,300);if(existing && existing.username===username && existing.password===payload.password)return;const id=crypto.randomUUID();passwordOffers.set(id,{url,username,password:String(payload.password).slice(0,1000)});setTimeout(()=>passwordOffers.delete(id),120000).unref?.();send('password-offer',{id,host:new URL(url).host,username,update:Boolean(existing)});}catch{}});

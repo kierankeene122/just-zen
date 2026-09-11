@@ -28,3 +28,7 @@ const UNREAD_PROBES={
  'discord.com':()=>{let n=0;for(const el of document.querySelectorAll('[class*="numberBadge"]'))n+=Number(String(el.textContent).replace(/\D/g,''))||0;return n;}
 };
 if(window===window.top){const probe=Object.entries(UNREAD_PROBES).find(([host])=>location.hostname===host || location.hostname.endsWith('.'+host))?.[1];if(probe){let last=-1;setInterval(()=>{let n=0;try{n=probe();}catch{}if(n!==last){last=n;ipcRenderer.send('web-unread',n);}},4000);}}
+
+// Sites like Slack replace the right-click menu with their own, which also hides Just Zen's. When text is selected the
+// app's menu takes over (Send to Claude, Send to Tasks, Copy); with nothing selected the site's own menu is left alone.
+window.addEventListener('contextmenu',e=>{const text=String(window.getSelection?.() || '').trim();if(!text)return;e.preventDefault();e.stopImmediatePropagation();const t=e.target;const editable=Boolean(t && (t.isContentEditable || ['INPUT','TEXTAREA'].includes(t.tagName)));ipcRenderer.send('web-context-selection',{text:text.slice(0,20000),link:String(t?.closest?.('a')?.href || '').slice(0,2000),editable});},true);
