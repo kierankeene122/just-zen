@@ -35,7 +35,7 @@ class ChatSession {
   async run(prompt,cwd,executable='/opt/homebrew/bin/claude',meta={}){
     if(this.state.busy)throw Error('Wait for the current reply, or stop it first');
     if(typeof prompt!=='string' || !prompt.trim() || prompt.length>100000)throw Error('Enter a message up to 100,000 characters');
-    this.state.busy=true;this.add('user',prompt.trim(),meta?.from?{from:meta.from}:{});this.aborter=new AbortController();
+    this.lastMeta=meta || {};this.state.busy=true;this.add('user',prompt.trim(),meta?.from?{from:meta.from}:{});this.aborter=new AbortController();
     const savedSession=this.state.sessionId;
     const task=this.consume(prompt.trim(),cwd,savedSession,executable);
     this.task=task;return task;
@@ -69,7 +69,7 @@ class ChatSession {
       const query=this.queryFactory || (await import('@anthropic-ai/claude-agent-sdk')).query;
       const access=this.policy();
       const accessText=access.mode==='readOnly'?'Read-only: do not change files or run commands.':access.mode==='notes'?'Notes only: Markdown changes are expected; ask before changing anything else.':'Full workspace access, with explicit approval for commands that may reach outside it.';
-      this.active=query({prompt,options:{cwd,pathToClaudeCodeExecutable:executable,env:this.env(),permissionMode:'default',settingSources:['user'],strictMcpConfig:true,systemPrompt:{type:'preset',preset:'claude_code',append:`Just Zen has selected exactly this workspace: ${JSON.stringify(cwd)}. ${accessText} Never claim access outside this folder.`},hooks:{PreToolUse:[{hooks:[policyHook(()=>this.policy())]}]},includePartialMessages:true,abortController:this.aborter,...(resume?{resume}:{}),canUseTool:(...args)=>this.permission(...args)}});
+      this.active=query({prompt,options:{cwd,pathToClaudeCodeExecutable:executable,env:this.env(),permissionMode:'default',settingSources:['user'],strictMcpConfig:true,systemPrompt:{type:'preset',preset:'claude_code',append:`Just Zen has selected exactly this workspace: ${JSON.stringify(cwd)}. ${accessText} Never claim access outside this folder.${this.lastMeta?.apps?.length?` The user's web apps open in Just Zen: ${this.lastMeta.apps.join(', ')}. When the user asks you to send, post, reply or draft a message in one of those apps, write the message inside a fenced code block whose info string is message:<app name>, for example \`\`\`message:Slack. Just Zen shows a Paste button so the user can put it into that app's composer; you cannot send it yourself, so never claim you have sent anything.`:''}`},hooks:{PreToolUse:[{hooks:[policyHook(()=>this.policy())]}]},includePartialMessages:true,abortController:this.aborter,...(resume?{resume}:{}),canUseTool:(...args)=>this.permission(...args)}});
       for await(const message of this.active){
         if(message.session_id)this.state.sessionId=message.session_id;
         if(message.type==='stream_event' && !message.parent_tool_use_id){

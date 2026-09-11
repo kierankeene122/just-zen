@@ -47,6 +47,8 @@ Just Zen should not be described as externally audited. The automated Claude Sec
 
 Camera and microphone (`media`) permission requests from saved apps are answered by a native prompt once per app and site and remembered in `config.mediaGrants`; the hardened-runtime entitlements for audio input and camera and the matching Info.plist usage strings are set in `package.json`. Display capture stays denied. Downloads use Electron's built-in save dialog, configured synchronously in `will-download`.
 
+The isolated website preload can also insert text into a page's message box on the user's request (`web-deliver`, used by drops on the dock and by Paste buttons under Claude replies); it only inserts, never submits, and only into views the app owns. It reports named unread items (`web-items`) for the Now stream from a small per-site selector table.
+
 Website views load a sandboxed, context-isolated preload (`web-preload.cjs`) that exposes nothing to page scripts; it only reports a submitted login so the app can offer to save it, and fills a saved login when the user focuses a login field. Saved logins live in `passwords.secure`, encrypted with safeStorage, keyed by exact origin; the origin is taken from the sending frame, never from the page. When the app theme is dark, pages that remain light get an inverting stylesheet; nothing is injected in light mode.
 
 Session-only cookies (no expiry) are re-saved with a rolling 30-day expiry inside each app's own partition so logins survive a restart, matching Chrome's "continue where you left off" behaviour; they are removed with the profile.
