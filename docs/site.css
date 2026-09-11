@@ -181,3 +181,5 @@ html{overflow-x:hidden}
 
 /* Chips can carry a full sentence; they wrap and stay readable. */
 .pillar li{white-space:normal;line-height:1.4;max-width:100%}
+
+.art .dk{fill:#1f3644}.art .kl{fill:none;stroke:#cfe5ef;stroke-width:2;stroke-linecap:round}
