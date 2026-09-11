@@ -95,7 +95,7 @@ function placeViews(){if(placeScheduled)return;placeScheduled=true;requestAnimat
 async function placeNow(){peekBounds();
  const list=[];
  if(page==='browser-page' && !layout.centreCollapsed && !viewsSuspended && !document.body.classList.contains('is-locked')){
-  for(let i=0;i<slotCount();i++){const slot=tiles.slots[i];if(!slot)continue;const tab=tabOf(slot);if(!tab || !(tab.current || tab.url || tabLive.has(liveKey(slot.serviceKey,slot.tabId))))continue;const surface=$('tiles').children[i]?.querySelector('.tile-surface');if(!surface)continue;const r=surface.getBoundingClientRect();if(r.width<10 || r.height<10)continue;let width=r.width;if(peekOpenState && !$('peek').classList.contains('hidden')){const d=$('peek').getBoundingClientRect();if(d.width && r.x+width>d.left)width=Math.max(0,d.left-r.x);}list.push({serviceKey:slot.serviceKey,tabId:slot.tabId,x:r.x,y:r.y,width,height:r.height,radius:12});}
+  for(let i=0;i<slotCount();i++){const slot=tiles.slots[i];if(!slot)continue;const tab=tabOf(slot);if(!tab || !(tab.current || tab.url || tabLive.has(liveKey(slot.serviceKey,slot.tabId))))continue;const surface=$('tiles').children[i]?.querySelector('.tile-surface');if(!surface)continue;const r=surface.getBoundingClientRect();if(r.width<10 || r.height<10)continue;let width=r.width;if(peekOpenState && !$('peek').classList.contains('hidden')){const d=$('peek').getBoundingClientRect();if(d.width && r.x+width>d.left)width=Math.max(0,d.left-r.x);}list.push({serviceKey:slot.serviceKey,tabId:slot.tabId,x:r.x,y:r.y,width,height:r.height,radius:12,slot:i});}
  }
  const infos=await call('place-views',list);
  for(const info of infos)tabLive.set(liveKey(info.serviceKey,info.tabId),info);
@@ -117,11 +117,14 @@ function renderTiles(){
   if(!slot || !item || !group){
    bar.classList.add('hidden');
    const empty=el('div','tile-empty');empty.append(el('span','tile-empty-mark','⊞'),el('p',null,n>1?'Choose an app for this tile.':'Choose an app from the sidebar.'));
-   const pick=document.createElement('select');pick.setAttribute('aria-label','App for this tile');pick.add(new Option('Choose an app…',''));for(const s of sidebarItems.filter(openable))pick.add(new Option((isBrowserItem(s) && iconLabel(s.icon)?iconLabel(s.icon)+' ':'')+s.name,s.id || s.url));
-   pick.onchange=()=>{if(!pick.value)return;tiles.focus=i;attempt(()=>openInTile(pick.value));};empty.append(pick);surface.append(empty);
+   const find=el('button','tile-find');find.type='button';find.append(searchGlyph(),document.createTextNode('Find an app'));find.onclick=()=>{tiles.focus=i;openAppSearch(i);};empty.append(find);surface.append(empty);
    tile.append(bar,surface);host.append(tile);continue;
   }
   const browser=isBrowserItem(item);
+  if(browser){const urlbar=el('div','tile-urlbar');for(const [action,glyph,title] of [['back','‹','Back'],['forward','›','Forward'],['reload','↻','Reload']]){const nb=el('button',null,glyph);nb.type='button';nb.dataset.nav=action;nb.title=title;nb.onclick=()=>attempt(async()=>{const info=await call('tab-action',{serviceKey:slot.serviceKey,tabId:slot.tabId,action});if(info)tabLive.set(liveKey(info.serviceKey,info.tabId),info);refreshTileBars();});urlbar.append(nb);}
+   const form=el('form','tile-url');const address=document.createElement('input');address.className='tile-address';address.type='text';address.autocomplete='off';address.spellcheck=false;address.placeholder='Enter a website address';address.setAttribute('aria-label','Address');const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId)),tab=tabOf(slot);address.value=live?.url || tab?.current || tab?.url || '';address.onfocus=()=>address.select();
+   form.append(address);form.onsubmit=e=>{e.preventDefault();const value=address.value.trim();if(!value)return;attempt(async()=>{const target=/^[a-z][a-z0-9+.-]*:/i.test(value)?value:/^[^\s]+\.[^\s]+$/.test(value)?'https://'+value:'https://duckduckgo.com/?q='+encodeURIComponent(value);tabs[slot.serviceKey]=await call('navigate-tab',{serviceKey:slot.serviceKey,tabId:slot.tabId,url:target});renderTiles();});};urlbar.append(form);
+   tile.__urlbar=urlbar;}
   // The tab strip is always visible: it is where new tabs and extra Slack workspaces are added.
   bar.classList.remove('hidden');
   if(browser){const label=el('button','tile-app');const tileIcon=el('span','tile-emoji');tileIcon.append(iconNode(item.icon || '🌐'));label.append(tileIcon,el('span',null,item.name));label.title=item.name;label.onclick=()=>{tiles.focus=i;};bar.append(label);}
@@ -151,7 +154,7 @@ function renderTiles(){
   const tab=tabOf(slot);
   if(!tab || !(tab.current || tab.url)){const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));const empty=el('div','tile-empty');if(live)empty.append(el('span','tile-empty-mark','…'),el('p',null,'Opening…'));else empty.append(el('span','tile-empty-mark','⌕'),el('p',null,'Type an address above, or paste a link.'));surface.append(empty);}
   else if(asleep.has(slot.serviceKey)){const empty=el('div','tile-empty tile-waking');const img=el('img','site-favicon wake-icon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback wake-icon',item.name.slice(0,1).toUpperCase());empty.append(img,fallback,el('strong',null,tab.title || item.name),el('p',null,'Waking '+item.name+' up…'));if(!isBrowserItem(item))call('favicon',slot.serviceKey).then(icon=>paintIcon(img,icon)).catch(()=>{});surface.append(empty);}
-  tile.append(bar,surface);host.append(tile);
+  tile.append(bar,surface);if(tile.__urlbar)tile.append(tile.__urlbar);host.append(tile);
  }
  placeViews();updateZoomControl();deckSync();
 }
@@ -164,11 +167,10 @@ function refreshTileBars(){
  const host=$('tiles');
  for(let i=0;i<slotCount();i++){const tile=host.children[i],slot=tiles.slots[i];if(!tile || !slot)continue;const group=tabs[slot.serviceKey];if(!group)continue;
   for(const b of tile.querySelectorAll('.tile-tab')){const tab=group.items.find(t=>t.id===b.dataset.tab);if(!tab)continue;const live=tabLive.get(liveKey(slot.serviceKey,tab.id));b.firstChild.textContent=tabTitle(slot.serviceKey,tab);b.title=live?.url || tab.current || tab.url || 'New tab';b.classList.toggle('loading',Boolean(live?.loading));}
-  const address=tile.querySelector('.tile-address');const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));tile.classList.toggle('loading',Boolean(live?.loading));
+  const address=tile.querySelector('.tile-urlbar .tile-address');const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));tile.classList.toggle('loading',Boolean(live?.loading));
   if(address && document.activeElement!==address && live?.url)address.value=live.url;
-  const back=tile.querySelector('[data-nav=back]'),forward=tile.querySelector('[data-nav=forward]');if(back)back.disabled=!live?.canGoBack;if(forward)forward.disabled=!live?.canGoForward;
+  const back=tile.querySelector('.tile-urlbar [data-nav=back]'),forward=tile.querySelector('.tile-urlbar [data-nav=forward]');if(back)back.disabled=!live?.canGoBack;if(forward)forward.disabled=!live?.canGoForward;
   if(live?.url && tile.querySelector('.tile-empty') && !asleep.has(slot.serviceKey))tile.querySelector('.tile-empty').remove();
-  if(i===Math.min(tiles.focus,slotCount()-1))renderAppBar(true);
  }
 }
 // In a split layout, opening an app that is not already on screen and has no empty tile asks which pane it should take:
@@ -188,7 +190,7 @@ async function openInTile(serviceKey,tabId,forceIndex=null){cancelPaneChoice();i
  closePopovers();await show('browser-page');renderTiles();saveLayout();
  if(isBrowserItem(serviceOf(serviceKey))){const tab=group.items.find(t=>t.id===tabId);if(tab && !(tab.current || tab.url))focusAddress(index);}
 }
-function focusAddress(index=tiles.focus){requestAnimationFrame(()=>{const address=$('tiles').children[index]?.querySelector('.tile-address');if(address){address.focus();address.select();}});}
+function focusAddress(index=tiles.focus){requestAnimationFrame(()=>{const address=$('tiles').children[index]?.querySelector('.tile-urlbar .tile-address');if(address){address.focus();address.select();}});}
 // Links from notes and chat open in the default browser app; one is created if every browser has been removed.
 async function openBrowser(url){let item=defaultBrowser();if(!item){const added=await call('add-browser',{name:'Browser',icon:'🌐'});services(added.services);item=serviceOf(added.key);}const key=item.id;if(url){const opened=await call('open-tab',{serviceKey:key,url});tabs[key]=opened.tabs;await openInTile(key,opened.tabId);}else await openInTile(key);}
 async function activateTab(index,serviceKey,tabId){tabs[serviceKey]=await call('activate-tab',{serviceKey,tabId});tiles.slots[index]={serviceKey,tabId};renderTiles();saveLayout();}
@@ -226,7 +228,7 @@ $('peek-toggle').onchange=()=>attempt(async()=>{await call('set-peek-links',$('p
 window.hearth.on('tab-opened',({serviceKey,tabId,tabs:group})=>{tabs[serviceKey]=group;const n=slotCount();const index=tiles.slots.findIndex((s,i)=>i<n && s && s.serviceKey===serviceKey);if(index>=0){tiles.slots[index]={serviceKey,tabId};renderTiles();saveLayout();}});
 window.hearth.on('tab-command',command=>attempt(async()=>{
  if(command==='new'){const slot=page==='browser-page'?focusedSlot():null;if(slot)await newTab(slot.serviceKey);else await openBrowser();return;}
- if(command==='address'){await openBrowser();const slot=focusedSlot();if(slot && isBrowserItem(serviceOf(slot.serviceKey)))editAddress(slot);return;}
+ if(command==='address'){await openBrowser();focusAddress();return;}
  if(command.startsWith('zoom-')){if(page==='overview'){document.getElementById(command==='zoom-in'?'board-zoom-in':command==='zoom-out'?'board-zoom-out':'board-home-view').click();return;}await zoomApp(command==='zoom-in'?1:command==='zoom-out'?-1:0);return;}
  if(page!=='browser-page')return;const slot=focusedSlot();if(!slot)return;
  if(command==='close')await closeTab(slot.serviceKey,slot.tabId);
@@ -502,34 +504,6 @@ function deckLayout(){deckCards().forEach((card,i)=>{card.dataset.slot=String(i+
 // Behind the active card, the rest of the deck peeks out as stacked edges.
 function renderStackEdges(front){const host=$('stack-edges');host.replaceChildren();if(!front)return;const others=Math.min(4,deckCards().length-1);for(let i=others;i>=1;i--){const edge=el('div','edge');edge.style.setProperty('--top',(16-i*4)+'px');edge.style.setProperty('--inset',(i*10)+'px');edge.style.zIndex=String(5-i);host.append(edge);}}
 // The header carries the current app: name, address or title, tabs, navigation, and the way back to the canvas.
-function renderAppBar(soft=false){const bar=$('app-bar');const slot=page==='browser-page' && !layout.centreCollapsed?focusedSlot():null;const item=slot?serviceOf(slot.serviceKey):null;
- if(!item){bar.classList.add('hidden');bar.replaceChildren();delete bar.dataset.slot;return;}
- const group=tabs[slot.serviceKey];const tab=group?.items.find(t=>t.id===slot.tabId);const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));const browser=isBrowserItem(item);
- const url=live?.url || tab?.current || tab?.url || '';const detail=browser?(hostOf(url) || 'New tab'):(tab?tabTitle(slot.serviceKey,tab):'');
- bar.classList.remove('hidden');bar.classList.toggle('loading',Boolean(live?.loading));
- if(bar.querySelector('.app-address'))return;
- if(soft && bar.dataset.slot===slot.serviceKey+'/'+slot.tabId){const d=bar.querySelector('.app-chip-detail');if(d)d.textContent=detail===item.name?'':detail;const t=bar.querySelector('.app-chip-tabs');if(t){t.textContent=group && group.items.length>1?String(group.items.length):'';t.hidden=!(group && group.items.length>1);}return;}
- bar.dataset.slot=slot.serviceKey+'/'+slot.tabId;bar.replaceChildren();
- const chip=el('button','app-chip');chip.type='button';chip.title=item.name+(url?' · '+url:'')+' — click for tabs, navigation and zoom';
- if(browser){const i=el('span','group-icon');i.append(iconNode(item.icon || '🌐'));chip.append(i);}else{const img=el('img','site-favicon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback',item.name.slice(0,1).toUpperCase());chip.append(img,fallback);call('favicon',slot.serviceKey).then(icon=>paintIcon(img,icon)).catch(()=>{});}
- chip.append(el('span','app-chip-name',item.name),el('span','app-chip-detail',detail===item.name?'':detail));const count=el('span','app-chip-tabs',group && group.items.length>1?String(group.items.length):'');count.hidden=!(group && group.items.length>1);chip.append(count,el('span','app-chip-caret','▾'));
- chip.onclick=()=>appMenu(slot,item,chip);chip.oncontextmenu=e=>{e.preventDefault();rowMenu(item,e.clientX,e.clientY);};bar.append(chip);
- const close=el('button','app-bar-close','×');close.type='button';close.title='Back to the canvas (Esc)';close.onclick=()=>attempt(()=>show('overview'));bar.append(close);}
-// Everything about the current app hangs off its chip: address, tabs, navigation, zoom, and the way back.
-function appMenu(slot,item,chip){const rect=chip.getBoundingClientRect();const index=Math.min(tiles.focus,slotCount()-1);const group=tabs[slot.serviceKey];const browser=isBrowserItem(item);const zoom=Math.round((zoomByApp[slot.serviceKey] || 1)*100)+'%';
- const items=[];
- if(browser)items.push({label:'Go to address…',hint:'⌘L',run:()=>editAddress(slot)});
- if(group && group.items.length>1){items.push('-');for(const x of group.items)items.push({label:tabTitle(slot.serviceKey,x),checked:x.id===slot.tabId,run:()=>x.id===slot.tabId?null:activateTab(index,slot.serviceKey,x.id)});items.push({label:'Close this tab',hint:'⌘W',run:()=>closeTab(slot.serviceKey,slot.tabId)});}
- items.push({label:isSlack(item)?'Add another Slack workspace':'New tab',hint:'⌘T',run:()=>newTab(slot.serviceKey)},'-');
- for(const [action,label,hint] of [['back','Back',''],['forward','Forward',''],['reload','Reload','⌘R']])items.push({label,hint,run:async()=>{const info=await call('tab-action',{serviceKey:slot.serviceKey,tabId:slot.tabId,action});if(info)tabLive.set(liveKey(info.serviceKey,info.tabId),info);renderAppBar(true);}});
- items.push('-',{label:'Zoom in',hint:'⌘+',run:()=>zoomApp(1)},{label:'Zoom out',hint:'⌘−',run:()=>zoomApp(-1)},{label:'Actual size · now '+zoom,hint:'⌘0',run:()=>zoomApp(0)},'-',{label:'Back to the canvas',hint:'Esc',run:()=>show('overview')});
- showMenu(items,rect.left,rect.bottom+6);}
-function editAddress(slot){const bar=$('app-bar');if(bar.querySelector('.app-address'))return;const chip=bar.querySelector('.app-chip');const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));const tab=tabs[slot.serviceKey]?.items.find(t=>t.id===slot.tabId);
- const form=el('form','app-address');const input=el('input','app-address-input');input.type='text';input.autocomplete='off';input.spellcheck=false;input.placeholder='Enter a website address';input.setAttribute('aria-label','Address');input.value=live?.url || tab?.current || tab?.url || '';form.append(input);
- const done=()=>{form.remove();if(chip)chip.hidden=false;renderAppBar(true);};
- form.onsubmit=e=>{e.preventDefault();const value=input.value.trim();if(!value){done();return;}attempt(async()=>{const target=/^[a-z][a-z0-9+.-]*:/i.test(value)?value:/^[^\s]+\.[^\s]+$/.test(value)?'https://'+value:'https://duckduckgo.com/?q='+encodeURIComponent(value);tabs[slot.serviceKey]=await call('navigate-tab',{serviceKey:slot.serviceKey,tabId:slot.tabId,url:target});done();renderTiles();});};
- input.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();done();}};input.onblur=()=>setTimeout(()=>{if(form.isConnected)done();},120);
- if(chip){chip.hidden=true;bar.insertBefore(form,chip);}else bar.prepend(form);input.focus();input.select();}
 window.hearth.on('tab-focused',({serviceKey,tabId})=>{const n=slotCount();const i=tiles.slots.findIndex((s,at)=>at<n && s && s.serviceKey===serviceKey && s.tabId===tabId);if(i<0 || tiles.focus===i)return;tiles.focus=i;for(const t of $('tiles').children)t.classList.toggle('focused',t===$('tiles').children[i]);saveLayout();updateZoomControl();deckSync();});
 function cardFor(key){if(!key)return null;return deckCards().find(c=>c.dataset.key===key || c.querySelector(`.hand>.service-row[data-key="${CSS.escape(key)}"]`)) || null;}
 function cardKey(card){if(!card)return null;if(card.dataset.key)return card.dataset.key;return card.dataset.active || card.querySelector('.hand>.service-row')?.dataset.key || null;}
@@ -539,29 +513,38 @@ function deckSync(){const slot=page==='browser-page' && !layout.centreCollapsed?
  const companion=key?companionFor(key):null;const frontCard=cardFor(key),companionCard=cardFor(companion);
  for(const card of deckCards()){const mine=card===frontCard;card.classList.toggle('front',mine);card.classList.toggle('companion',Boolean(companionCard) && card===companionCard && !mine);card.querySelector('.nav')?.setAttribute('aria-selected',String(mine));if(card===companionCard)card.dataset.companionKey=companion;else delete card.dataset.companionKey;
   if(card.classList.contains('group-card')){if(mine){card.classList.remove('open');card.dataset.active=key;const member=serviceOf(key);card.querySelector('.nav>.label').textContent=card.dataset.name+' › '+(member?.name || '');}else{delete card.dataset.active;card.querySelector('.nav>.label').textContent=card.dataset.name;}}}
- renderStackEdges(frontCard);renderAppBar();
+ renderStackEdges(frontCard);
  deckLayout();}
 function deckSelect(index){const card=deckCards()[index];const item=serviceOf(cardKey(card));if(item)return openService(item);}
 function deckStep(direction){const cards=deckCards();if(!cards.length)return;const at=cards.findIndex(c=>c.classList.contains('front'));const next=at<0?(direction>0?0:cards.length-1):Math.max(0,Math.min(cards.length-1,at+direction));return deckSelect(next);}
 function deckCompanion(){const card=deckCards().find(c=>c.classList.contains('companion'));const item=card?serviceOf(card.dataset.companionKey || card.dataset.key):null;if(item)return openService(item);notice('No companion yet. Switch between two apps a few times and the deck will learn the pair.');}
 function fanDeck(on){document.querySelector('body>aside').classList.toggle('fanned',on);deckLayout();}
-// Find any app by name from the strip: type, autocomplete, Enter. Every app is reachable here, pinned or not.
-let deckSearchIndex=0;
+// Search is the navigation: a visual picker that fills the pane it was opened from.
+let searchTarget=0,searchIndex=0;
+function searchGlyph(){const ns='http://www.w3.org/2000/svg';const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 20 20');svg.setAttribute('aria-hidden','true');const c=document.createElementNS(ns,'circle');c.setAttribute('cx','8.5');c.setAttribute('cy','8.5');c.setAttribute('r','5.5');const p=document.createElementNS(ns,'path');p.setAttribute('d','M12.8 12.8 17 17');svg.append(c,p);return svg;}
 function iconFor(item){if(isBrowserItem(item)){const i=el('span','group-icon');i.append(iconNode(item.icon || '🌐'));return i;}const wrap=el('span','icon-pair');const img=el('img','site-favicon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback',item.name.slice(0,1).toUpperCase());wrap.append(img,fallback);call('favicon',item.id || item.url).then(icon=>paintIcon(img,icon)).catch(()=>{});return wrap;}
-function deckSearchResults(q){const needle=q.trim().toLowerCase();const out=[];for(const item of sidebarItems.filter(openable)){const group=item.folderId?serviceFolders.find(f=>f.id===item.folderId)?.name || '':'';const name=item.name.toLowerCase();const score=!needle?1:name.startsWith(needle)?3:name.split(/\s+/).some(w=>w.startsWith(needle))?2.5:name.includes(needle)?2:group.toLowerCase().includes(needle)?1:0;if(score>0)out.push({item,group,score});}return out.sort((a,b)=>b.score-a.score || a.item.name.localeCompare(b.item.name)).slice(0,8);}
-function openDeckSearch(){$('deck-search-btn').classList.add('hidden');const input=$('deck-search-input');input.classList.remove('hidden');input.value='';deckSearchIndex=0;renderDeckSearch();input.focus();}
-function closeDeckSearch(){$('deck-search-input').classList.add('hidden');$('deck-search-list').classList.add('hidden');$('deck-search-btn').classList.remove('hidden');}
-function renderDeckSearch(){const list=$('deck-search-list');const results=deckSearchResults($('deck-search-input').value);list.replaceChildren();deckSearchIndex=Math.max(0,Math.min(deckSearchIndex,results.length-1));
- results.forEach((r,i)=>{const b=el('button','deck-result');b.type='button';b.setAttribute('role','option');b.setAttribute('aria-selected',String(i===deckSearchIndex));b.append(iconFor(r.item),el('span','deck-result-name',r.item.name));if(r.group)b.append(el('small','deck-result-group',r.group));b.onmousedown=e=>e.preventDefault();b.onclick=()=>{closeDeckSearch();attempt(()=>openService(r.item));};list.append(b);});
- if(!results.length)list.append(el('div','deck-empty','No app called that. Press + to add one.'));list.classList.remove('hidden');}
-$('deck-search-btn').onclick=openDeckSearch;
-$('deck-search-input').oninput=e=>{const input=e.target;deckSearchIndex=0;if(e.inputType==='insertText'){const typed=input.value;const top=deckSearchResults(typed)[0];if(top && typed && top.item.name.toLowerCase().startsWith(typed.toLowerCase()) && top.item.name.length>typed.length){input.value=typed+top.item.name.slice(typed.length);input.setSelectionRange(typed.length,input.value.length);}}renderDeckSearch();};
-$('deck-search-input').onkeydown=e=>{const options=$('deck-search-list').querySelectorAll('.deck-result');if(e.key==='ArrowDown' || e.key==='ArrowUp'){e.preventDefault();if(!options.length)return;deckSearchIndex=(deckSearchIndex+(e.key==='ArrowDown'?1:options.length-1))%options.length;renderDeckSearch();}else if(e.key==='Enter'){e.preventDefault();options[deckSearchIndex]?.click();}else if(e.key==='Escape'){e.preventDefault();closeDeckSearch();}};
-$('deck-search-input').onblur=()=>setTimeout(()=>{if(document.activeElement!==$('deck-search-input'))closeDeckSearch();},120);
+function searchResults(q){const needle=q.trim().toLowerCase();const out=[];for(const item of sidebarItems.filter(openable)){const group=item.folderId?serviceFolders.find(f=>f.id===item.folderId)?.name || '':'';const name=item.name.toLowerCase();const score=!needle?1:name.startsWith(needle)?3:name.split(/\s+/).some(w=>w.startsWith(needle))?2.5:name.includes(needle)?2:group.toLowerCase().includes(needle)?1:0;if(score>0)out.push({item,group,score});}return out.sort((a,b)=>b.score-a.score || a.item.name.localeCompare(b.item.name));}
+function openAppSearch(target=0){searchTarget=Math.max(0,Math.min(3,target));searchIndex=0;const dialog=$('app-search');const n=page==='browser-page'?slotCount():1;$('app-search-target').textContent=n>1?'Pane '+(searchTarget+1):'';$('app-search-input').value='';if(!dialog.open){suspendViews();dialog.showModal();}renderAppSearch();$('app-search-input').focus();}
+function closeAppSearch(){const dialog=$('app-search');if(dialog.open)dialog.close();}
+function pickApp(item){closeAppSearch();attempt(async()=>{if(page!=='browser-page')await show('browser-page');await openInTile(item.id || item.url,undefined,searchTarget);});}
+function renderAppSearch(){const grid=$('app-search-grid');const results=searchResults($('app-search-input').value);grid.replaceChildren();
+ const extras=[];if(page==='browser-page'){extras.push({label:'Canvas',sub:'Home · ⌘⇧H',glyph:'⌂',run:()=>{closeAppSearch();attempt(()=>show('overview'));}});const slot=tiles.slots[searchTarget];const group=slot?tabs[slot.serviceKey]:null;if(group && group.items.length>1)for(const tab of group.items)if(tab.id!==slot.tabId)extras.push({label:tabTitle(slot.serviceKey,tab),sub:'Tab in '+(serviceOf(slot.serviceKey)?.name || ''),glyph:'⧉',run:()=>{closeAppSearch();attempt(()=>activateTab(searchTarget,slot.serviceKey,tab.id));}});}
+ const needle=$('app-search-input').value.trim().toLowerCase();const shownExtras=extras.filter(x=>!needle || x.label.toLowerCase().includes(needle));
+ shownExtras.forEach((x,i)=>{const t=el('button','app-tile app-tile-extra');t.type='button';t.setAttribute('role','option');t.setAttribute('aria-selected',String(i===searchIndex));const art=el('span','art',x.glyph);t.append(art,el('span','app-tile-name',x.label),el('span','app-tile-group',x.sub));t.onclick=x.run;grid.append(t);});
+ const offset=shownExtras.length;
+ results.forEach((r,i0)=>{const i=i0+offset;const key=r.item.id || r.item.url;const t=el('button','app-tile');t.type='button';t.setAttribute('role','option');t.setAttribute('aria-selected',String(i===searchIndex));const art=el('span','art');art.append(iconFor(r.item));t.append(art,el('span','app-tile-name',r.item.name));if(r.group)t.append(el('span','app-tile-group',r.group));const count=serviceBadges.get(key) || 0;if(count){const b=el('small','service-badge',count>99?'99+':String(count));t.append(b);}t.title=r.item.name;t.onclick=()=>pickApp(r.item);grid.append(t);});
+ const add=el('button','app-tile app-tile-add');add.type='button';add.setAttribute('role','option');add.setAttribute('aria-selected',String(searchIndex===results.length+offset));const art=el('span','art','＋');add.append(art,el('span','app-tile-name','Add an app'));add.onclick=()=>{closeAppSearch();$('add-app').click();};grid.append(add);
+ searchIndex=Math.max(0,Math.min(searchIndex,results.length+offset));for(const [i,t] of [...grid.querySelectorAll('.app-tile')].entries())t.setAttribute('aria-selected',String(i===searchIndex));
+ if(!results.length && !shownExtras.length && $('app-search-input').value.trim())grid.prepend(el('div','app-search-empty','No app called "'+$('app-search-input').value.trim()+'". Add it, or try another name.'));
+ grid.querySelector('[aria-selected=true]')?.scrollIntoView({block:'nearest'});}
+$('app-search-close').onclick=closeAppSearch;$('app-search').addEventListener('close',resumeViews);$('app-search').addEventListener('click',e=>{if(e.target===$('app-search'))closeAppSearch();});
+$('app-search-input').oninput=e=>{const input=e.target;searchIndex=0;if(e.inputType==='insertText'){const typed=input.value;const top=searchResults(typed)[0];if(top && typed && top.item.name.toLowerCase().startsWith(typed.toLowerCase()) && top.item.name.length>typed.length){input.value=top.item.name;input.setSelectionRange(typed.length,input.value.length);}}renderAppSearch();};
+$('app-search-input').onkeydown=e=>{const options=$('app-search-grid').querySelectorAll('.app-tile');const cols=5;if(!options.length)return;const move=d=>{e.preventDefault();searchIndex=Math.max(0,Math.min(options.length-1,searchIndex+d));renderAppSearch();};if(e.key==='ArrowRight')move(1);else if(e.key==='ArrowLeft')move(-1);else if(e.key==='ArrowDown')move(cols);else if(e.key==='ArrowUp')move(-cols);else if(e.key==='Enter'){e.preventDefault();options[searchIndex]?.click();}};
+$('canvas-search').onclick=()=>openAppSearch(0);
 $('deck-zone').addEventListener('mouseover',e=>{if(!e.target.closest('.front'))fanDeck(true);});
 $('deck-zone').addEventListener('mouseout',e=>{const to=e.relatedTarget;if(!to || !$('deck-zone').contains(to) || to.closest('.front'))fanDeck(false);});
 $('deck-zone').addEventListener('wheel',e=>{if(e.deltaY<-12)fanDeck(true);else if(e.deltaY>12)fanDeck(false);},{passive:true});
-window.hearth.on('deck-command',cmd=>attempt(()=>{if(cmd?.page)return show(cmd.page);if(typeof cmd?.slot==='number')return deckSelect(cmd.slot);if(cmd?.step)return deckStep(cmd.step);if(cmd?.companion)return deckCompanion();}));
+window.hearth.on('deck-command',cmd=>attempt(()=>{if(typeof cmd?.search==='number')return openAppSearch(cmd.search);if(cmd?.page)return show(cmd.page);if(typeof cmd?.slot==='number')return deckSelect(cmd.slot);if(cmd?.step)return deckStep(cmd.step);if(cmd?.companion)return deckCompanion();}));
 new ResizeObserver(deckMetrics).observe(document.querySelector('main'));addEventListener('resize',deckMetrics);
 function sidebarMenu(x,y){showMenu([{label:'Add an app, website or group',run:()=>$('add-app').click()},{label:'Home · the canvas',hint:'⌘⇧H',run:()=>show('overview')}],x,y);}
 document.querySelector('body>aside').addEventListener('contextmenu',e=>{if(e.target.closest('.service-row,.service-group'))return;e.preventDefault();sidebarMenu(e.clientX,e.clientY);});

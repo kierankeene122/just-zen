@@ -305,6 +305,23 @@ function attachView(serviceKey,tabId,view,url){
   return entry;
 }
 function clipBounds(box){const [w,h]=win.getContentSize();const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));return {x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))};}
+// ---- Pane search badges: a floating ⌕ over the top-right of each pane ----
+const badges=[];
+function ensureBadge(i){if(badges[i] && !badges[i].view.webContents.isDestroyed())return badges[i];
+  const view=new WebContentsView({webPreferences:{preload:path.join(__dirname,'pane-badge-preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,partition:'popover',backgroundThrottling:false}});
+  const c=view.webContents;c.session.setPermissionRequestHandler((_c,_p,done)=>done(false));c.session.setPermissionCheckHandler(()=>false);
+  const allowed=new Set(['pane-badge.html','pane-badge.js'].map(f=>pathToFileURL(path.join(__dirname,f)).href));
+  c.session.webRequest.onBeforeRequest((details,done)=>done({cancel:!allowed.has(details.url)}));
+  c.setWindowOpenHandler(()=>({action:'deny'}));c.on('will-navigate',e=>e.preventDefault());
+  try{view.setBackgroundColor('#00000000');}catch{}
+  c.on('did-finish-load',()=>c.send('badge-theme',config.theme || 'light'));c.loadFile('pane-badge.html');
+  const entry={view,attached:false,visible:false};badges[i]=entry;return entry;}
+function placeBadges(list){const wanted=new Map();for(const p of list)if(Number.isInteger(p.slot) && p.slot>=0 && p.slot<4)wanted.set(p.slot,p);
+  for(let i=0;i<4;i++){const p=wanted.get(i);if(!p){if(badges[i]?.visible){badges[i].view.setVisible(false);badges[i].visible=false;}continue;}
+    const b=ensureBadge(i);const box=clipBounds({x:p.x+p.width-50,y:p.y+6,width:44,height:44});
+    if(!b.attached || !b.visible){win.contentView.addChildView(b.view);b.attached=true;}
+    b.view.setBounds(box);if(!b.visible){b.view.setVisible(!locked);b.visible=true;}}}
+function retintBadges(){for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-theme',config.theme || 'light');}
 function placeViews(list){
   if(!Array.isArray(list) || list.length>4)throw Error('Invalid placement');
   const wanted=new Map();
@@ -313,13 +330,14 @@ function placeViews(list){
     let entry=null;try{entry=ensureView(p.serviceKey,p.tabId);}catch{}
     if(entry)wanted.set(viewKey(p.serviceKey,p.tabId),{...clipBounds(p),radius:Number.isFinite(p.radius)?Math.max(0,Math.min(24,Math.round(p.radius))):0});
   }
-  if(locked)return [];
+  if(locked){placeBadges([]);return [];}
   for(const [key,entry] of views){
     if(appPeek && entry===appPeek)continue;
     const box=wanted.get(key);
     if(box){entry.view.setBounds({x:box.x,y:box.y,width:box.width,height:box.height});if(typeof entry.view.setBorderRadius==='function' && entry.radius!==box.radius){entry.radius=box.radius;try{entry.view.setBorderRadius(box.radius);}catch{}}if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
     else if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}
   }
+  placeBadges(list.filter(p=>wanted.has(viewKey(p.serviceKey,p.tabId))));
   return [...wanted.keys()].map(key=>tabInfo(views.get(key)));
 }
 function openTab(serviceKey,url='',announce=false){
@@ -420,7 +438,7 @@ async function darkenIfLight(contents){
 }
 // The Now stream: per app, its unread count and the named items its page reported, newest first.
 function nowFeed(){const out=[];for(const item of (config.services || []).filter(openable)){const key=item.id || item.url;const entry=[...views.values()].find(v=>v.serviceKey===key);const source=entry?notificationSources.get(entry.view.webContents):null;const count=visibleBadge(key);const items=source?.items || [];if(!count && !items.length)continue;out.push({key,name:item.name,count,items,at:source?.itemsAt || 0,muted:isMuted(key)});}return out.sort((a,b)=>(b.count-a.count) || (b.at-a.at));}
-function retheme(){for(const entry of views.values())darkenIfLight(entry.view.webContents);}
+function retheme(){for(const entry of views.values())darkenIfLight(entry.view.webContents);retintBadges();}
 function subscriptionEnv(){
   const env={...process.env,TERM:'xterm-256color',COLORTERM:'truecolor',PATH:'/opt/homebrew/bin:/usr/local/bin:'+process.env.PATH,CLAUDE_CONFIG_DIR:claudeConfigDir};
   delete env.ELECTRON_RUN_AS_NODE;
@@ -491,6 +509,7 @@ app.whenReady().then(async () => {
   ipcMain.on('popover-open',(e,key)=>{try{popoverTrusted(e);hidePopover();if(typeof key==='string' && (config.services || []).some(s=>(s.id || s.url)===key))send('open-service',key);}catch{}});
   ipcMain.on('popover-edit',(e,id)=>{try{popoverTrusted(e);hidePopover();if(typeof id==='string' && (config.serviceFolders || []).some(f=>f.id===id))send('edit-group',id);}catch{}});
   ipcMain.on('popover-close',e=>{try{popoverTrusted(e);hidePopover();}catch{}});
+  ipcMain.on('pane-search',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{search:i});});
   ipcMain.on('popover-remove',async (e,input)=>{try{popoverTrusted(e);if(!input || typeof input.key!=='string' || typeof input.folderId!=='string')return;config.services=setFolder(config.services || [],input.key,null,config.serviceFolders || []);await persist();send('sidebar-changed',{services:config.services,folders:config.serviceFolders || []});const cb=win.getContentBounds();await showPopover({folderId:input.folderId,left:popover.__anchor.x-cb.x,top:popover.__anchor.y-cb.y});}catch{}});
   win.on('move',()=>hidePopover());win.on('resize',()=>hidePopover());
   handle('document-capture-all',()=>{dc.send('capture-selection','claude-all');return true;});
@@ -551,7 +570,7 @@ app.whenReady().then(async () => {
   ipcMain.on('web-unread',(e,count)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;const source=notificationSources.get(e.sender);if(!source?.saved)return;const n=Math.max(0,Math.min(9999,Number(count) || 0));if(source.domUnread===n)return;source.domUnread=n;const previous=serviceBadges.get(entry.serviceKey) || 0;const merged=Math.max(unreadCount(e.sender.getTitle()),n);updateServiceBadge(entry.serviceKey,merged);if(merged>previous && !entry.visible && !isMuted(entry.serviceKey))pushRecent({key:entry.serviceKey,name:source.name,count:merged});}catch{}});
   handle('peek-bounds',box=>{if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid peek bounds');peekPlace(box);return true;});
   handle('peek-close',()=>{peekClose();return true;});
-  if(!app.isPackaged)handle('debug-views',()=>({tiles:[...views.values()].map(v=>({key:v.serviceKey.slice(0,8),tab:v.tabId.slice(0,6),visible:v.visible,bounds:v.view.getBounds(),peeked:appPeek===v})),peek:peek?{visible:peek.visible,bounds:peek.view.getBounds()}:null}));
+  if(!app.isPackaged)handle('debug-views',()=>({tiles:[...views.values()].map(v=>({key:v.serviceKey.slice(0,8),tab:v.tabId.slice(0,6),visible:v.visible,bounds:v.view.getBounds(),peeked:appPeek===v})),peek:peek?{visible:peek.visible,bounds:peek.view.getBounds()}:null,badges:badges.map(b=>b&&b.visible?b.view.getBounds():null)}));
   handle('peek-action',({action}={})=>{if(appPeek){const key=appPeek.serviceKey,tabId=appPeek.tabId;if(action==='tab' || action==='beside'){peekClose();return {serviceKey:key,tabId,tabs:tabsFor(key),beside:action==='beside'};}if(action==='reload'){appPeek.view.webContents.reload();return true;}return null;}if(!peek)return null;const c=peek.view.webContents;if(action==='back' && c.navigationHistory.canGoBack()){c.navigationHistory.goBack();return true;}if(action==='reload'){c.reload();return true;}const url=c.getURL(),key=peek.serviceKey;if(!/^https?:/i.test(url))return null;if(action==='tab'){const opened=openTab(key,url,true);peekClose();return opened;}if(action==='beside'){const opened=openTab(key,url,false);peekClose();return {...opened,beside:true};}return null;});
   handle('set-peek-links',async on=>{config.peekLinks=Boolean(on);await persist();return config.peekLinks;});
   ipcMain.on('web-peek-link',(e,url)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || locked || typeof url!=='string' || !/^https?:/i.test(url))return;peekOpen(entry.serviceKey,null,url);}catch{}});
