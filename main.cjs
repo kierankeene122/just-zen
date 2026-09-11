@@ -266,6 +266,7 @@ function attachView(serviceKey,tabId,view,url){
   views.set(key,entry);win.contentView.addChildView(view);view.setVisible(false);
   const contents=view.webContents;
   contents.once('destroyed',()=>{if(views.get(key)===entry){views.delete(key);try{win.contentView.removeChildView(view);}catch{}}});
+  contents.on('focus',()=>send('tab-focused',{serviceKey,tabId}));
   const notificationSource={contents,saved:!isBrowser,key:serviceKey,name:item.name,notificationPermission:false,badgeInitialized:false,origins:new Set(),landed:false};
   notificationSources.set(contents,notificationSource);
   hardenWebSession(contents.session);
@@ -310,13 +311,13 @@ function placeViews(list){
   for(const p of list){
     if(!p || typeof p.serviceKey!=='string' || typeof p.tabId!=='string' || !['x','y','width','height'].every(k=>Number.isFinite(p[k])))throw Error('Invalid placement');
     let entry=null;try{entry=ensureView(p.serviceKey,p.tabId);}catch{}
-    if(entry)wanted.set(viewKey(p.serviceKey,p.tabId),clipBounds(p));
+    if(entry)wanted.set(viewKey(p.serviceKey,p.tabId),{...clipBounds(p),radius:Number.isFinite(p.radius)?Math.max(0,Math.min(24,Math.round(p.radius))):0});
   }
   if(locked)return [];
   for(const [key,entry] of views){
     if(appPeek && entry===appPeek)continue;
     const box=wanted.get(key);
-    if(box){entry.view.setBounds(box);if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
+    if(box){entry.view.setBounds({x:box.x,y:box.y,width:box.width,height:box.height});if(typeof entry.view.setBorderRadius==='function' && entry.radius!==box.radius){entry.radius=box.radius;try{entry.view.setBorderRadius(box.radius);}catch{}}if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
     else if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}
   }
   return [...wanted.keys()].map(key=>tabInfo(views.get(key)));
@@ -609,7 +610,7 @@ app.whenReady().then(async () => {
   handle('remove-service',async key=>{const index=(config.services || []).findIndex(s=>(s.id || s.url)===key);if(index<0)throw Error('App not found');const item=config.services[index];closeServiceViews(key);config.services=config.services.filter((_,i)=>i!==index);const snapshot={item,index,tabs:(config.tabs || {})[key] || null,sleep:config.sleep?.apps?.[key],zoom:config.zoom?.[key],mute:config.mutes?.[key]};delete (config.tabs || {})[key];if(config.sleep?.apps)delete config.sleep.apps[key];if(config.zoom)delete config.zoom[key];if(config.mutes)delete config.mutes[key];await persist();return {services:config.services,snapshot};});
   handle('restore-service',async snapshot=>{if(!snapshot || !snapshot.item || typeof snapshot.item!=='object')throw Error('Nothing to restore');const item=snapshot.item;const key=item.id || item.url;if(typeof key!=='string' || (config.services || []).some(s=>(s.id || s.url)===key))return config.services || [];if(item.url)validURL(item.url);const clean={...item,name:String(item.name || '').slice(0,50)};config.services=config.services || [];const at=Math.max(0,Math.min(config.services.length,Number(snapshot.index) || 0));config.services.splice(at,0,clean);if(snapshot.tabs && cleanTabs(key,snapshot.tabs)){config.tabs=config.tabs || {};config.tabs[key]=cleanTabs(key,snapshot.tabs);}if(SLEEP_CHOICES.has(snapshot.sleep)){config.sleep=sleepSettings();config.sleep.apps[key]=snapshot.sleep;}if(typeof snapshot.zoom==='number'){config.zoom=config.zoom || {};config.zoom[key]=snapshot.zoom;}if(snapshot.mute===-1 || (typeof snapshot.mute==='number' && snapshot.mute>Date.now())){config.mutes=config.mutes || {};config.mutes[key]=snapshot.mute;}await persist();return config.services;});
   handle('add-browser',async ({name,icon}={})=>{if(typeof name!=='string' || !name.trim())throw Error('Name is required');config.services=config.services || [];const item={id:crypto.randomUUID(),kind:'browser',name:name.trim().slice(0,50),icon:cleanEmoji(icon),profile:'isolated'};config.services.push(item);await persist();return {services:config.services,key:item.id};});
-  handle('update-service',async ({key,name,icon}={})=>{let found=false;config.services=(config.services || []).map(item=>{if((item.id || item.url)!==key)return item;found=true;const next={...item};if(typeof name==='string' && name.trim())next.name=name.trim().slice(0,50);if(icon!==undefined && isBrowserItem(item))next.icon=cleanEmoji(icon);return next;});if(!found)throw Error('App not found');await persist();return config.services;});
+  handle('update-service',async ({key,name,icon,pinned}={})=>{let found=false;config.services=(config.services || []).map(item=>{if((item.id || item.url)!==key)return item;found=true;const next={...item};if(typeof name==='string' && name.trim())next.name=name.trim().slice(0,50);if(icon!==undefined && isBrowserItem(item))next.icon=cleanEmoji(icon);if(typeof pinned==='boolean')next.pinned=pinned;return next;});if(!found)throw Error('App not found');await persist();return config.services;});
   handle('add-service',async ({name,url}) => { url = validURL(url); if(typeof name !== 'string' || !name.trim()) throw Error('Name is required'); config.services=config.services || [];if(!config.services.some(s=>s.url===url))config.services.push({id:require('node:crypto').randomUUID(),name:name.trim().slice(0,50),kind:'web',url,profile:'isolated'}); await persist(); return config.services; });
   handle('start-terminal',kind => { if(!['claude','shell','login'].includes(kind)) throw Error('Invalid session'); return startTerminal(kind); });
   handle('stop-terminal',() => { terminal?.kill(); });
