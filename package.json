@@ -81,7 +81,11 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Just Zen passes your microphone to the web app you are calling from, such as Slack or Google Meet.",
+        "NSCameraUsageDescription": "Just Zen passes your camera to the web app you are calling from, such as Slack or Google Meet."
+      }
     },
     "artifactName": "Just-Zen-${version}-${arch}.${ext}",
     "publish": [

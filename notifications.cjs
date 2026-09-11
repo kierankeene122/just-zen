@@ -15,7 +15,9 @@ function unreadCount(title=''){
  const text=String(title).trim();
  const match=text.match(/(?:\(([\d,]{1,7})\)|\[([\d,]{1,7})\])/)
   || text.match(/\b([\d,]{1,7})\s+(?:unread|new messages?|new notifications?)\b/i);
- return match?Math.min(9999,Number((match[1] || match[2]).replace(/,/g,'')) || 0):0;
+ if(match)return Math.min(9999,Number((match[1] || match[2]).replace(/,/g,'')) || 0);
+ // Slack and others mark unread with a leading dot or asterisk and no number.
+ return /^[•*●]\s/.test(text)?1:0;
 }
 
 module.exports={canNotify,unreadCount,secureOrigin};

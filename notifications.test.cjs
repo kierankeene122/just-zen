@@ -27,3 +27,4 @@ test('unread counts support Gmail and counts after the app name',()=>{
  assert.equal(unreadCount('Teams — 2 unread messages'),2);
  assert.equal(unreadCount('Inbox - Gmail'),0);
 });
+test('a leading dot or asterisk counts as one unread',()=>{const {unreadCount}=require('./notifications.cjs');assert.equal(unreadCount('• Slack | general'),1);assert.equal(unreadCount('* general - Slack'),1);assert.equal(unreadCount('(3) Slack'),3);assert.equal(unreadCount('Slack | general'),0);});

@@ -17,3 +17,14 @@ async function offerFill(target){
  const user=usernameFor(pw);if(user && !user.value && saved.username)setValue(user,saved.username);setValue(pw,saved.password);
 }
 document.addEventListener('focusin',e=>{const el=e.target;if(!el || el.tagName!=='INPUT')return;if(passwordField(el) || (['text','email','tel',''].includes(el.type) && (el.form || el.closest('form'))?.querySelector('input[type=password]')))offerFill(el);},true);
+
+// Unread counts for sites that keep them in the page rather than the title. Read from the isolated world, sent only from the top frame.
+const UNREAD_PROBES={
+ 'chat.google.com':()=>{let n=0;for(const el of document.querySelectorAll('div[data-section-type] div.TeR7uc'))n+=Number(String(el.textContent).replace(/\D/g,''))||0;if(!n)n=document.querySelectorAll('[data-unread="true"],[aria-label*="unread" i]').length;return n;},
+ 'mail.google.com':()=>{const m=document.title.match(/\((\d+)\)/);return m?Number(m[1]):0;},
+ 'app.slack.com':()=>{let n=0;for(const el of document.querySelectorAll('.p-channel_sidebar__badge'))n+=Number(String(el.textContent).replace(/\D/g,''))||0;if(!n)n=document.querySelectorAll('.p-channel_sidebar__channel--unread:not(.p-channel_sidebar__channel--muted),.p-channel_sidebar__link--unread').length;return n;},
+ 'teams.microsoft.com':()=>{let n=0;for(const el of document.querySelectorAll('[data-tid*="badge" i],[class*="badge" i]'))n+=Number(String(el.textContent).replace(/\D/g,''))||0;return n;},
+ 'web.whatsapp.com':()=>{let n=0;for(const el of document.querySelectorAll('[aria-label$="unread message"],[aria-label$="unread messages"]'))n+=Number(String(el.getAttribute('aria-label')).replace(/\D/g,''))||0;return n;},
+ 'discord.com':()=>{let n=0;for(const el of document.querySelectorAll('[class*="numberBadge"]'))n+=Number(String(el.textContent).replace(/\D/g,''))||0;return n;}
+};
+if(window===window.top){const probe=Object.entries(UNREAD_PROBES).find(([host])=>location.hostname===host || location.hostname.endsWith('.'+host))?.[1];if(probe){let last=-1;setInterval(()=>{let n=0;try{n=probe();}catch{}if(n!==last){last=n;ipcRenderer.send('web-unread',n);}},4000);}}

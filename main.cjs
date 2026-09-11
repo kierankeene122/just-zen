@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification, webContents, clipboard } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification, webContents, clipboard, shell } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const execFile = require('node:util').promisify(require('node:child_process').execFile);
@@ -51,7 +51,7 @@ function handle(name, fn) { ipcMain.handle(name, async (e, ...args) => { trusted
 function send(name, value) { if (win && !win.isDestroyed()) win.webContents.send(name, value); }
 function touchIDAvailable(){return process.platform==='darwin' && Boolean(systemPreferences.canPromptTouchID?.());}
 function scheduleLock(){clearTimeout(lockTimer);if(!config.appLock || locked)return;lockTimer=setTimeout(()=>lockApp(),Math.max(1,Number(config.autoLockMinutes) || 15)*60_000);lockTimer.unref?.();}
-function lockApp(){if(!config.appLock || locked)return false;locked=true;hideAllViews();hidePopover();for(const view of win.contentView.children)if(view.webContents?.getURL().endsWith('/document-view.html'))view.setVisible(false);send('app-locked',{locked:true,method:config.appLockMethod});return true;}
+function lockApp(){if(!config.appLock || locked)return false;locked=true;hideAllViews();hidePopover();send('calendar-hide');for(const view of win.contentView.children)if(view.webContents?.getURL().endsWith('/document-view.html'))view.setVisible(false);send('app-locked',{locked:true,method:config.appLockMethod});return true;}
 async function authenticate(reason){if(!touchIDAvailable())throw Error('Touch ID is not available on this Mac');await systemPreferences.promptTouchID(reason);}
 function passcodeHash(passcode,salt){return crypto.scryptSync(String(passcode),salt,32);}
 function verifyPasscode(passcode){if(typeof passcode!=='string' || !config.lockSalt || !config.lockHash)return false;const actual=passcodeHash(passcode,Buffer.from(config.lockSalt,'base64')),expected=Buffer.from(config.lockHash,'base64');return actual.length===expected.length && crypto.timingSafeEqual(actual,expected);}
@@ -68,7 +68,7 @@ function sleepMinutesFor(serviceKey){const s=sleepSettings();return serviceKey i
 function stateSnapshot(){if(locked)return {locked:true,lockMethod:config.appLockMethod || 'touchID',theme:config.theme || 'light',version:app.getVersion()};return {locked:false,home:require('node:os').homedir(),root,claudeRoot,claudePolicy:config.claudePolicy || 'notes',claudeWorkspaces:config.claudeWorkspaces || (claudeRoot?[claudeRoot]:[]),connectedFolders:[...new Set([root,...(config.connectedFolders || []),...(config.claudeWorkspaces || [])].filter(Boolean))],services:config.services || [],serviceFolders:config.serviceFolders || [],sidebarOrder:config.sidebarOrder || [],serviceBadges:Object.fromEntries([...serviceBadges.keys()].map(key=>[key,visibleBadge(key)])),mutes:mutes(),zoom:config.zoom || {},recent:recentList(),tourDone:Boolean(config.tourDone),tabs:allTabs(),sleep:sleepSettings(),asleep:asleepKeys(),todos:config.todos || [],whiteboard:config.whiteboard || {items:[]},version:app.getVersion(),theme:config.theme || 'light',mode:config.mode || 'chat',layout:config.layout || {},chat:chat.snapshot()};}
 function validWhiteboard(value){if(!value || !Array.isArray(value.items) || value.items.length>1000)throw Error('Invalid whiteboard');const camera=value.camera || {x:0,y:0,zoom:1};if(![camera.x,camera.y,camera.zoom].every(Number.isFinite) || camera.zoom<.2 || camera.zoom>3)throw Error('Invalid whiteboard view');const raw=JSON.stringify({items:value.items,camera:{x:camera.x,y:camera.y,zoom:camera.zoom}});if(raw.length>12_000_000)throw Error('Whiteboard is too large');const types=new Set(['path','note','text','rectangle','ellipse','arrow','image']);for(const item of value.items){if(!item || typeof item.id!=='string' || item.id.length>100 || !types.has(item.type))throw Error('Invalid whiteboard item');if(item.html!==undefined && (typeof item.html!=='string' || item.html.length>20000))throw Error('Note is too large');if(item.type==='image' && (typeof item.src!=='string' || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(item.src) || item.src.length>1_600_000))throw Error('Invalid whiteboard image');}return JSON.parse(raw);}
 function validLayout(layout){
- const out={agentCollapsed:Boolean(layout.agentCollapsed),centreCollapsed:Boolean(layout.centreCollapsed),navCollapsed:Boolean(layout.navCollapsed),navColumns:layout.navColumns===2?2:1,navGrey:Boolean(layout.navGrey),chime:Boolean(layout.chime)};
+ const out={agentCollapsed:Boolean(layout.agentCollapsed),centreCollapsed:Boolean(layout.centreCollapsed),navCollapsed:Boolean(layout.navCollapsed),navColumns:layout.navColumns===2?2:1,navGrey:Boolean(layout.navGrey),chime:Boolean(layout.chime),navDock:layout.navDock!==false,page:['overview','browser-page','brain-page','security-page','files-page'].includes(layout.page)?layout.page:'overview'};
  const tiles=layout.tiles;
  if(tiles && typeof tiles==='object'){
   const mode=['1','2h','2v','4'].includes(tiles.mode)?tiles.mode:'1';
@@ -107,13 +107,30 @@ function keepSessionCookies(target){
     target.cookies.set(details).catch(()=>{});
   });
 }
+// Calls (Slack huddles, Google Meet) need the camera and microphone. A saved app asks once per site; the answer is remembered
+// per app and site and can be forgotten from Privacy & data. macOS then asks for the app itself the first time.
+async function mediaAllowed(source,contents,details){
+  let origin='';try{origin=new URL(details?.requestingUrl || contents.getURL()).origin;}catch{return false;}
+  if(!secureOrigin(origin))return false;
+  const kinds=(details?.mediaTypes || []).filter(k=>k==='audio' || k==='video');if(!kinds.length)return false;
+  config.mediaGrants=config.mediaGrants || {};const grantKey=source.key+' '+origin;
+  if(config.mediaGrants[grantKey]===true)return systemMedia(kinds);
+  if(config.mediaGrants[grantKey]===false)return false;
+  const what=kinds.includes('video') && kinds.includes('audio')?'camera and microphone':kinds.includes('video')?'camera':'microphone';
+  const {response}=await dialog.showMessageBox(win,{type:'question',buttons:['Allow','Don\u2019t allow'],defaultId:0,cancelId:1,message:source.name+' wants to use your '+what,detail:origin+'\n\nNeeded for calls and huddles. Just Zen remembers this choice for '+source.name+'; change it later in Privacy & data.'});
+  config.mediaGrants[grantKey]=response===0;await persist();
+  return response===0?systemMedia(kinds):false;
+}
+async function systemMedia(kinds){for(const kind of kinds){const type=kind==='video'?'camera':'microphone';try{if(systemPreferences.getMediaAccessStatus?.(type)!=='granted'){const ok=await systemPreferences.askForMediaAccess?.(type);if(ok===false)return false;}}catch{}}return true;}
 function hardenWebSession(target){
   if(hardenedSessions.has(target))return;
   hardenedSessions.add(target);
   keepSessionCookies(target);
   const allowedOrigins=notificationOrigins.get(target) || new Set();notificationOrigins.set(target,allowedOrigins);
-  target.setPermissionRequestHandler((contents,permission,callback,details)=>{
-    const source=notificationSources.get(contents),origin=details?.requestingUrl || details?.securityOrigin || '',allowed=permission==='notifications' && canNotify(source,contents,origin);
+  target.setPermissionRequestHandler(async (contents,permission,callback,details)=>{
+    const source=notificationSources.get(contents),origin=details?.requestingUrl || details?.securityOrigin || '';
+    if(permission==='media' && source?.saved){callback(await mediaAllowed(source,contents,details));return;}
+    const allowed=permission==='notifications' && canNotify(source,contents,origin);
     if(allowed){source.notificationPermission=true;try{allowedOrigins.add(new URL(origin || contents.getURL()).origin);}catch{}}
     callback(allowed);
   });
@@ -123,13 +140,12 @@ function hardenWebSession(target){
     try{return allowedOrigins.has(new URL(requestingOrigin).origin);}catch{return false;}
   });
   target.setDisplayMediaRequestHandler?.((_request,callback)=>callback({}));
+  // Downloads use Electron's own save dialog, configured synchronously here; a second, asynchronous dialog used to race it and
+  // could leave the download cancelled. On completion a toast offers to reveal the file.
   target.on('will-download',(_event,item)=>{
-    item.pause();
     const suggested=item.getFilename().replace(/[\\/\0]/g,'_').slice(0,240) || 'download';
-    dialog.showSaveDialog(win,{title:'Save download from Just Zen?',defaultPath:path.join(app.getPath('downloads'),suggested),buttonLabel:'Save'}).then(result=>{
-      if(result.canceled || !result.filePath){item.cancel();return;}
-      item.setSavePath(result.filePath);item.resume();
-    }).catch(()=>item.cancel());
+    item.setSaveDialogOptions({title:'Save download from Just Zen',defaultPath:path.join(app.getPath('downloads'),suggested),buttonLabel:'Save'});
+    item.once('done',(_e,state)=>{const saved=item.getSavePath();if(state==='completed' && saved)send('download-done',{name:path.basename(saved),path:saved});else if(state==='interrupted')send('notice','Download of '+suggested+' was interrupted.');});
   });
 }
 async function localFile(relative) {
@@ -244,7 +260,7 @@ function attachView(serviceKey,tabId,view,url){
     try{const live=tabOf(serviceKey,tabId);live.title=String(title).slice(0,200);persistSoon();}catch{}
     announceTab(entry);
     if(isBrowser)return;
-    const count=unreadCount(title),previous=serviceBadges.get(serviceKey) || 0;
+    const count=Math.max(unreadCount(title),notificationSource.domUnread || 0),previous=serviceBadges.get(serviceKey) || 0;
     updateServiceBadge(serviceKey,count);
     if(notificationSource.badgeInitialized && count>previous && !entry.visible && !isMuted(serviceKey))pushRecent({key:serviceKey,name:item.name,added:count-previous,count});
     if(notificationSource.badgeInitialized && count>previous && !notificationSource.notificationPermission && !isMuted(serviceKey) && Notification.isSupported()){
@@ -335,14 +351,14 @@ function ensurePopover(){
 }
 function popoverTrusted(e){if(!popover || popover.isDestroyed() || e.sender!==popover.webContents)throw Error('Untrusted popover request');}
 function hidePopover(){popoverFolder=null;if(popover && !popover.isDestroyed() && popover.isVisible())popover.hide();}
-async function showPopover({folderId,left,top}){
+async function showPopover({folderId,left,top,above}){
   const folder=(config.serviceFolders || []).find(f=>f.id===folderId);if(!folder)throw Error('Group not found');
   const members=(config.services || []).filter(s=>openable(s) && s.folderId===folderId);
   const items=await Promise.all(members.map(async item=>({key:item.id || item.url,name:item.name,icon:isBrowserItem(item)?null:await iconFor(item),emoji:isBrowserItem(item)?item.icon || '🌐':null,badge:visibleBadge(item.id || item.url)})));
   const window_=ensurePopover();popoverFolder=folderId;
   if(window_.webContents.isLoading())await new Promise(resolve=>window_.webContents.once('did-finish-load',resolve));
   const cb=win.getContentBounds();
-  window_.__anchor={x:cb.x+Math.round(left),y:cb.y+Math.round(top)};
+  window_.__anchor={x:cb.x+Math.round(left),y:cb.y+Math.round(top),above:Boolean(above)};
   window_.webContents.send('popover-show',{folder,items,theme:config.theme || 'light'});
   return true;
 }
@@ -350,7 +366,8 @@ function placePopover(size){
   if(!popover || popover.isDestroyed() || !popoverFolder)return;
   const {x,y}=popover.__anchor || {x:0,y:0};const {x:wx,y:wy,width:ww,height:wh}=win.getContentBounds();
   const width=Math.max(160,Math.min(620,Math.round(size.width))),height=Math.max(80,Math.min(wh,Math.round(size.height)));
-  popover.setBounds({x:Math.max(wx,Math.min(x,wx+ww-width)),y:Math.max(wy,Math.min(y-10,wy+wh-height)),width,height});
+  const top=popover.__anchor?.above?y-height:y-10;
+  popover.setBounds({x:Math.max(wx,Math.min(x,wx+ww-width)),y:Math.max(wy,Math.min(top,wy+wh-height)),width,height});
   if(!popover.isVisible())popover.show();else popover.focus();
 }
 function webViewOrigin(e){const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry)throw Error('Untrusted request');const url=e.senderFrame?.url || '';return passwords.originOf(url)?url:null;}
@@ -429,7 +446,7 @@ app.whenReady().then(async () => {
   for(const [name,fn] of [['document-open',()=>documents.open()],['document-save',input=>documents.save(input)],['document-close',()=>documents.close()]])ipcMain.handle(name,(e,...args)=>{documentTrusted(e);return fn(...args);});
   ipcMain.on('document-collapse',e=>{try{documentTrusted(e);documentView.setVisible(false);send('document-collapse');}catch{}});
   ipcMain.on('document-selection',(e,payload)=>{try{documentTrusted(e);const text=payload?.text;if(typeof text!=='string' || !text.trim())return;if(payload.target==='task')taskFromSelection(text);else send('claude-context',{text:text.slice(0,20000),source:'the document'});}catch{}});
-  handle('show-group-popover',input=>{if(!input || typeof input.folderId!=='string' || !Number.isFinite(input.left) || !Number.isFinite(input.top))throw Error('Invalid popover request');return showPopover(input);});
+  handle('show-group-popover',input=>{if(!input || typeof input.folderId!=='string' || !Number.isFinite(input.left) || !Number.isFinite(input.top))throw Error('Invalid popover request');return showPopover({folderId:input.folderId,left:input.left,top:input.top,above:Boolean(input.above)});});
   handle('hide-group-popover',()=>{hidePopover();return true;});
   ipcMain.on('popover-size',(e,size)=>{try{popoverTrusted(e);if(size && Number.isFinite(size.width) && Number.isFinite(size.height))placePopover(size);}catch{}});
   ipcMain.on('popover-open',(e,key)=>{try{popoverTrusted(e);hidePopover();if(typeof key==='string' && (config.services || []).some(s=>(s.id || s.url)===key))send('open-service',key);}catch{}});
@@ -440,6 +457,27 @@ app.whenReady().then(async () => {
   handle('document-capture-all',()=>{dc.send('capture-selection','claude-all');return true;});
   handle('document-bounds',box=>{const [w,h]=win.getContentSize();if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid document bounds');const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));documentView.setBounds({x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))});documentView.setVisible(Boolean(box.visible)&&!locked);});
   dc.loadURL(documentEntry);
+  // Calendar side pane: Google Calendar's phone layout fits a 400px column. It shares the login of the Google Calendar app when that is in the sidebar.
+  let calendarView=null;
+  function calendarPartition(){const item=(config.services || []).find(s=>s.id==='web-google-calendar');return item?partitionFor(item.profile || 'isolated','web-google-calendar'):'persist:calendar';}
+  function ensureCalendar(){
+    if(calendarView && !calendarView.webContents.isDestroyed())return calendarView;
+    calendarView=new WebContentsView({webPreferences:{...webPreferences(),partition:calendarPartition(),backgroundThrottling:false}});
+    win.contentView.addChildView(calendarView);calendarView.setVisible(false);
+    const cc=calendarView.webContents;
+    cc.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1');
+    hardenWebSession(cc.session);
+    notificationSources.set(cc,{contents:cc,saved:false,key:'calendar',name:'Calendar',notificationPermission:false,badgeInitialized:false,origins:new Set(),landed:false});
+    configureWebContents(cc,win,message=>send('notice',message),cc,webPreferences());
+    attachContextMenu(cc,()=>'the calendar');
+    cc.on('did-finish-load',()=>darkenIfLight(cc));
+    // Signed out, calendar.google.com bounces to a marketing page; send it to the sign-in flow instead.
+    cc.on('did-navigate',(_e,url)=>{try{const u=new URL(url);if(u.hostname==='workspace.google.com')cc.loadURL('https://accounts.google.com/ServiceLogin?service=cl&continue='+encodeURIComponent('https://calendar.google.com/calendar/r')).catch(()=>{});}catch{}});
+    cc.loadURL('https://calendar.google.com/calendar/r').catch(()=>{});
+    return calendarView;
+  }
+  handle('calendar-bounds',box=>{if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid calendar bounds');if(!box.visible){if(calendarView)calendarView.setVisible(false);return true;}const view=ensureCalendar();view.setBounds(clipBounds(box));view.setVisible(!locked);return true;});
+  handle('calendar-reload',()=>{if(calendarView && !calendarView.webContents.isDestroyed())calendarView.webContents.reload();return true;});
   handle('state',stateSnapshot);
   handle('security-status',securityStatus);
   handle('unlock-app',async passcode=>{if(!locked)return stateSnapshot();await unlockAuthentication(passcode);locked=false;scheduleLock();send('app-locked',{locked:false});return stateSnapshot();});
@@ -486,6 +524,7 @@ app.whenReady().then(async () => {
   handle('set-zoom',async ({key,step,reset}={})=>{if(typeof key!=='string' || !serviceItem(key))throw Error('App not found');config.zoom=config.zoom || {};let index=ZOOM_STEPS.indexOf(zoomFor(key));if(reset)index=ZOOM_STEPS.indexOf(1);else if(step===1 || step===-1)index=Math.max(0,Math.min(ZOOM_STEPS.length-1,index+step));else throw Error('Invalid zoom step');const factor=ZOOM_STEPS[index];if(factor===1)delete config.zoom[key];else config.zoom[key]=factor;await persist();applyZoom(key);return factor;});
   handle('recent-clear',()=>{recent.length=0;return [];});
   handle('tour-done',async()=>{config.tourDone=true;await persist();return true;});
+  ipcMain.on('web-unread',(e,count)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;const source=notificationSources.get(e.sender);if(!source?.saved)return;const n=Math.max(0,Math.min(9999,Number(count) || 0));if(source.domUnread===n)return;source.domUnread=n;const previous=serviceBadges.get(entry.serviceKey) || 0;const merged=Math.max(unreadCount(e.sender.getTitle()),n);updateServiceBadge(entry.serviceKey,merged);if(merged>previous && !entry.visible && !isMuted(entry.serviceKey))pushRecent({key:entry.serviceKey,name:source.name,count:merged});}catch{}});
   ipcMain.handle('web-password-request',async e=>{const url=webViewOrigin(e);if(!url || locked)return null;const saved=await passwords.get(url);if(saved)passwords.touch(url,saved.username).catch(()=>{});return saved?{username:saved.username,password:saved.password}:null;});
   ipcMain.on('web-password-submitted',async (e,payload)=>{try{const url=webViewOrigin(e);if(!url || locked || !payload || typeof payload.password!=='string' || !payload.password)return;if(await passwords.isNever(url))return;const existing=await passwords.get(url);const username=String(payload.username || '').slice(0,300);if(existing && existing.username===username && existing.password===payload.password)return;const id=crypto.randomUUID();passwordOffers.set(id,{url,username,password:String(payload.password).slice(0,1000)});setTimeout(()=>passwordOffers.delete(id),120000).unref?.();send('password-offer',{id,host:new URL(url).host,username,update:Boolean(existing)});}catch{}});
   handle('password-decide',async ({id,decision}={})=>{const offer=passwordOffers.get(id);passwordOffers.delete(id);if(!offer)return false;if(decision==='save')await passwords.set(offer.url,offer.username,offer.password);else if(decision==='never')await passwords.never(offer.url);return true;});
@@ -547,6 +586,10 @@ app.whenReady().then(async () => {
   if(!locked)scheduleLock();
   const updates=startAutoUpdates(message=>send('notice',message),version=>send('update-ready',version));
   handle('install-update',()=>{if(!updates.install)throw Error('No update is ready');updates.install();return true;});
+  handle('media-grants',()=>Object.entries(config.mediaGrants || {}).map(([k,v])=>{const i=k.indexOf(' ');const key=k.slice(0,i),origin=k.slice(i+1);return {key,name:serviceItem(key)?.name || key,origin,allowed:v};}));
+  handle('media-forget',async k=>{if(config.mediaGrants && typeof k==='string')delete config.mediaGrants[k];await persist();return true;});
+  handle('reveal-download',p=>{if(typeof p!=='string' || !path.isAbsolute(p))throw Error('Invalid path');shell.showItemInFolder(p);return true;});
+  handle('test-notification',()=>{if(!Notification.isSupported())throw Error('Notifications are not supported on this Mac');const n=new Notification({title:'Just Zen',body:'Notifications are working. If you did not see this, allow Just Zen in System Settings → Notifications.'});n.show();return true;});
   handle('check-updates',()=>{if(!updates.checkNow)throw Error(updates.reason==='development'?'Update checks are off in a development build.':'Updates are not available in this build.');updates.checkNow();return true;});
   const sleeper=setInterval(()=>{sleepSweep();expireMutes();},30_000);sleeper.unref?.();
   if(!smoke){let index=0;const warm=()=>{if(!win || win.isDestroyed())return;const sites=(config.services || []).filter(s=>s.url);if(index>=sites.length)return;if(!locked){const item=sites[index++];const key=item.id || item.url;try{const tabs=tabsFor(key);ensureView(key,tabs.active);}catch{}}setTimeout(warm,1500);};setTimeout(warm,1500);}
