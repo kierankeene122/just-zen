@@ -45,6 +45,8 @@ Just Zen should not be described as externally audited. The automated Claude Sec
 - Malware already running as the signed-in macOS user may inspect screens, memory, files, or browser data regardless of Just Zen’s app lock.
 - A compromised release account could distribute malicious updates. Protected tags, mandatory two-factor authentication and tightly scoped GitHub access remain release requirements.
 
+Session-only cookies (no expiry) are re-saved with a rolling 30-day expiry inside each app's own partition so logins survive a restart, matching Chrome's "continue where you left off" behaviour; they are removed with the profile.
+
 ## Release gate
 
 A public daily-use release requires all of the following:

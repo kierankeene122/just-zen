@@ -66,7 +66,7 @@ function sleepMinutesFor(serviceKey){const s=sleepSettings();return serviceKey i
 function stateSnapshot(){if(locked)return {locked:true,lockMethod:config.appLockMethod || 'touchID',theme:config.theme || 'light',version:app.getVersion()};return {locked:false,home:require('node:os').homedir(),root,claudeRoot,claudePolicy:config.claudePolicy || 'notes',claudeWorkspaces:config.claudeWorkspaces || (claudeRoot?[claudeRoot]:[]),connectedFolders:[...new Set([root,...(config.connectedFolders || []),...(config.claudeWorkspaces || [])].filter(Boolean))],services:config.services || [],serviceFolders:config.serviceFolders || [],sidebarOrder:config.sidebarOrder || [],serviceBadges:Object.fromEntries(serviceBadges),tabs:allTabs(),sleep:sleepSettings(),asleep:asleepKeys(),todos:config.todos || [],whiteboard:config.whiteboard || {items:[]},version:app.getVersion(),theme:config.theme || 'light',mode:config.mode || 'chat',layout:config.layout || {},chat:chat.snapshot()};}
 function validWhiteboard(value){if(!value || !Array.isArray(value.items) || value.items.length>1000)throw Error('Invalid whiteboard');const camera=value.camera || {x:0,y:0,zoom:1};if(![camera.x,camera.y,camera.zoom].every(Number.isFinite) || camera.zoom<.2 || camera.zoom>3)throw Error('Invalid whiteboard view');const raw=JSON.stringify({items:value.items,camera:{x:camera.x,y:camera.y,zoom:camera.zoom}});if(raw.length>2_000_000)throw Error('Whiteboard is too large');const types=new Set(['path','note','text','rectangle','ellipse','arrow']);for(const item of value.items){if(!item || typeof item.id!=='string' || item.id.length>100 || !types.has(item.type))throw Error('Invalid whiteboard item');if(item.html!==undefined && (typeof item.html!=='string' || item.html.length>20000))throw Error('Note is too large');}return JSON.parse(raw);}
 function validLayout(layout){
- const out={agentCollapsed:Boolean(layout.agentCollapsed),centreCollapsed:Boolean(layout.centreCollapsed),navCollapsed:Boolean(layout.navCollapsed)};
+ const out={agentCollapsed:Boolean(layout.agentCollapsed),centreCollapsed:Boolean(layout.centreCollapsed),navCollapsed:Boolean(layout.navCollapsed),navColumns:layout.navColumns===2?2:1,navGrey:Boolean(layout.navGrey)};
  const tiles=layout.tiles;
  if(tiles && typeof tiles==='object'){
   const mode=['1','2h','2v','4'].includes(tiles.mode)?tiles.mode:'1';
@@ -79,9 +79,23 @@ async function clearSessionData(target){await target.clearStorageData();await ta
 const hardenedSessions=new WeakSet();
 function updateAppBadge(){const total=[...serviceBadges.values()].reduce((sum,value)=>sum+value,0);app.setBadgeCount?.(Math.min(9999,total));}
 function updateServiceBadge(key,count){if(count)serviceBadges.set(key,count);else serviceBadges.delete(key);updateAppBadge();send('service-badge',{key,count});}
+// Chromium forgets session cookies (those without an expiry) when the app quits, so logins that rely on them are lost
+// between launches. Like other app-hosting shells, Just Zen gives such cookies a rolling 30-day expiry inside their own profile.
+const KEEP_LOGIN_DAYS=30;
+function keepSessionCookies(target){
+  target.cookies.on('changed',(_event,cookie,_cause,removed)=>{
+    if(removed || !cookie.session || !cookie.name)return;
+    const host=cookie.domain?.replace(/^\./,'');if(!host)return;
+    const details={url:(cookie.secure?'https://':'http://')+host+(cookie.path || '/'),name:cookie.name,value:cookie.value,path:cookie.path || '/',secure:Boolean(cookie.secure),httpOnly:Boolean(cookie.httpOnly),expirationDate:Math.floor(Date.now()/1000)+KEEP_LOGIN_DAYS*86400};
+    if(!cookie.hostOnly && cookie.domain)details.domain=cookie.domain;
+    if(cookie.sameSite && cookie.sameSite!=='unspecified')details.sameSite=cookie.sameSite;
+    target.cookies.set(details).catch(()=>{});
+  });
+}
 function hardenWebSession(target){
   if(hardenedSessions.has(target))return;
   hardenedSessions.add(target);
+  keepSessionCookies(target);
   const allowedOrigins=notificationOrigins.get(target) || new Set();notificationOrigins.set(target,allowedOrigins);
   target.setPermissionRequestHandler((contents,permission,callback,details)=>{
     const source=notificationSources.get(contents),origin=details?.requestingUrl || details?.securityOrigin || '',allowed=permission==='notifications' && canNotify(source,contents,origin);
@@ -411,7 +425,7 @@ app.whenReady().then(async () => {
   handle('select-claude-folder',async value=>{if(terminal || chat.state.busy)throw Error('Stop the current Claude session before changing its workspace');if(typeof value!=='string' || !(config.claudeWorkspaces || []).includes(value))throw Error('Unknown Claude workspace');claudeRoot=await fs.realpath(value);config.claudeRoot=claudeRoot;chat.restore(config.chats?.[claudeRoot]);chat.publish();await persist();return {root:claudeRoot,policy:config.claudePolicy || 'notes',workspaces:config.claudeWorkspaces};});
   handle('disconnect-claude-folder',async ()=>{if(terminal || chat.state.busy)throw Error('Stop the current Claude session before disconnecting its workspace');claudeRoot=null;delete config.claudeRoot;chat.restore(null);chat.publish();await persist();return true;});
   handle('set-claude-policy',async mode=>{if(!['full','notes','readOnly'].includes(mode))throw Error('Invalid Claude access mode');if(terminal || chat.state.busy)throw Error('Stop the current Claude session before changing access');config.claudePolicy=mode;await persist();return mode;});
-  handle('appearance',async ({theme,mode,layout})=>{if(theme && !['light','dark'].includes(theme))throw Error('Invalid theme');if(mode && !['chat','terminal'].includes(mode))throw Error('Invalid mode');if(layout && typeof layout==='object')config.layout=validLayout(layout);if(theme){config.theme=theme;nativeTheme.themeSource=theme;}if(mode)config.mode=mode;await persist();return true;});
+  handle('appearance',async ({theme,mode,layout})=>{if(theme && !['light','dark'].includes(theme))throw Error('Invalid theme');if(mode && !['chat','terminal','files'].includes(mode))throw Error('Invalid mode');if(layout && typeof layout==='object')config.layout=validLayout(layout);if(theme){config.theme=theme;nativeTheme.themeSource=theme;}if(mode)config.mode=mode;await persist();return true;});
   handle('chat-send',async prompt=>{if(!claudeRoot)throw Error('Choose a Claude workspace first');if(terminal)throw Error('Stop the terminal session before sending a chat message');if(chat.state.busy)throw Error('Wait for the current reply');const sandbox=await prepareClaudeSandbox({fs,root:claudeRoot,mode:config.claudePolicy || 'notes',userData:app.getPath('userData'),packageRoot:__dirname,nodePath:findNode(),claudePath:findClaude(),configDir:claudeConfigDir});chat.run(prompt,claudeRoot,sandbox.executable).catch(error=>send('notice',error.message));return true;});
   handle('chat-stop',()=>chat.stop());
   handle('claude-logout',async()=>{if(terminal || chat.state.busy)throw Error('Stop Claude before signing out');try{await execFile(findClaude(),['auth','logout'],{env:subscriptionEnv(),timeout:15000});}catch(error){if(!/not logged in/i.test(String(error.stdout || '')+String(error.stderr || '')))throw Error('Sign-out failed: '+String(error.stderr || error.message).trim().slice(0,200));}chat.restore(null);chat.publish();config.chats={};await persist();return true;});
@@ -543,3 +557,5 @@ app.whenReady().then(async () => {
   }
 });
 app.on('window-all-closed',() => app.quit());
+// Cookies are written to disk on quit, so a login made moments before closing survives.
+app.on('before-quit',()=>{for(const view of views.values()){try{view.view.webContents.session.cookies.flushStore().catch(()=>{});}catch{}}});

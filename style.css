@@ -213,3 +213,27 @@ header .theme-toggle{margin-left:0}
 .icon-picker-bar{display:flex;gap:6px;align-items:center;margin-bottom:6px}.icon-picker-bar button{font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}.icon-picker-bar button[aria-pressed=true]{background:#e8effc;color:#375b9b;border-color:transparent}[data-theme=dark] .icon-picker-bar button[aria-pressed=true]{background:#30392d;color:#d7e4c9}.icon-picker-bar input{flex:1;min-width:0;padding:5px 9px;font-size:11px;margin:0}
 .icon-grid[data-mode=symbols] button{color:#4f5f78}.icon-grid button .ms-icon{width:20px;height:20px}
 .icon-custom{display:flex;align-items:center;gap:8px}.icon-preview{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:8px;font-size:20px;flex-shrink:0}.icon-preview .ms-icon{width:22px;height:22px}#group-icon,#browser-icon{width:200px;margin-top:0}
+
+/* Collapsed sidebar in two columns: wider rail, icon grid, no scrolling needed for a typical list. */
+.nav-collapsed.nav-two aside{width:124px}.nav-collapsed.nav-two main{left:124px}.nav-collapsed.nav-two.centre-collapsed #agent{left:124px}
+.nav-collapsed.nav-two #services{display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:0 2px}
+.nav-collapsed.nav-two #services>.service-row,.nav-collapsed.nav-two #services>.service-group{min-width:0}
+.nav-collapsed.nav-two #collapse-nav{right:8px}
+.nav-collapsed.nav-two aside>.nav{width:48px;margin-left:auto;margin-right:auto}
+
+/* First page of the add dialog: pick what you are adding. */
+.picker-choice{margin:22px 0 6px}.picker-choice>p{font-size:14px;margin:0 0 14px}
+.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.choice-grid button{text-align:left;border:1px solid var(--line);border-radius:12px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:4px;background:#fbfcfe;transition:transform .12s}.choice-grid button:hover{transform:translateY(-1px);box-shadow:0 10px 26px -18px rgba(38,54,74,.5);filter:none;border-color:#c9d6ea}[data-theme=dark] .choice-grid button{background:#1d221e}
+.choice-mark{font-size:22px;color:#5278c8;margin-bottom:4px}[data-theme=dark] .choice-mark{color:#c4d3ab}
+.choice-grid strong{font-size:14px;font-weight:500}.choice-grid small{font-size:11px;color:var(--muted);line-height:1.5}
+
+/* Files tab in the Claude pane */
+#files-view{position:absolute;top:111px;bottom:36px;left:0;right:0;display:flex;flex-direction:column;padding:4px 16px 12px}
+#files-view .files-connections{margin-bottom:10px}#files-view #file-list{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:7px;padding:6px;width:auto;border-right:1px solid var(--line)}
+.files-note{font-size:10px;color:var(--muted);margin:8px 2px 0;line-height:1.5}
+#file-layout{border:1px solid var(--line)}#editor-wrap{flex:1}
+.mode-switch button{padding:5px 8px}
+/* Greyscale sidebar: colour comes back on hover and on the selected item. */
+.nav-grey aside .site-favicon,.nav-grey aside .site-fallback,.nav-grey aside .group-icon,.nav-grey aside .nav-tile{filter:grayscale(1);opacity:.72;transition:filter .15s,opacity .15s}
+.nav-grey aside .nav:hover .site-favicon,.nav-grey aside .nav:hover .site-fallback,.nav-grey aside .nav:hover .group-icon,.nav-grey aside .nav:hover .nav-tile,.nav-grey aside .nav.selected .nav-tile{filter:none;opacity:1}
