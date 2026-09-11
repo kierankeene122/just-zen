@@ -43,15 +43,16 @@ document.addEventListener('keydown',e=>{if(e.key===' ' && e.shiftKey && hoveredL
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const visible=el=>el && el.offsetParent!==null && !el.disabled;
 const editors=()=>[...document.querySelectorAll('[contenteditable="true"],[contenteditable=""],textarea')].filter(visible);
+const onHost=(host,name)=>host===name || host.endsWith('.'+name);
 async function composerFor(mode){
  const host=location.hostname;
- if(host.endsWith('mail.google.com')){
+ if(onHost(host,'mail.google.com')){
   let body=editors().find(e=>/message body/i.test(e.getAttribute('aria-label') || ''));
   if(!body){const button=mode==='reply'?[...document.querySelectorAll('[role="button"],[aria-label]')].find(e=>/^reply$/i.test(e.getAttribute('aria-label') || e.textContent.trim())):document.querySelector('[gh="cm"],[role="button"][aria-label*="Compose" i]');button?.click();for(let i=0;i<20 && !body;i++){await sleep(150);body=editors().find(e=>/message body/i.test(e.getAttribute('aria-label') || ''));}}
   return body || null;
  }
- if(host.endsWith('slack.com'))return editors().find(e=>e.classList.contains('ql-editor') || /message/i.test(e.getAttribute('aria-label') || '')) || null;
- if(host.endsWith('chat.google.com') || host.endsWith('teams.microsoft.com') || host.endsWith('web.whatsapp.com') || host.endsWith('discord.com'))return editors().find(e=>/message|type|reply|say something/i.test(e.getAttribute('aria-label') || e.getAttribute('placeholder') || e.dataset.placeholder || '')) || editors().at(-1) || null;
+ if(onHost(host,'slack.com'))return editors().find(e=>e.classList.contains('ql-editor') || /message/i.test(e.getAttribute('aria-label') || '')) || null;
+ if(onHost(host,'chat.google.com') || onHost(host,'teams.microsoft.com') || onHost(host,'web.whatsapp.com') || onHost(host,'discord.com'))return editors().find(e=>/message|type|reply|say something/i.test(e.getAttribute('aria-label') || e.getAttribute('placeholder') || e.dataset.placeholder || '')) || editors().at(-1) || null;
  const active=document.activeElement;if(active && visible(active) && (active.isContentEditable || active.tagName==='TEXTAREA'))return active;
  return editors()[0] || null;
 }
