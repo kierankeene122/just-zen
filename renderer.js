@@ -195,7 +195,7 @@ async function openBrowser(url){let item=defaultBrowser();if(!item){const added=
 async function activateTab(index,serviceKey,tabId){tabs[serviceKey]=await call('activate-tab',{serviceKey,tabId});tiles.slots[index]={serviceKey,tabId};renderTiles();saveLayout();}
 async function newTab(serviceKey){const item=serviceOf(serviceKey);if(!item)return;const url=isSlack(item)?'https://slack.com/signin':'';const opened=await call('open-tab',{serviceKey,url});tabs[serviceKey]=opened.tabs;await openInTile(serviceKey,opened.tabId);if(isSlack(item))notice('Sign in to the other workspace here; it opens in its own tab beside this one.');}
 async function closeTab(serviceKey,tabId){tabs[serviceKey]=await call('close-tab',{serviceKey,tabId});tabLive.delete(liveKey(serviceKey,tabId));renderTiles();saveLayout();}
-function updateZoomControl(){const slot=page==='browser-page'?focusedSlot():null;$('zoom-switch').classList.toggle('hidden',!slot);if(slot)$('zoom-label').textContent=Math.round((zoomByApp[slot.serviceKey] || 1)*100)+'%';}
+function updateZoomControl(){const slot=page==='browser-page'?focusedSlot():null;$('zoom-switch').classList.add('hidden');if(slot)$('zoom-label').textContent=Math.round((zoomByApp[slot.serviceKey] || 1)*100)+'%';}
 async function zoomApp(step){const slot=page==='browser-page'?focusedSlot():null;if(!slot)return;const factor=await call('set-zoom',step===0?{key:slot.serviceKey,reset:true}:{key:slot.serviceKey,step});if(factor===1)delete zoomByApp[slot.serviceKey];else zoomByApp[slot.serviceKey]=factor;updateZoomControl();const item=serviceOf(slot.serviceKey);notice((item?.name || 'App')+' at '+Math.round(factor*100)+'%');}
 for(const b of document.querySelectorAll('#zoom-switch button'))b.onclick=()=>attempt(()=>zoomApp(Number(b.dataset.zoom)));
 function focusedSlot(){const n=slotCount();return tiles.slots[Math.min(tiles.focus,n-1)] || tiles.slots.slice(0,n).find(Boolean) || null;}
@@ -227,7 +227,7 @@ $('peek-toggle').onchange=()=>attempt(async()=>{await call('set-peek-links',$('p
 window.hearth.on('tab-opened',({serviceKey,tabId,tabs:group})=>{tabs[serviceKey]=group;const n=slotCount();const index=tiles.slots.findIndex((s,i)=>i<n && s && s.serviceKey===serviceKey);if(index>=0){tiles.slots[index]={serviceKey,tabId};renderTiles();saveLayout();}});
 window.hearth.on('tab-command',command=>attempt(async()=>{
  if(command==='new'){const slot=page==='browser-page'?focusedSlot():null;if(slot)await newTab(slot.serviceKey);else await openBrowser();return;}
- if(command==='address'){await openBrowser();focusAddress();return;}
+ if(command==='address'){await openBrowser();const slot=focusedSlot();if(slot && isBrowserItem(serviceOf(slot.serviceKey)))editAddress(slot);return;}
  if(command.startsWith('zoom-')){if(page==='overview'){document.getElementById(command==='zoom-in'?'board-zoom-in':command==='zoom-out'?'board-zoom-out':'board-home-view').click();return;}await zoomApp(command==='zoom-in'?1:command==='zoom-out'?-1:0);return;}
  if(page!=='browser-page')return;const slot=focusedSlot();if(!slot)return;
  if(command==='close')await closeTab(slot.serviceKey,slot.tabId);
@@ -243,7 +243,7 @@ function closePopovers(){$('ctx-menu').classList.add('hidden');$('ctx-menu').rep
 let popoverSuspended=false;
 function showMenu(items,x,y){
  closePopovers();const menu=$('ctx-menu');
- for(const item of items){if(item==='-'){menu.append(document.createElement('hr'));continue;}const b=el('button',item.checked?'checked':'',item.label);b.type='button';b.onclick=()=>{if(item.keep){showMenu(item.run(),x,y);return;}closePopovers();attempt(()=>item.run());};menu.append(b);}
+ for(const item of items){if(item==='-'){menu.append(document.createElement('hr'));continue;}const b=el('button',item.checked?'checked':'',item.label);b.type='button';if(item.hint)b.append(el('kbd','menu-hint',item.hint));b.onclick=()=>{if(item.keep){showMenu(item.run(),x,y);return;}closePopovers();attempt(()=>item.run());};menu.append(b);}
  menu.classList.remove('hidden');
  const w=menu.offsetWidth,h=menu.offsetHeight,aside=document.querySelector('body>aside').getBoundingClientRect();
  // Inside the sidebar the menu sits above everything; over the centre it would be hidden behind the web pages, so only then are they paused.
@@ -358,7 +358,7 @@ function services(items,folders=serviceFolders,order=sidebarOrder){sidebarItems=
  const explicit=entries.some(pinnedOf);const shown=(explicit?entries.filter(pinnedOf):entries).slice(0,DECK_CAP);deckOverflow=entries.filter(e=>!shown.includes(e));
  for(const entry of shown){if(entry.startsWith('group:')){const folder=folders.find(f=>f.id===entry.slice(6));$('services').append(groupCard(folder,items.filter(item=>openable(item) && item.folderId===folder.id)));}else{$('services').append(serviceRow(items.find(i=>(i.id || i.url)===entry)));}}
  for(const key of Object.keys(tabs))if(!items.some(item=>(item.id || item.url)===key))delete tabs[key];
- $('deck-more').classList.toggle('hidden',!deckOverflow.length);deckSync();
+ deckSync();
  if(page==='browser-page')renderTiles();
 }
 window.hearth.on('favicon',({url,icon})=>{for(const img of document.querySelectorAll('.site-favicon'))if(img.dataset.site===url)paintIcon(img,icon);});
@@ -504,20 +504,33 @@ function deckLayout(){deckCards().forEach((card,i)=>{card.dataset.slot=String(i+
 function renderStackEdges(front){const host=$('stack-edges');host.replaceChildren();if(!front)return;const others=Math.min(4,deckCards().length-1);for(let i=others;i>=1;i--){const edge=el('div','edge');edge.style.setProperty('--top',(16-i*4)+'px');edge.style.setProperty('--inset',(i*10)+'px');edge.style.zIndex=String(5-i);host.append(edge);}}
 // The header carries the current app: name, address or title, tabs, navigation, and the way back to the canvas.
 function renderAppBar(soft=false){const bar=$('app-bar');const slot=page==='browser-page' && !layout.centreCollapsed?focusedSlot():null;const item=slot?serviceOf(slot.serviceKey):null;
- if(!item){bar.classList.add('hidden');bar.replaceChildren();return;}
- const index=Math.min(tiles.focus,slotCount()-1);const group=tabs[slot.serviceKey];const tab=group?.items.find(t=>t.id===slot.tabId);const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));const browser=isBrowserItem(item);
+ if(!item){bar.classList.add('hidden');bar.replaceChildren();delete bar.dataset.slot;return;}
+ const group=tabs[slot.serviceKey];const tab=group?.items.find(t=>t.id===slot.tabId);const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));const browser=isBrowserItem(item);
+ const url=live?.url || tab?.current || tab?.url || '';const detail=browser?(hostOf(url) || 'New tab'):(tab?tabTitle(slot.serviceKey,tab):'');
  bar.classList.remove('hidden');bar.classList.toggle('loading',Boolean(live?.loading));
- if(soft && bar.dataset.slot===slot.serviceKey+'/'+slot.tabId){const address=bar.querySelector('.app-bar-address');if(address && document.activeElement!==address && live?.url)address.value=live.url;const title=bar.querySelector('.app-bar-title');if(title && tab)title.textContent=tabTitle(slot.serviceKey,tab);const back=bar.querySelector('[data-nav=back]'),forward=bar.querySelector('[data-nav=forward]');if(back)back.disabled=!live?.canGoBack;if(forward)forward.disabled=!live?.canGoForward;const t=bar.querySelector('.app-bar-tabs');if(t && group)t.textContent=group.items.length+' tabs ▾';return;}
+ if(bar.querySelector('.app-address'))return;
+ if(soft && bar.dataset.slot===slot.serviceKey+'/'+slot.tabId){const d=bar.querySelector('.app-chip-detail');if(d)d.textContent=detail===item.name?'':detail;const t=bar.querySelector('.app-chip-tabs');if(t){t.textContent=group && group.items.length>1?String(group.items.length):'';t.hidden=!(group && group.items.length>1);}return;}
  bar.dataset.slot=slot.serviceKey+'/'+slot.tabId;bar.replaceChildren();
- const app=el('button','app-bar-app');app.type='button';app.title=item.name+' · right-click for options';if(browser){const i=el('span','group-icon');i.append(iconNode(item.icon || '🌐'));app.append(i);}else{const img=el('img','site-favicon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback',item.name.slice(0,1).toUpperCase());app.append(img,fallback);call('favicon',slot.serviceKey).then(icon=>paintIcon(img,icon)).catch(()=>{});}
- app.append(el('span',null,item.name));app.onclick=()=>attempt(()=>show('overview'));app.oncontextmenu=e=>{e.preventDefault();rowMenu(item,e.clientX,e.clientY);};bar.append(app);
- if(browser){const form=el('form','app-bar-url');const address=el('input','app-bar-address');address.type='text';address.autocomplete='off';address.spellcheck=false;address.placeholder='Enter a website address';address.setAttribute('aria-label','Address');address.value=live?.url || tab?.current || tab?.url || '';address.onfocus=()=>address.select();form.append(address);
-  form.onsubmit=e=>{e.preventDefault();const value=address.value.trim();if(!value)return;attempt(async()=>{const target=/^[a-z][a-z0-9+.-]*:/i.test(value)?value:/^[^\s]+\.[^\s]+$/.test(value)?'https://'+value:'https://duckduckgo.com/?q='+encodeURIComponent(value);tabs[slot.serviceKey]=await call('navigate-tab',{serviceKey:slot.serviceKey,tabId:slot.tabId,url:target});renderTiles();});};bar.append(form);}
- else bar.append(el('span','app-bar-title',tab?tabTitle(slot.serviceKey,tab):''));
- if(group && group.items.length>1){const t=el('button','app-bar-tabs',group.items.length+' tabs ▾');t.type='button';t.title='Switch tab';t.onclick=()=>{const rect=t.getBoundingClientRect();showMenu([...group.items.map(x=>({label:tabTitle(slot.serviceKey,x),checked:x.id===slot.tabId,run:()=>x.id===slot.tabId?null:activateTab(index,slot.serviceKey,x.id)})),'-',{label:'Close this tab · ⌘W',run:()=>closeTab(slot.serviceKey,slot.tabId)}],rect.left,rect.bottom+4);};bar.append(t);}
- const plus=el('button','app-bar-btn','+');plus.type='button';plus.title=isSlack(item)?'Add another Slack workspace':'New tab (⌘T)';plus.onclick=()=>attempt(()=>newTab(slot.serviceKey));bar.append(plus);
- for(const [action,glyph,title] of [['back','‹','Back'],['forward','›','Forward'],['reload','↻','Reload (⌘R)']]){const b=el('button','app-bar-btn',glyph);b.type='button';b.dataset.nav=action;b.title=title;if(action==='back')b.disabled=!live?.canGoBack;if(action==='forward')b.disabled=!live?.canGoForward;b.onclick=()=>attempt(async()=>{const info=await call('tab-action',{serviceKey:slot.serviceKey,tabId:slot.tabId,action});if(info)tabLive.set(liveKey(info.serviceKey,info.tabId),info);renderAppBar(true);});bar.append(b);}
- const close=el('button','app-bar-btn app-bar-close','×');close.type='button';close.title='Back to the canvas (Esc)';close.onclick=()=>attempt(()=>show('overview'));bar.append(close);}
+ const chip=el('button','app-chip');chip.type='button';chip.title=item.name+(url?' · '+url:'')+' — click for tabs, navigation and zoom';
+ if(browser){const i=el('span','group-icon');i.append(iconNode(item.icon || '🌐'));chip.append(i);}else{const img=el('img','site-favicon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback',item.name.slice(0,1).toUpperCase());chip.append(img,fallback);call('favicon',slot.serviceKey).then(icon=>paintIcon(img,icon)).catch(()=>{});}
+ chip.append(el('span','app-chip-name',item.name),el('span','app-chip-detail',detail===item.name?'':detail));const count=el('span','app-chip-tabs',group && group.items.length>1?String(group.items.length):'');count.hidden=!(group && group.items.length>1);chip.append(count,el('span','app-chip-caret','▾'));
+ chip.onclick=()=>appMenu(slot,item,chip);chip.oncontextmenu=e=>{e.preventDefault();rowMenu(item,e.clientX,e.clientY);};bar.append(chip);
+ const close=el('button','app-bar-close','×');close.type='button';close.title='Back to the canvas (Esc)';close.onclick=()=>attempt(()=>show('overview'));bar.append(close);}
+// Everything about the current app hangs off its chip: address, tabs, navigation, zoom, and the way back.
+function appMenu(slot,item,chip){const rect=chip.getBoundingClientRect();const index=Math.min(tiles.focus,slotCount()-1);const group=tabs[slot.serviceKey];const browser=isBrowserItem(item);const zoom=Math.round((zoomByApp[slot.serviceKey] || 1)*100)+'%';
+ const items=[];
+ if(browser)items.push({label:'Go to address…',hint:'⌘L',run:()=>editAddress(slot)});
+ if(group && group.items.length>1){items.push('-');for(const x of group.items)items.push({label:tabTitle(slot.serviceKey,x),checked:x.id===slot.tabId,run:()=>x.id===slot.tabId?null:activateTab(index,slot.serviceKey,x.id)});items.push({label:'Close this tab',hint:'⌘W',run:()=>closeTab(slot.serviceKey,slot.tabId)});}
+ items.push({label:isSlack(item)?'Add another Slack workspace':'New tab',hint:'⌘T',run:()=>newTab(slot.serviceKey)},'-');
+ for(const [action,label,hint] of [['back','Back',''],['forward','Forward',''],['reload','Reload','⌘R']])items.push({label,hint,run:async()=>{const info=await call('tab-action',{serviceKey:slot.serviceKey,tabId:slot.tabId,action});if(info)tabLive.set(liveKey(info.serviceKey,info.tabId),info);renderAppBar(true);}});
+ items.push('-',{label:'Zoom in',hint:'⌘+',run:()=>zoomApp(1)},{label:'Zoom out',hint:'⌘−',run:()=>zoomApp(-1)},{label:'Actual size · now '+zoom,hint:'⌘0',run:()=>zoomApp(0)},'-',{label:'Back to the canvas',hint:'Esc',run:()=>show('overview')});
+ showMenu(items,rect.left,rect.bottom+6);}
+function editAddress(slot){const bar=$('app-bar');if(bar.querySelector('.app-address'))return;const chip=bar.querySelector('.app-chip');const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));const tab=tabs[slot.serviceKey]?.items.find(t=>t.id===slot.tabId);
+ const form=el('form','app-address');const input=el('input','app-address-input');input.type='text';input.autocomplete='off';input.spellcheck=false;input.placeholder='Enter a website address';input.setAttribute('aria-label','Address');input.value=live?.url || tab?.current || tab?.url || '';form.append(input);
+ const done=()=>{form.remove();if(chip)chip.hidden=false;renderAppBar(true);};
+ form.onsubmit=e=>{e.preventDefault();const value=input.value.trim();if(!value){done();return;}attempt(async()=>{const target=/^[a-z][a-z0-9+.-]*:/i.test(value)?value:/^[^\s]+\.[^\s]+$/.test(value)?'https://'+value:'https://duckduckgo.com/?q='+encodeURIComponent(value);tabs[slot.serviceKey]=await call('navigate-tab',{serviceKey:slot.serviceKey,tabId:slot.tabId,url:target});done();renderTiles();});};
+ input.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();done();}};input.onblur=()=>setTimeout(()=>{if(form.isConnected)done();},120);
+ if(chip){chip.hidden=true;bar.insertBefore(form,chip);}else bar.prepend(form);input.focus();input.select();}
 window.hearth.on('tab-focused',({serviceKey,tabId})=>{const n=slotCount();const i=tiles.slots.findIndex((s,at)=>at<n && s && s.serviceKey===serviceKey && s.tabId===tabId);if(i<0 || tiles.focus===i)return;tiles.focus=i;for(const t of $('tiles').children)t.classList.toggle('focused',t===$('tiles').children[i]);saveLayout();updateZoomControl();deckSync();});
 function cardFor(key){if(!key)return null;return deckCards().find(c=>c.dataset.key===key || c.querySelector(`.hand>.service-row[data-key="${CSS.escape(key)}"]`)) || null;}
 function cardKey(card){if(!card)return null;if(card.dataset.key)return card.dataset.key;return card.dataset.active || card.querySelector('.hand>.service-row')?.dataset.key || null;}
@@ -533,7 +546,19 @@ function deckSelect(index){const card=deckCards()[index];const item=serviceOf(ca
 function deckStep(direction){const cards=deckCards();if(!cards.length)return;const at=cards.findIndex(c=>c.classList.contains('front'));const next=at<0?(direction>0?0:cards.length-1):Math.max(0,Math.min(cards.length-1,at+direction));return deckSelect(next);}
 function deckCompanion(){const card=deckCards().find(c=>c.classList.contains('companion'));const item=card?serviceOf(card.dataset.companionKey || card.dataset.key):null;if(item)return openService(item);notice('No companion yet. Switch between two apps a few times and the deck will learn the pair.');}
 function fanDeck(on){document.querySelector('body>aside').classList.toggle('fanned',on);deckLayout();}
-$('deck-more').onclick=()=>{const rect=$('deck-more').getBoundingClientRect();const entries=[];for(const e of deckOverflow){if(e.startsWith('group:')){const folder=serviceFolders.find(f=>f.id===e.slice(6));for(const member of sidebarItems.filter(i=>openable(i) && i.folderId===e.slice(6)))entries.push({label:(folder?.name || 'Group')+' › '+member.name,run:()=>openService(member)});}else{const item=serviceOf(e);if(item)entries.push({label:item.name,run:()=>openService(item)});}}showMenu(entries.length?entries:[{label:'Everything is on the deck',run:()=>{}}],rect.left,rect.top-8);};
+// Find any app by name from the strip: type, autocomplete, Enter. Every app is reachable here, pinned or not.
+let deckSearchIndex=0;
+function iconFor(item){if(isBrowserItem(item)){const i=el('span','group-icon');i.append(iconNode(item.icon || '🌐'));return i;}const wrap=el('span','icon-pair');const img=el('img','site-favicon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback',item.name.slice(0,1).toUpperCase());wrap.append(img,fallback);call('favicon',item.id || item.url).then(icon=>paintIcon(img,icon)).catch(()=>{});return wrap;}
+function deckSearchResults(q){const needle=q.trim().toLowerCase();const out=[];for(const item of sidebarItems.filter(openable)){const group=item.folderId?serviceFolders.find(f=>f.id===item.folderId)?.name || '':'';const name=item.name.toLowerCase();const score=!needle?1:name.startsWith(needle)?3:name.split(/\s+/).some(w=>w.startsWith(needle))?2.5:name.includes(needle)?2:group.toLowerCase().includes(needle)?1:0;if(score>0)out.push({item,group,score});}return out.sort((a,b)=>b.score-a.score || a.item.name.localeCompare(b.item.name)).slice(0,8);}
+function openDeckSearch(){$('deck-search-btn').classList.add('hidden');const input=$('deck-search-input');input.classList.remove('hidden');input.value='';deckSearchIndex=0;renderDeckSearch();input.focus();}
+function closeDeckSearch(){$('deck-search-input').classList.add('hidden');$('deck-search-list').classList.add('hidden');$('deck-search-btn').classList.remove('hidden');}
+function renderDeckSearch(){const list=$('deck-search-list');const results=deckSearchResults($('deck-search-input').value);list.replaceChildren();deckSearchIndex=Math.max(0,Math.min(deckSearchIndex,results.length-1));
+ results.forEach((r,i)=>{const b=el('button','deck-result');b.type='button';b.setAttribute('role','option');b.setAttribute('aria-selected',String(i===deckSearchIndex));b.append(iconFor(r.item),el('span','deck-result-name',r.item.name));if(r.group)b.append(el('small','deck-result-group',r.group));b.onmousedown=e=>e.preventDefault();b.onclick=()=>{closeDeckSearch();attempt(()=>openService(r.item));};list.append(b);});
+ if(!results.length)list.append(el('div','deck-empty','No app called that. Press + to add one.'));list.classList.remove('hidden');}
+$('deck-search-btn').onclick=openDeckSearch;
+$('deck-search-input').oninput=e=>{const input=e.target;deckSearchIndex=0;if(e.inputType==='insertText'){const typed=input.value;const top=deckSearchResults(typed)[0];if(top && typed && top.item.name.toLowerCase().startsWith(typed.toLowerCase()) && top.item.name.length>typed.length){input.value=typed+top.item.name.slice(typed.length);input.setSelectionRange(typed.length,input.value.length);}}renderDeckSearch();};
+$('deck-search-input').onkeydown=e=>{const options=$('deck-search-list').querySelectorAll('.deck-result');if(e.key==='ArrowDown' || e.key==='ArrowUp'){e.preventDefault();if(!options.length)return;deckSearchIndex=(deckSearchIndex+(e.key==='ArrowDown'?1:options.length-1))%options.length;renderDeckSearch();}else if(e.key==='Enter'){e.preventDefault();options[deckSearchIndex]?.click();}else if(e.key==='Escape'){e.preventDefault();closeDeckSearch();}};
+$('deck-search-input').onblur=()=>setTimeout(()=>{if(document.activeElement!==$('deck-search-input'))closeDeckSearch();},120);
 $('deck-zone').addEventListener('mouseover',e=>{if(!e.target.closest('.front'))fanDeck(true);});
 $('deck-zone').addEventListener('mouseout',e=>{const to=e.relatedTarget;if(!to || !$('deck-zone').contains(to) || to.closest('.front'))fanDeck(false);});
 $('deck-zone').addEventListener('wheel',e=>{if(e.deltaY<-12)fanDeck(true);else if(e.deltaY>12)fanDeck(false);},{passive:true});
