@@ -302,26 +302,34 @@ main>section.page-entering{opacity:0;transform:translateY(-3px)}
 /* Home tile */
 #home .nav-tile{background:#eef1f6;color:#4f5f78}
 /* Dock: the app nav as a floating pill along the bottom of the centre. The centre leaves a band for it, since web views are native layers. */
-.nav-dock main{left:0;bottom:104px}.nav-dock.centre-collapsed #agent{left:0}
-.nav-dock aside{top:auto;bottom:40px;left:calc(var(--dock-left,0px) + var(--dock-width,100%)/2);transform:translateX(-50%);width:max-content;max-width:calc(var(--dock-width,100%) - 24px);height:64px;padding:0 6px;display:flex;flex-direction:row;align-items:center;overflow:visible;background:#ffffffee;border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 50px -18px rgba(38,54,74,.45);backdrop-filter:blur(12px)}
-[data-theme=dark].nav-dock aside{background:#1d221eee;border-color:#303630}
-.nav-dock #collapse-nav,.nav-dock .workspace-label,.nav-dock .nav-rule{display:none}
-.nav-dock #services{display:flex;flex-direction:row;align-items:center;gap:2px;flex:0 1 auto;min-width:0;max-width:calc(var(--dock-width,100%) - 190px);overflow-x:auto;overflow-y:hidden;padding:0 4px;background:transparent;height:64px}
-.nav-dock .group-head{flex:0 0 auto}.nav-dock .group-head .nav{flex:0 0 auto;width:auto;min-width:0}
-.nav-dock #home,.nav-dock .service-row,.nav-dock .service-group{position:relative;z-index:1;margin:0;width:auto;flex:0 0 auto}
-.nav-dock #home{padding:9px 6px;height:64px;display:flex;align-items:center}.nav-dock #home>span,.nav-dock #home kbd{display:none}
-.nav-dock .service-row .nav,.nav-dock .service-group .nav{justify-content:center;padding:9px 6px;height:64px;position:relative}
-.nav-dock .service-row .nav>span:not(.site-fallback),.nav-dock .service-group .nav>span:not(.group-icon),.nav-dock .reorder-handle,.nav-dock .remove-service,.nav-dock .service-profile,.nav-dock .group-count,.nav-dock .zz{display:none}
-.nav-dock .service-badge{position:absolute;right:2px;top:8px;min-width:16px;height:16px;padding:0 4px;font-size:8px;line-height:16px;margin:0}.nav-dock .muted-mark{position:absolute;right:4px;bottom:6px;font-size:9px;margin:0}
-.nav-dock .floating-add-app{position:relative;z-index:1;left:auto;bottom:auto;transform:none;width:38px;height:38px;border-radius:12px;font-size:24px;margin:0 8px 13px 6px}
-.nav-dock .site-favicon,.nav-dock .site-fallback,.nav-dock .group-icon{width:34px;height:34px;flex-basis:34px!important}.nav-dock .nav-tile{width:42px;height:42px;flex-basis:42px;padding:7px}
-.nav-dock .service-row .nav:hover::after,.nav-dock .service-group .nav:hover::after,.nav-dock #home:hover::after{content:attr(title);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#26364a;color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:9}
-.nav-dock .toasts{bottom:120px}
-
-/* Wide dock: spans the window; side panes lift to leave the band free. */
-.nav-dock-wide aside{max-width:calc(100vw - 24px);z-index:6}
-.nav-dock-wide #agent,.nav-dock-wide #tasks,.nav-dock-wide #documents{bottom:104px}
-.nav-dock-wide #services{max-width:calc(100vw - 190px)}
+/* Accordion card deck: apps rest as overlapping cards along the bottom band; the active one lifts into a full card over the canvas. */
+body{--deck-h:64px;--card-w:200px;--spring:cubic-bezier(.34,1.45,.64,1)}
+main{left:0;bottom:calc(34px + var(--deck-h))}
+.centre-collapsed aside{display:none}
+aside{left:var(--main-left,0px);top:var(--main-top,64px);width:var(--main-width,100%);height:calc(var(--main-height,0px) + var(--deck-h));bottom:auto;padding:0;display:block;overflow:visible;pointer-events:none;z-index:100;background:transparent!important;border:0!important}
+#deck-zone{position:absolute;left:0;right:0;bottom:0;height:var(--deck-h);pointer-events:auto}
+#services{position:absolute;inset:0;overflow:visible;pointer-events:none;max-height:none;display:block}
+aside #home{position:absolute;left:10px;bottom:11px;width:42px;height:42px;padding:0;margin:0;border-radius:13px;display:flex;align-items:center;justify-content:center;pointer-events:auto;z-index:3}
+aside #home>span,aside #home kbd{display:none}aside #home .nav-tile{width:42px;height:42px;flex-basis:42px;padding:8px;margin:0}
+aside .floating-add-app{left:auto;right:12px;bottom:12px;transform:none;width:40px;height:40px;border-radius:13px;font-size:24px;pointer-events:auto;z-index:3}
+.service-row{position:absolute;bottom:0;left:var(--l,0px);width:var(--card-w);height:40px;margin:0;padding:0 10px 0 10px;border:1px solid var(--line);border-bottom:0;border-radius:11px 11px 0 0;background:#fff;box-shadow:0 -8px 20px -14px rgba(20,30,40,.55);transform:translateY(var(--dy,0px)) scale(var(--sc,1));transform-origin:50% 100%;z-index:var(--z,1);pointer-events:auto;cursor:pointer;transition:left .5s var(--spring),width .5s var(--spring),transform .5s var(--spring),box-shadow .3s ease,border-radius .3s ease}
+[data-theme=dark] .service-row{background:#1d221e}
+.service-row:not(.front):hover{transform:translateY(calc(var(--dy,0px) - 6px)) scale(1);z-index:60}
+.service-row .nav{padding:0;gap:9px;height:38px;width:100%;justify-content:flex-start;flex:1;min-width:0;background:transparent;border:0}
+.service-row .nav>span:not(.site-fallback):not(.group-icon){font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.service-row .reorder-handle,.service-row .remove-service,.service-row .service-profile,.service-row .zz{display:none}
+.service-row .site-favicon,.service-row .site-fallback,.service-row .group-icon{width:22px;height:22px;flex-basis:22px!important}
+.service-row .service-badge{margin-left:auto}.service-row .muted-mark{margin-left:auto}.service-row .muted-mark+.service-badge{margin-left:4px}
+.service-row.front{left:0!important;width:100%!important;transform:translateY(calc(-1*(var(--main-height,0px) + var(--deck-h) - 40px))) scale(1)!important;z-index:100!important;border-radius:0;border-bottom:1px solid var(--line);box-shadow:none;cursor:default}
+.service-row.front .nav{cursor:pointer}.service-row.front .nav::after{content:'▾ back to the canvas';margin-left:auto;font-size:10px;color:var(--muted);opacity:0;transition:opacity .2s}.service-row.front:hover .nav::after{opacity:1}.service-row.front .service-badge{margin-left:8px}
+#deck-ghost{position:absolute;bottom:0;left:var(--l,0px);height:40px;width:var(--card-w);border:1px dashed var(--line);border-bottom:0;border-radius:11px 11px 0 0;opacity:.6;pointer-events:none;transition:left .5s var(--spring),width .5s var(--spring)}
+aside.fanned .service-row:not(.front){transform:translateY(-22px) scale(1)}
+.service-row.companion:not(.front){transform:translateY(calc(var(--dy,0px) - 8px)) scale(var(--sc,1));box-shadow:0 0 0 2px #c4d3ab80,0 -10px 24px -10px #c4d3abcc}
+aside.fanned .service-row.companion:not(.front),.service-row.companion:not(.front):hover{transform:translateY(-30px) scale(1)}
+.service-row.companion:not(.front)::after{content:'Tab ⇥';position:absolute;right:8px;top:-10px;font:9px/1 ui-monospace,SFMono-Regular,monospace;padding:3px 5px;border-radius:5px;background:var(--accent);color:#1e2a14;letter-spacing:.3px;pointer-events:none}
+#browser-page{position:absolute;left:0;right:0;top:40px;bottom:0;height:auto}
+.toasts{bottom:120px}
+@media (prefers-reduced-motion:reduce){.service-row,#deck-ghost{transition:none}}
 
 /* Quick look drawer */
 .peek{position:absolute;top:0;bottom:0;right:0;width:min(58%,760px);min-width:360px;display:flex;flex-direction:column;background:var(--bg);border-left:1px solid var(--line);box-shadow:-24px 0 60px -30px rgba(38,54,74,.5);z-index:7;transform:translateX(102%);transition:transform .18s ease}
