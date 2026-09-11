@@ -220,33 +220,35 @@ function ensureView(serviceKey,tabId){
 // A popup (window.open, target=_blank, OAuth) becomes a new tab in the same pane; Chromium loads it and keeps the opener.
 // Peek: a link opened from an app slides out in a drawer over the right of the centre instead of taking the whole pane.
 // Esc dismisses it; it can be promoted to a tab, or opened beside. Popups and Shift+Space on a hovered link both land here.
-let peek=null;
-function peekOpen(serviceKey,options,url){
-  peekClose();
+let peek=null,peekStack=[];
+// A popup from the drawer (Sign in with Google) keeps its opener alive underneath: OAuth talks back to it, then window.close() brings it back.
+function peekOpen(serviceKey,options,url,from=null){
+  if(from && peek && peek.view.webContents===from){peek.view.setVisible(false);peek.visible=false;peekStack.push(peek);peek=null;}else peekClose();
   const item=serviceItem(serviceKey);if(!item)return null;
   const view=new WebContentsView({...(options || {}),webPreferences:{...(options?.webPreferences || {}),...preferencesFor(serviceKey)}});
   win.contentView.addChildView(view);view.setVisible(false);
   const contents=view.webContents;
-  peek={view,serviceKey,visible:false};
+  peek={view,serviceKey,visible:false,name:item.name,announce:null};
   notificationSources.set(contents,{contents,saved:false,key:serviceKey,name:item.name+' (peek)',notificationPermission:false,badgeInitialized:false,origins:new Set(),landed:false});
   hardenWebSession(contents.session);
-  configureWebContents(contents,win,message=>send('notice',message),contents,preferencesFor(serviceKey),o=>peekOpen(serviceKey,o,''));
+  configureWebContents(contents,win,message=>send('notice',message),contents,preferencesFor(serviceKey),o=>peekOpen(serviceKey,o,'',contents));
   attachContextMenu(contents,()=>item.name);
   const announce=()=>{if(!contents.isDestroyed() && peek?.view===view)send('peek-update',{url:contents.getURL(),title:contents.getTitle(),loading:contents.isLoading(),canGoBack:contents.navigationHistory.canGoBack()});};
-  for(const event of ['did-navigate','did-navigate-in-page','did-start-loading','did-stop-loading','page-title-updated'])contents.on(event,announce);
+  peek.announce=announce;for(const event of ['did-navigate','did-navigate-in-page','did-start-loading','did-stop-loading','page-title-updated'])contents.on(event,announce);
   contents.on('did-finish-load',()=>{contents.__darkKey=null;darkenIfLight(contents);});
-  contents.once('destroyed',()=>{if(peek?.view===view){peek=null;send('peek-closed');}});
+  contents.once('destroyed',()=>{if(peek?.view===view){peek=null;peekRestore();}else{const i=peekStack.indexOf(peekStack.find(p=>p.view===view));if(i>=0)peekStack.splice(i,1);}});
   if(url)contents.loadURL(url).catch(()=>{});
   send('peek-opened',{serviceKey,name:item.name});
   return contents;
 }
 let appPeek=null;
-function peekClose(){if(appPeek){appPeek=null;send('peek-closed');}if(!peek)return;const {view}=peek;peek=null;try{win.contentView.removeChildView(view);}catch{}try{view.webContents.close();}catch{}send('peek-closed');}
+function peekRestore(){const parent=peekStack.pop();if(!parent || parent.view.webContents.isDestroyed()){if(parent)peekRestore();else send('peek-closed');return;}peek=parent;send('peek-opened',{serviceKey:parent.serviceKey,name:parent.name});parent.announce?.();}
+function peekClose(){if(appPeek){appPeek=null;send('peek-closed');}for(const p of peekStack.splice(0)){try{win.contentView.removeChildView(p.view);}catch{}try{p.view.webContents.close();}catch{}}if(!peek)return;const {view}=peek;peek=null;try{win.contentView.removeChildView(view);}catch{}try{view.webContents.close();}catch{}send('peek-closed');}
 function peekPlace(box){if(appPeek){if(box?.visible){win.contentView.addChildView(appPeek.view);appPeek.view.setBounds(clipBounds(box));appPeek.view.setVisible(!locked);appPeek.visible=true;appPeek.hiddenSince=0;}return;}if(!peek)return;if(!box?.visible){peek.view.setVisible(false);peek.visible=false;return;}win.contentView.addChildView(peek.view);peek.view.setBounds(clipBounds(box));peek.view.setVisible(!locked);peek.visible=true;}
 function popupAsTab(serviceKey,options,opener=null){
   // Only a popup from an app the user is looking at gets the drawer; background apps (sign-in bounces, warm-up) get a quiet tab.
   const openerEntry=opener?[...views.values()].find(v=>v.view.webContents===opener):null;
-  if(config.peekLinks!==false && (!opener || openerEntry?.visible || (peek && peek.view.webContents===opener) || (appPeek && appPeek.view.webContents===opener)))return peekOpen(serviceKey,options,'');
+  if(config.peekLinks!==false && (!opener || openerEntry?.visible || (peek && peek.view.webContents===opener) || (appPeek && appPeek.view.webContents===opener)))return peekOpen(serviceKey,options,'',opener);
   const tabs=tabsFor(serviceKey);if(tabs.items.length>=20)return null;
   const tab={id:crypto.randomUUID(),url:'',current:'',title:''};tabs.items.push(tab);tabs.active=tab.id;persist();
   const view=new WebContentsView({...options,webPreferences:{...(options.webPreferences || {}),...preferencesFor(serviceKey)}});
