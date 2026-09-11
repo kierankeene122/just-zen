@@ -243,14 +243,16 @@ let appPeek=null;
 function peekApp(serviceKey){peekClose();const item=serviceItem(serviceKey);if(!item)return false;const tabs=tabsFor(serviceKey);const entry=ensureView(serviceKey,tabs.active);if(!entry)return false;appPeek=entry;win.contentView.addChildView(entry.view);send('peek-opened',{serviceKey,name:item.name,live:true});send('peek-update',{url:entry.view.webContents.getURL(),title:entry.view.webContents.getTitle(),loading:entry.view.webContents.isLoading(),canGoBack:false});return true;}
 function peekClose(){if(appPeek){appPeek=null;send('peek-closed');}if(!peek)return;const {view}=peek;peek=null;try{win.contentView.removeChildView(view);}catch{}try{view.webContents.close();}catch{}send('peek-closed');}
 function peekPlace(box){if(appPeek){if(box?.visible){win.contentView.addChildView(appPeek.view);appPeek.view.setBounds(clipBounds(box));appPeek.view.setVisible(!locked);appPeek.visible=true;appPeek.hiddenSince=0;}return;}if(!peek)return;if(!box?.visible){peek.view.setVisible(false);peek.visible=false;return;}win.contentView.addChildView(peek.view);peek.view.setBounds(clipBounds(box));peek.view.setVisible(!locked);peek.visible=true;}
-function popupAsTab(serviceKey,options){
-  if(config.peekLinks!==false)return peekOpen(serviceKey,options,'');
+function popupAsTab(serviceKey,options,opener=null){
+  // Only a popup from an app the user is looking at gets the drawer; background apps (sign-in bounces, warm-up) get a quiet tab.
+  const openerEntry=opener?[...views.values()].find(v=>v.view.webContents===opener):null;
+  if(config.peekLinks!==false && (!opener || openerEntry?.visible || (peek && peek.view.webContents===opener) || (appPeek && appPeek.view.webContents===opener)))return peekOpen(serviceKey,options,'');
   const tabs=tabsFor(serviceKey);if(tabs.items.length>=20)return null;
   const tab={id:crypto.randomUUID(),url:'',current:'',title:''};tabs.items.push(tab);tabs.active=tab.id;persist();
   const view=new WebContentsView({...options,webPreferences:{...(options.webPreferences || {}),...preferencesFor(serviceKey)}});
   const entry=attachView(serviceKey,tab.id,view,'');
   entry.view.webContents.once('destroyed',()=>{views.delete(viewKey(serviceKey,tab.id));const live=tabsFor(serviceKey);const index=live.items.findIndex(t=>t.id===tab.id);if(index<0)return;live.items.splice(index,1);if(!live.items.length)live.items.push({id:crypto.randomUUID(),url:isBrowserItem(serviceItem(serviceKey))?'':serviceItem(serviceKey)?.url || '',current:'',title:''});if(live.active===tab.id)live.active=live.items[Math.max(0,index-1)].id;persist();send('tabs-changed',{serviceKey,tabs:live});});
-  send('tab-opened',{serviceKey,tabId:tab.id,tabs});
+  if(!opener || openerEntry?.visible)send('tab-opened',{serviceKey,tabId:tab.id,tabs});else send('tabs-changed',{serviceKey,tabs});
   return view.webContents;
 }
 function attachView(serviceKey,tabId,view,url){
@@ -266,7 +268,7 @@ function attachView(serviceKey,tabId,view,url){
   notificationSources.set(contents,notificationSource);
   hardenWebSession(contents.session);
   const origins=notificationOrigins.get(contents.session);try{if(!isBrowser && secureOrigin(url)){origins.add(new URL(url).origin);notificationSource.origins.add(new URL(url).origin);}}catch{}
-  configureWebContents(contents,win,message=>send('notice',message),contents,preferences,options=>popupAsTab(serviceKey,options) || undefined);
+  configureWebContents(contents,win,message=>send('notice',message),contents,preferences,options=>popupAsTab(serviceKey,options,contents) || undefined);
   attachContextMenu(contents,()=>item.name,params=>params.linkURL && /^https?:/i.test(params.linkURL)?[{label:'Open Link in Quick Look',click:()=>peekOpen(serviceKey,null,params.linkURL)},{label:'Open Link in New Tab',click:()=>openTab(serviceKey,params.linkURL,true)}]:[]);
   contents.on('page-favicon-updated',async (_e,urls)=>{if(!urls.length || isBrowser || bundledIcon(item))return;const icon=await favicon(item.url,urls[0]);if(icon)send('favicon',{url:item.url,icon});});
   // Origins reached by the app's initial redirect chain may notify; later navigations (open redirects, links) may not.
@@ -310,6 +312,7 @@ function placeViews(list){
   }
   if(locked)return [];
   for(const [key,entry] of views){
+    if(appPeek && entry===appPeek)continue;
     const box=wanted.get(key);
     if(box){entry.view.setBounds(box);if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
     else if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}
@@ -545,6 +548,7 @@ app.whenReady().then(async () => {
   ipcMain.on('web-unread',(e,count)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;const source=notificationSources.get(e.sender);if(!source?.saved)return;const n=Math.max(0,Math.min(9999,Number(count) || 0));if(source.domUnread===n)return;source.domUnread=n;const previous=serviceBadges.get(entry.serviceKey) || 0;const merged=Math.max(unreadCount(e.sender.getTitle()),n);updateServiceBadge(entry.serviceKey,merged);if(merged>previous && !entry.visible && !isMuted(entry.serviceKey))pushRecent({key:entry.serviceKey,name:source.name,count:merged});}catch{}});
   handle('peek-bounds',box=>{if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid peek bounds');peekPlace(box);return true;});
   handle('peek-close',()=>{peekClose();return true;});
+  if(!app.isPackaged)handle('debug-views',()=>({tiles:[...views.values()].map(v=>({key:v.serviceKey.slice(0,8),tab:v.tabId.slice(0,6),visible:v.visible,bounds:v.view.getBounds(),peeked:appPeek===v})),peek:peek?{visible:peek.visible,bounds:peek.view.getBounds()}:null}));
   handle('peek-app',serviceKey=>peekApp(String(serviceKey || '')));
   handle('peek-action',({action}={})=>{if(appPeek){const key=appPeek.serviceKey,tabId=appPeek.tabId;if(action==='tab' || action==='beside'){peekClose();return {serviceKey:key,tabId,tabs:tabsFor(key),beside:action==='beside'};}if(action==='reload'){appPeek.view.webContents.reload();return true;}return null;}if(!peek)return null;const c=peek.view.webContents;if(action==='back' && c.navigationHistory.canGoBack()){c.navigationHistory.goBack();return true;}if(action==='reload'){c.reload();return true;}const url=c.getURL(),key=peek.serviceKey;if(!/^https?:/i.test(url))return null;if(action==='tab'){const opened=openTab(key,url,true);peekClose();return opened;}if(action==='beside'){const opened=openTab(key,url,false);peekClose();return {...opened,beside:true};}return null;});
   handle('set-peek-links',async on=>{config.peekLinks=Boolean(on);await persist();return config.peekLinks;});
