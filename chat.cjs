@@ -84,7 +84,7 @@ class ChatSession {
           const text=blocks.filter(b=>b.type==='text').map(b=>b.text).join('\n');
           if(text && !streamed){this.add('assistant',text);assistantTextSeen=true;}
           for(const block of blocks){if(block.type==='tool_use' && !tools.has(block.id)){const item=this.add('tool',JSON.stringify(block.input,null,2),{tool:block.name,toolId:block.id,status:'Running'});tools.set(block.id,item);}}
-          if(message.error)this.add('error',`Claude Code: ${message.error}. Check your login or usage limits in Terminal mode.`);
+          if(message.error){if(/authentication_failed|401|invalid.*(token|api key)/i.test(String(message.error)))expiredToken=true;else this.add('error',/rate_limit|usage|limit/i.test(String(message.error))?'Claude has hit a usage limit on your account. Try again later, or check your plan at claude.ai.':`Claude Code: ${message.error}.`);}
         }
         if(message.type==='user'){
           for(const block of (Array.isArray(message.message?.content)?message.message.content:[])){
