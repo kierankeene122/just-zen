@@ -2,3 +2,4 @@
 document.getElementById('b').onclick=()=>window.badge.search();
 document.getElementById('x').onclick=()=>window.badge.close();
 window.badge.onTheme(theme=>{document.body.dataset.theme=theme;});
+window.badge.onLabelled(on=>{document.body.dataset.labelled=String(Boolean(on));});

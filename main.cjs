@@ -333,11 +333,12 @@ function ensureBadge(i){if(badges[i] && !badges[i].view.webContents.isDestroyed(
   c.session.webRequest.onBeforeRequest((details,done)=>done({cancel:!allowed.has(details.url)}));
   c.setWindowOpenHandler(()=>({action:'deny'}));c.on('will-navigate',e=>e.preventDefault());
   try{view.setBackgroundColor('#00000000');}catch{}
-  c.on('did-finish-load',()=>c.send('badge-theme',config.theme || 'light'));c.loadFile('pane-badge.html');
+  c.on('did-finish-load',()=>{c.send('badge-theme',config.theme || 'light');c.send('badge-labelled',badgeLabelled());});c.loadFile('pane-badge.html');
   const entry={view,attached:false,visible:false};badges[i]=entry;return entry;}
+function badgeLabelled(){return (config.searchUses || 0)<4;}
 function placeBadges(list){const wanted=new Map();for(const p of list)if(Number.isInteger(p.slot) && p.slot>=0 && p.slot<4)wanted.set(p.slot,p);
   for(let i=0;i<4;i++){const p=wanted.get(i);if(!p){if(badges[i]?.visible){badges[i].view.setVisible(false);badges[i].visible=false;}continue;}
-    const b=ensureBadge(i);const box=clipBounds({x:p.x+p.width-92,y:p.y+6,width:86,height:44});
+    const b=ensureBadge(i);const wide=badgeLabelled()?184:86;const box=clipBounds({x:p.x+p.width-wide-6,y:p.y+6,width:wide,height:44});
     if(!b.attached || !b.visible){win.contentView.addChildView(b.view);b.attached=true;}
     b.view.setBounds(box);if(!b.visible){b.view.setVisible(!locked);b.visible=true;}}}
 function retintBadges(){for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-theme',config.theme || 'light');}
@@ -539,6 +540,7 @@ app.whenReady().then(async () => {
   ipcMain.on('popover-edit',(e,id)=>{try{popoverTrusted(e);hidePopover();if(typeof id==='string' && (config.serviceFolders || []).some(f=>f.id===id))send('edit-group',id);}catch{}});
   ipcMain.on('popover-close',e=>{try{popoverTrusted(e);hidePopover();}catch{}});
   ipcMain.on('pane-search',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{search:i});});
+  handle('search-used',async()=>{config.searchUses=(config.searchUses || 0)+1;await persist();if(!badgeLabelled())for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-labelled',false);return true;});
   ipcMain.on('pane-close',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{close:i});});
   ipcMain.on('popover-remove',async (e,input)=>{try{popoverTrusted(e);if(!input || typeof input.key!=='string' || typeof input.folderId!=='string')return;config.services=setFolder(config.services || [],input.key,null,config.serviceFolders || []);await persist();send('sidebar-changed',{services:config.services,folders:config.serviceFolders || []});const cb=win.getContentBounds();await showPopover({folderId:input.folderId,left:popover.__anchor.x-cb.x,top:popover.__anchor.y-cb.y});}catch{}});
   win.on('move',()=>hidePopover());win.on('resize',()=>hidePopover());
