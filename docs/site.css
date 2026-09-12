@@ -222,3 +222,6 @@ html{overflow-x:hidden}
 @media (max-width:560px){.why-grid{grid-template-columns:1fr}}
 
 a.brand{text-decoration:none;color:inherit}
+
+.shot.film{margin-top:44px}.shot.film video{display:block;width:100%;height:auto;background:#eef4f7}
+.explore{padding:110px 0 0}.explore h2{font-size:clamp(28px,3.4vw,42px);font-variation-settings:"opsz" 144}

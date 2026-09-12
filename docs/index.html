@@ -19,7 +19,7 @@
 <meta name="twitter:image" content="https://justzen.co/hero.png">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="fonts/fonts.css">
-<link rel="stylesheet" href="site.css?v=20260912b">
+<link rel="stylesheet" href="site.css?v=20260912c">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Just Zen","applicationCategory":"BusinessApplication","operatingSystem":"macOS 13+, Windows 10+","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/license/isc-license-txt","url":"https://justzen.co/","downloadUrl":["https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg","https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-Setup.exe"],"description":"Every web app you use in one window, side by side, with search instead of switching, messages that come to you, and Claude Code alongside. Free and open source."}</script>
 </head>
 <body>
@@ -47,33 +47,15 @@
   </div>
 </section>
 
-<div class="shot" id="tour">
-  <div class="tour-head"><div class="tabs" role="tablist" aria-label="Parts of the window"></div></div>
+<div class="shot film" id="film">
   <div class="frame">
     <div class="bar"><i></i><i></i><i></i></div>
-    <div class="pic"><img src="hero.png?v=6" alt="Just Zen: two panes side by side, the justzen.co page on the left with text selected and a right-click menu offering Send Selection to Claude and Send Selection to Tasks, Proton Mail sign-in on the right, a search button in the corner of each pane, and the Claude and Tasks rails on the right" width="1382" height="734">
-    <div class="spot" aria-hidden="true" hidden></div></div>
+    <video autoplay muted loop playsinline preload="metadata" poster="switch-poster.jpg" aria-label="Just Zen in use: searching for an app from a pane and switching between panes">
+      <source src="switch.webm" type="video/webm">
+      <source src="switch.mp4" type="video/mp4">
+    </video>
   </div>
-  <div class="caption" aria-live="polite"><b></b><p></p></div>
 </div>
-<script>
-(()=>{
-  // Regions are percentages of the screenshot, so the highlight lands on the same part at any size.
-  const stops=[
-    ['Search, don\u2019t switch',{x:42.9,y:10.6,w:3,h:5.8},'A ⌕ in the corner of every pane: type a couple of letters, press Enter, and the app snaps in.'],
-    ['Panes',{x:0.6,y:9.4,w:91.6,h:85.7},'One app, two side by side, two stacked, three columns, or four. Each pane has its own search, so you put whatever you want wherever you want, and each keeps its own tabs and login.'],
-    ['Splits',{x:62.6,y:0.9,w:11.8,h:4.2},'Split the window with one click, and save layouts you come back to: Inbox zero, Standup, Client A.'],
-    ['Send anywhere',{x:38.9,y:64.3,w:18,h:11.8},'Select text in any app and right-click: send it to Claude, or straight onto your task list. The task remembers where it came from.'],
-    ['Claude',{x:93.3,y:9.4,w:3.7,h:85.7},'Claude Code lives in the right-hand rail. Choose any open pane, document or note from the About dropdown and ask; selected text lands there with one-click actions, and replies can add tasks, draft messages into your apps and open links.'],
-    ['Tasks',{x:97.1,y:9.4,w:2.9,h:85.7},'Your task list slides out from the right rail and stays one click away. Each task keeps a ↩ link back to the tab it came from.']
-  ];
-  const tabs=document.querySelector('#tour .tabs'),spot=document.querySelector('#tour .spot'),title=document.querySelector('#tour .caption b'),text=document.querySelector('#tour .caption p');
-  let current=0;
-  const show=i=>{current=i;const [name,r,copy]=stops[i];spot.hidden=false;Object.assign(spot.style,{left:r.x+'%',top:r.y+'%',width:r.w+'%',height:r.h+'%'});title.textContent=name;text.textContent=copy;[...tabs.children].forEach((b,j)=>b.setAttribute('aria-selected',String(j===i)));};
-  stops.forEach(([name],i)=>{const b=document.createElement('button');b.type='button';b.role='tab';b.textContent=name;b.addEventListener('click',()=>show(i));tabs.append(b);});
-  title.textContent='One window';text.textContent='Choose a part of the window above to see what lives there.';
-})();
-</script>
 
 <section class="moments" id="moments">
   <div class="moment">
@@ -120,6 +102,38 @@
     </div>
   </div>
 </section>
+
+<section class="explore" id="explore">
+  <div class="eyebrow">Explore the window</div>
+  <h2 style="margin-top:14px">Every part of it, in one screenshot.</h2>
+</section>
+<div class="shot" id="tour" style="margin-top:28px">
+  <div class="tour-head"><div class="tabs" role="tablist" aria-label="Parts of the window"></div></div>
+  <div class="frame">
+    <div class="bar"><i></i><i></i><i></i></div>
+    <div class="pic"><img src="hero.png?v=6" alt="Just Zen: two panes side by side, the justzen.co page on the left with text selected and a right-click menu offering Send Selection to Claude and Send Selection to Tasks, Proton Mail sign-in on the right, a search button in the corner of each pane, and the Claude and Tasks rails on the right" width="1382" height="734">
+    <div class="spot" aria-hidden="true" hidden></div></div>
+  </div>
+  <div class="caption" aria-live="polite"><b></b><p></p></div>
+</div>
+<script>
+(()=>{
+  // Regions are percentages of the screenshot, so the highlight lands on the same part at any size.
+  const stops=[
+    ['Search, don\u2019t switch',{x:42.9,y:10.6,w:3,h:5.8},'A ⌕ in the corner of every pane: type a couple of letters, press Enter, and the app snaps in.'],
+    ['Panes',{x:0.6,y:9.4,w:91.6,h:85.7},'One app, two side by side, two stacked, three columns, or four. Each pane has its own search, so you put whatever you want wherever you want, and each keeps its own tabs and login.'],
+    ['Splits',{x:62.6,y:0.9,w:11.8,h:4.2},'Split the window with one click, and save layouts you come back to: Inbox zero, Standup, Client A.'],
+    ['Send anywhere',{x:38.9,y:64.3,w:18,h:11.8},'Select text in any app and right-click: send it to Claude, or straight onto your task list. The task remembers where it came from.'],
+    ['Claude',{x:93.3,y:9.4,w:3.7,h:85.7},'Claude Code lives in the right-hand rail. Choose any open pane, document or note from the About dropdown and ask; selected text lands there with one-click actions, and replies can add tasks, draft messages into your apps and open links.'],
+    ['Tasks',{x:97.1,y:9.4,w:2.9,h:85.7},'Your task list slides out from the right rail and stays one click away. Each task keeps a ↩ link back to the tab it came from.']
+  ];
+  const tabs=document.querySelector('#tour .tabs'),spot=document.querySelector('#tour .spot'),title=document.querySelector('#tour .caption b'),text=document.querySelector('#tour .caption p');
+  let current=0;
+  const show=i=>{current=i;const [name,r,copy]=stops[i];spot.hidden=false;Object.assign(spot.style,{left:r.x+'%',top:r.y+'%',width:r.w+'%',height:r.h+'%'});title.textContent=name;text.textContent=copy;[...tabs.children].forEach((b,j)=>b.setAttribute('aria-selected',String(j===i)));};
+  stops.forEach(([name],i)=>{const b=document.createElement('button');b.type='button';b.role='tab';b.textContent=name;b.addEventListener('click',()=>show(i));tabs.append(b);});
+  title.textContent='One window';text.textContent='Choose a part of the window above to see what lives there.';
+})();
+</script>
 
 <section class="why" id="why">
   <div class="eyebrow">Why not just browser tabs?</div>
