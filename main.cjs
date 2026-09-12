@@ -71,7 +71,7 @@ function validLayout(layout){
  const out={agentCollapsed:Boolean(layout.agentCollapsed),centreCollapsed:Boolean(layout.centreCollapsed),navCollapsed:Boolean(layout.navCollapsed),navColumns:layout.navColumns===2?2:1,navGrey:layout.navGrey!==false,chime:Boolean(layout.chime),navDock:layout.navDock!==false,page:['overview','browser-page','brain-page','security-page','files-page'].includes(layout.page)?layout.page:'overview'};
  const tiles=layout.tiles;
  if(tiles && typeof tiles==='object'){
-  const mode=['1','2h','2v','4'].includes(tiles.mode)?tiles.mode:'1';
+  const mode=['1','2h','2v','3','4'].includes(tiles.mode)?tiles.mode:'1';
   const slots=Array.from({length:4},(_,i)=>{const slot=Array.isArray(tiles.slots)?tiles.slots[i]:null;return slot && typeof slot.serviceKey==='string' && slot.serviceKey.length<200 && typeof slot.tabId==='string' && slot.tabId.length<100?{serviceKey:slot.serviceKey,tabId:slot.tabId}:null;});
   const ratio=Number(tiles.ratio);out.tiles={mode,slots,focus:Number.isInteger(tiles.focus) && tiles.focus>=0 && tiles.focus<4?tiles.focus:0,ratio:Number.isFinite(ratio)?Math.max(.2,Math.min(.8,ratio)):.5};
  }
@@ -262,7 +262,7 @@ function attachView(serviceKey,tabId,view,url){
   const key=viewKey(serviceKey,tabId);
   const isBrowser=isBrowserItem(item);
   const preferences=preferencesFor(serviceKey);
-  const entry={view,serviceKey,tabId,visible:false,hiddenSince:Date.now()};
+  const entry={view,serviceKey,tabId,visible:false,hiddenSince:Date.now(),mobile:false,desktopUA:view.webContents.getUserAgent()};
   views.set(key,entry);win.contentView.addChildView(view);view.setVisible(false);
   const contents=view.webContents;
   contents.once('destroyed',()=>{if(views.get(key)===entry){views.delete(key);try{win.contentView.removeChildView(view);}catch{}}});
@@ -322,6 +322,10 @@ function placeBadges(list){const wanted=new Map();for(const p of list)if(Number.
     if(!b.attached || !b.visible){win.contentView.addChildView(b.view);b.attached=true;}
     b.view.setBounds(box);if(!b.visible){b.view.setVisible(!locked);b.visible=true;}}}
 function retintBadges(){for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-theme',config.theme || 'light');}
+// Thin panes get the mobile web: a phone user agent and a mobile viewport, so sites serve their phone layout.
+const MOBILE_WIDTH=480;
+const MOBILE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+function applyFormFactor(entry){const c=entry.view.webContents;if(c.isDestroyed())return;try{if(entry.mobile){c.setUserAgent(MOBILE_UA);const b=entry.view.getBounds();c.enableDeviceEmulation({screenPosition:'mobile',screenSize:{width:b.width,height:b.height},viewPosition:{x:0,y:0},deviceScaleFactor:0,viewSize:{width:0,height:0},scale:1});}else{c.setUserAgent(entry.desktopUA);c.disableDeviceEmulation();}}catch{}if(/^https?:/i.test(c.getURL()))c.reload();}
 function placeViews(list){
   if(!Array.isArray(list) || list.length>4)throw Error('Invalid placement');
   const wanted=new Map();
@@ -334,7 +338,7 @@ function placeViews(list){
   for(const [key,entry] of views){
     if(appPeek && entry===appPeek)continue;
     const box=wanted.get(key);
-    if(box){entry.view.setBounds({x:box.x,y:box.y,width:box.width,height:box.height});if(typeof entry.view.setBorderRadius==='function' && entry.radius!==box.radius){entry.radius=box.radius;try{entry.view.setBorderRadius(box.radius);}catch{}}if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
+    if(box){entry.view.setBounds({x:box.x,y:box.y,width:box.width,height:box.height});const mobile=box.width<MOBILE_WIDTH;if(entry.mobile!==mobile){entry.mobile=mobile;clearTimeout(entry.formTimer);entry.formTimer=setTimeout(()=>applyFormFactor(entry),400);}if(typeof entry.view.setBorderRadius==='function' && entry.radius!==box.radius){entry.radius=box.radius;try{entry.view.setBorderRadius(box.radius);}catch{}}if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
     else if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}
   }
   placeBadges(list.filter(p=>wanted.has(viewKey(p.serviceKey,p.tabId))));

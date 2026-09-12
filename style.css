@@ -136,7 +136,7 @@ header{position:relative}
 .ctx-menu button{display:flex;width:100%;text-align:left;padding:7px 10px 7px 26px;border-radius:6px;font-size:12px;position:relative;white-space:nowrap}.ctx-menu button:hover{background:#edf1f7}[data-theme=dark] .ctx-menu button:hover{background:#2a302c}.ctx-menu button.checked::before{content:'✓';position:absolute;left:10px}.ctx-menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 
 /* Tiles: one, two or four apps in the centre, each with its own tab strip. */
-#browser-page{height:100%}#tiles{display:grid;height:100%;gap:2px;background:var(--line)}#tiles[data-mode="1"]{grid-template-columns:1fr}#tiles[data-mode="2h"]{grid-template-columns:1fr 1fr}#tiles[data-mode="2v"]{grid-template-rows:1fr 1fr}#tiles[data-mode="4"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+#browser-page{height:100%}#tiles{display:grid;height:100%;gap:2px;background:var(--line)}#tiles[data-mode="1"]{grid-template-columns:1fr}#tiles[data-mode="2h"]{grid-template-columns:1fr 1fr}#tiles[data-mode="2v"]{grid-template-rows:1fr 1fr}#tiles[data-mode="4"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}#tiles[data-mode="3"]{grid-template-columns:1fr 1fr 2.2fr}
 .tile{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}.tile.hidden{display:none}
 .tile-bar{display:flex;align-items:center;gap:6px;height:38px;padding:0 8px;border-bottom:1px solid var(--line);flex-shrink:0;min-width:0}.tile-bar.hidden{display:none}
 #tiles:not([data-mode="1"]) .tile.focused .tile-bar{box-shadow:inset 0 2px var(--accent)}
@@ -412,3 +412,8 @@ header{gap:10px}#jump{flex:0 1 280px;min-width:130px}header .bell{flex:0 0 auto}
 #app-search-add{font-size:12px;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:transparent;color:inherit;white-space:nowrap}#app-search-add:hover{border-color:var(--accent);background:#c4d3ab33}
 
 .tile-urlbar .tile-tabs{flex:0 1 auto;max-width:45%;margin-left:4px}.tile-urlbar .tile-tab{padding:4px 6px 4px 8px}.tile-urlbar .tile-new{margin-left:2px}
+
+.chat-about-label{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);min-width:0}#chat-about{max-width:230px;font-size:11px;padding:4px 6px;border-radius:7px;border:1px solid var(--line);background:transparent;color:inherit}
+
+/* Narrow panes: the bottom bar keeps just the address. */
+.tile{container-type:inline-size}@container (max-width:340px){.tile-urlbar>button[data-nav=back],.tile-urlbar>button[data-nav=forward],.tile-urlbar .tile-tabs{display:none}.tile-urlbar{padding:5px 6px}}
