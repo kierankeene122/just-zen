@@ -7,7 +7,7 @@ function createDocuments(dialog,getWindow){
  close(){current=null;return true;},
  async open(){
   const choice=await dialog.showOpenDialog(getWindow(),{title:'Open local document',properties:['openFile'],filters:[{name:'Documents',extensions:['pdf','docx','txt','rtf']}]});
-  if(choice.canceled)return null;
+  if(choice.canceled || !choice.filePaths?.[0])return null;
   const file=choice.filePaths[0],type=path.extname(file).slice(1).toLowerCase();
   if(!['pdf','docx','txt','rtf'].includes(type))throw Error('Unsupported document type');
   if((await fs.stat(file)).size>30*1024*1024)throw Error('Choose a document smaller than 30 MB.');

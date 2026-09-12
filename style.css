@@ -417,3 +417,17 @@ header{gap:10px}#jump{flex:0 1 280px;min-width:130px}header .bell{flex:0 0 auto}
 
 /* Narrow panes: the bottom bar keeps just the address. */
 .tile{container-type:inline-size}@container (max-width:340px){.tile-urlbar>button[data-nav=back],.tile-urlbar>button[data-nav=forward],.tile-urlbar .tile-tabs{display:none}.tile-urlbar{padding:5px 6px}}
+
+/* No document rail: documents open in a pane like anything else. */
+body{--document-space:0px}#documents{display:none}
+.tile.document .tile-surface{background:var(--bg)}
+/* Apps & settings */
+#settings-page{padding:34px 36px 58px;overflow:auto}
+.settings-apps{display:flex;flex-direction:column;gap:6px;max-width:980px}
+.settings-row{display:grid;grid-template-columns:34px minmax(160px,1.2fr) 100px 150px auto;gap:14px;align-items:center;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:transparent}
+.settings-row .icon-pair{display:inline-flex}.settings-row .site-favicon,.settings-row .site-fallback,.settings-row .group-icon{width:26px;height:26px;flex:0 0 26px!important;font-size:12px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px}
+.settings-name{font-size:13px;font-weight:500;border:1px solid transparent;background:transparent;color:inherit;padding:5px 8px;border-radius:8px;min-width:0;width:100%}.settings-name:hover,.settings-name:focus{border-color:var(--line);outline:0}
+.settings-kind{font-size:11px;color:var(--muted);white-space:nowrap}
+.settings-row select{font-size:11px;padding:5px 6px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit}
+.settings-actions{display:flex;gap:4px;justify-content:flex-end}.settings-actions button{font-size:11px;padding:5px 9px;border-radius:8px;border:1px solid transparent;color:var(--muted);background:transparent}.settings-actions button:hover{border-color:var(--line);color:inherit}.settings-actions .danger:hover{color:#b5443d;border-color:#b5443d66}
+.settings-empty{padding:30px;color:var(--muted);text-align:center;border:1px dashed var(--line);border-radius:12px}

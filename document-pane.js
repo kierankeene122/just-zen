@@ -4,6 +4,7 @@ export function createDocumentPane({call,resize}){
  const changed=()=>{dirty=true;status('Unsaved edits — original unchanged');};
  const run=async fn=>{if(busy)return;busy=true;try{await fn();}catch(e){status(e.message);}finally{busy=false;}};
  $('documents-close').onclick=()=>window.documents.collapse();
+ window.documents.onOpenRequest?.(()=>$('document-open').click());
  $('document-editor').oninput=changed;$('document-text').oninput=changed;
  for(const button of document.querySelectorAll('[data-format]')){button.onmousedown=e=>e.preventDefault();button.onclick=()=>{document.execCommand(button.dataset.format);changed();};}
  $('document-editor').addEventListener('paste',event=>{event.preventDefault();document.execCommand('insertText',false,event.clipboardData.getData('text/plain'));});

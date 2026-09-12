@@ -72,7 +72,7 @@ function validLayout(layout){
  const tiles=layout.tiles;
  if(tiles && typeof tiles==='object'){
   const mode=['1','2h','2v','3','4'].includes(tiles.mode)?tiles.mode:'1';
-  const slots=Array.from({length:4},(_,i)=>{const slot=Array.isArray(tiles.slots)?tiles.slots[i]:null;return slot && typeof slot.serviceKey==='string' && slot.serviceKey.length<200 && typeof slot.tabId==='string' && slot.tabId.length<100?{serviceKey:slot.serviceKey,tabId:slot.tabId}:null;});
+  const slots=Array.from({length:4},(_,i)=>{const slot=Array.isArray(tiles.slots)?tiles.slots[i]:null;if(slot && slot.kind==='document')return {kind:'document'};return slot && typeof slot.serviceKey==='string' && slot.serviceKey.length<200 && typeof slot.tabId==='string' && slot.tabId.length<100?{serviceKey:slot.serviceKey,tabId:slot.tabId}:null;});
   const ratio=Number(tiles.ratio);out.tiles={mode,slots,focus:Number.isInteger(tiles.focus) && tiles.focus>=0 && tiles.focus<4?tiles.focus:0,ratio:Number.isFinite(ratio)?Math.max(.2,Math.min(.8,ratio)):.5};
  }
  return out;
@@ -333,6 +333,7 @@ function placeViews(list){
   if(!Array.isArray(list) || list.length>4)throw Error('Invalid placement');
   const wanted=new Map();
   for(const p of list){
+    if(p && p.document===true && ['x','y','width','height'].every(k=>Number.isFinite(p[k])))continue;
     if(!p || typeof p.serviceKey!=='string' || typeof p.tabId!=='string' || !['x','y','width','height'].every(k=>Number.isFinite(p[k])))throw Error('Invalid placement');
     let entry=null;try{entry=ensureView(p.serviceKey,p.tabId);}catch{}
     if(entry)wanted.set(viewKey(p.serviceKey,p.tabId),{...clipBounds(p),radius:Number.isFinite(p.radius)?Math.max(0,Math.min(24,Math.round(p.radius))):0});
@@ -344,7 +345,7 @@ function placeViews(list){
     if(box){entry.view.setBounds({x:box.x,y:box.y,width:box.width,height:box.height});const mobile=box.width<MOBILE_WIDTH;if(entry.mobile!==mobile){entry.mobile=mobile;clearTimeout(entry.formTimer);entry.formTimer=setTimeout(()=>applyFormFactor(entry),400);}if(typeof entry.view.setBorderRadius==='function' && entry.radius!==box.radius){entry.radius=box.radius;try{entry.view.setBorderRadius(box.radius);}catch{}}if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
     else if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}
   }
-  placeBadges(list.filter(p=>wanted.has(viewKey(p.serviceKey,p.tabId))));
+  placeBadges(list.filter(p=>p.document===true || wanted.has(viewKey(p.serviceKey,p.tabId))));
   return [...wanted.keys()].map(key=>tabInfo(views.get(key)));
 }
 function openTab(serviceKey,url='',announce=false){
@@ -495,7 +496,7 @@ app.whenReady().then(async () => {
   win.webContents.on('will-navigate', e => e.preventDefault());
   attachContextMenu(win.webContents,()=>'your workspace');
   win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
-  win.on('closed',() => { terminal?.kill();chat.stop();for(const key of [...views.keys()])destroyView(key); });
+  win.on('closed',() => { try{terminal?.kill();}catch{} try{chat.stop();}catch{} for(const key of [...views.keys()]){try{destroyView(key);}catch{}} });
   const documents=require('./documents.cjs').createDocuments(dialog,()=>win);
   const documentEntry=require('node:url').pathToFileURL(path.join(__dirname,'document-view.html')).href;
   const documentView=new WebContentsView({webPreferences:{preload:path.join(__dirname,'document-preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,partition:'documents-preview'}});
@@ -508,7 +509,7 @@ app.whenReady().then(async () => {
   dc.setWindowOpenHandler(()=>({action:'deny'}));dc.on('will-navigate',e=>e.preventDefault());dc.on('will-frame-navigate',e=>e.preventDefault());dc.on('will-redirect',e=>e.preventDefault());
   function documentTrusted(e){if(locked || e.sender!==dc || e.senderFrame!==dc.mainFrame || e.senderFrame.url!==documentEntry)throw Error('Untrusted document request');}
   for(const [name,fn] of [['document-open',()=>documents.open()],['document-save',input=>documents.save(input)],['document-close',()=>documents.close()]])ipcMain.handle(name,(e,...args)=>{documentTrusted(e);return fn(...args);});
-  ipcMain.on('document-collapse',e=>{try{documentTrusted(e);documentView.setVisible(false);send('document-collapse');}catch{}});
+  ipcMain.on('document-collapse',e=>{try{documentTrusted(e);documentView.setVisible(false);documents.close();send('document-collapse');}catch{}});
   ipcMain.on('document-selection',(e,payload)=>{try{documentTrusted(e);const text=payload?.text;if(typeof text!=='string' || !text.trim())return;if(payload.target==='task')taskFromSelection(text,{kind:'document'});else send('claude-context',{text:text.slice(0,20000),source:'the document',from:{kind:'document'}});}catch{}});
   handle('show-group-popover',input=>{if(!input || typeof input.folderId!=='string' || !Number.isFinite(input.left) || !Number.isFinite(input.top))throw Error('Invalid popover request');return showPopover({folderId:input.folderId,left:input.left,top:input.top,above:Boolean(input.above)});});
   handle('hide-group-popover',()=>{hidePopover();return true;});
@@ -520,7 +521,8 @@ app.whenReady().then(async () => {
   ipcMain.on('popover-remove',async (e,input)=>{try{popoverTrusted(e);if(!input || typeof input.key!=='string' || typeof input.folderId!=='string')return;config.services=setFolder(config.services || [],input.key,null,config.serviceFolders || []);await persist();send('sidebar-changed',{services:config.services,folders:config.serviceFolders || []});const cb=win.getContentBounds();await showPopover({folderId:input.folderId,left:popover.__anchor.x-cb.x,top:popover.__anchor.y-cb.y});}catch{}});
   win.on('move',()=>hidePopover());win.on('resize',()=>hidePopover());
   handle('document-capture-all',()=>{dc.send('capture-selection','claude-all');return true;});
-  handle('document-bounds',box=>{const [w,h]=win.getContentSize();if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid document bounds');const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));documentView.setBounds({x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))});documentView.setVisible(Boolean(box.visible)&&!locked);});
+  handle('document-bounds',box=>{if(!box || box.visible===false){documentView.setVisible(false);return;}const [w,h]=win.getContentSize();if(!['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid document bounds');const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));win.contentView.addChildView(documentView);documentView.setBounds({x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))});if(typeof documentView.setBorderRadius==='function')try{documentView.setBorderRadius(12);}catch{}documentView.setVisible(!locked);});
+  handle('document-request-open',()=>{dc.send('open-request');return true;});
   dc.loadURL(documentEntry);
   handle('state',stateSnapshot);
   handle('security-status',securityStatus);
@@ -706,7 +708,7 @@ app.whenReady().then(async () => {
       await win.webContents.executeJavaScript(`(async()=>{const decode=v=>new TextDecoder().decode(Uint8Array.from(atob(v),c=>c.charCodeAt(0)));const state=await window.hearth.call('select-files-folder',decode('${b64(nextFolder)}'));if(state.root!==state.claudeRoot || !state.connectedFolders.includes(decode('${b64(connectedBefore)}')))throw Error('Folder switch lost history or left Claude stale');})()`);
       const pdfTest=await require('pdf-lib').PDFDocument.create();pdfTest.addPage([200,200]);const {PDFName,PDFString}=require('pdf-lib');pdfTest.catalog.set(PDFName.of('OpenAction'),pdfTest.context.obj({S:'JavaScript',JS:PDFString.of('globalThis.__pdfAttack=1')}));
       const pdfBytes=Buffer.from(await pdfTest.save()).toString('base64');
-      await win.webContents.executeJavaScript(`document.getElementById('documents-rail').click()`);
+      await win.webContents.executeJavaScript(`document.querySelector('#layout-switch [data-tiles="2h"]').click()`);await new Promise(r=>setTimeout(r,400));await win.webContents.executeJavaScript(`(async()=>{document.querySelectorAll('#tiles .tile')[1].querySelector('.pane-search').click();await new Promise(r=>setTimeout(r,200));[...document.querySelectorAll('.app-tile')].find(t=>t.textContent.includes('A document')).click();})()`);await new Promise(r=>setTimeout(r,800));
       await dc.executeJavaScript(`(async()=>{if(window.hearth || typeof require!=='undefined')throw Error('Document viewer has privileged app access');let denied=false;try{window.documents.call('start-terminal','shell');}catch{denied=true;}if(!denied)throw Error('Document bridge accepted terminal action');let networkBlocked=false;try{await fetch('https://example.com');}catch{networkBlocked=true;}if(!networkBlocked)throw Error('Document viewer network access enabled');const lib=await import('./node_modules/pdfjs-dist/build/pdf.mjs');lib.GlobalWorkerOptions.workerSrc=new URL('./node_modules/pdfjs-dist/build/pdf.worker.mjs',location.href).href;const loading=lib.getDocument({data:Uint8Array.from(atob('${pdfBytes}'),c=>c.charCodeAt(0)),isEvalSupported:false});const pdf=await loading.promise;const page=await pdf.getPage(1);const canvas=document.getElementById('pdf-canvas');await page.render({canvasContext:canvas.getContext('2d'),viewport:page.getViewport({scale:1}),intent:'print'}).promise;await loading.destroy();if(globalThis.__pdfAttack)throw Error('PDF script executed');})()`);
       await require('./smoke-adversarial.cjs')({documentContents:dc});
       startTerminal('shell');
@@ -717,7 +719,8 @@ app.whenReady().then(async () => {
     } catch(e) {console.error(e);app.exit(1);}
   }
 });
-app.on('window-all-closed',() => app.quit());
+// Closing the window quits. If anything stalls the quit (a child process, a pending dialog), force the exit so a relaunch starts clean.
+app.on('window-all-closed',()=>{app.quit();setTimeout(()=>app.exit(0),2500).unref?.();});
 // Cookies are written to disk on quit, so a login made moments before closing survives.
 app.on('before-quit',()=>{for(const view of views.values()){try{view.view.webContents.session.cookies.flushStore().catch(()=>{});}catch{}}});
 setInterval(()=>{for(const target of hardenedSessions){try{target.cookies.flushStore().catch(()=>{});}catch{}}},30000).unref?.();
