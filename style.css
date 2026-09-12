@@ -431,3 +431,6 @@ body{--document-space:0px}#documents{display:none}
 .settings-row select{font-size:11px;padding:5px 6px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit}
 .settings-actions{display:flex;gap:4px;justify-content:flex-end}.settings-actions button{font-size:11px;padding:5px 9px;border-radius:8px;border:1px solid transparent;color:var(--muted);background:transparent}.settings-actions button:hover{border-color:var(--line);color:inherit}.settings-actions .danger:hover{color:#b5443d;border-color:#b5443d66}
 .settings-empty{padding:30px;color:var(--muted);text-align:center;border:1px dashed var(--line);border-radius:12px}
+
+/* Windows draws its window controls over the top-right of the header. */
+.platform-win header{padding-right:150px}.platform-win header .brand{margin-left:0}

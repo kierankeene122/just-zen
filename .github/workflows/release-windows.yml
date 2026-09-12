@@ -1,0 +1,66 @@
+name: Release Windows installer
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag to release (for example v0.5.6)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HEARTH_GITHUB_OWNER: ${{ vars.HEARTH_GITHUB_OWNER }}
+      HEARTH_GITHUB_REPO: ${{ vars.HEARTH_GITHUB_REPO }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run rebuild
+      - name: Bundle the Node.js runtime for the document worker
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          Copy-Item (node -p 'process.execPath') build/node.exe
+          & build/node.exe -v
+      - name: Record build information
+        shell: pwsh
+        run: |
+          node -e "(async()=>{const v=require('electron/package.json').version;let s=null;try{s=await require('./scripts/electron-support.cjs').electronSupport(v);}catch{}require('fs').writeFileSync('build/build-info.json',JSON.stringify({electron:v,app:require('./package.json').version,builtAt:new Date().toISOString(),electronSupport:s,platform:'win32'}));})()"
+          Get-Content build/build-info.json
+      - name: Create the GitHub release if the macOS job has not yet
+        shell: bash
+        env:
+          TAG: ${{ inputs.ref || github.ref_name }}
+        run: |
+          REPO="$HEARTH_GITHUB_OWNER/$HEARTH_GITHUB_REPO"
+          gh release view "$TAG" -R "$REPO" >/dev/null 2>&1 || gh release create "$TAG" -R "$REPO" --title "Just Zen $TAG" --notes "Signed and notarized macOS build for Apple silicon, and an unsigned Windows installer. Installed copies update automatically."
+      - run: npm run dist:win:publish
+      - name: Publish a stable download name for the website
+        shell: bash
+        env:
+          TAG: ${{ inputs.ref || github.ref_name }}
+        run: |
+          cp release/Just-Zen-Setup-*.exe release/Just-Zen-Setup.exe
+          gh release upload "$TAG" release/Just-Zen-Setup.exe -R "$HEARTH_GITHUB_OWNER/$HEARTH_GITHUB_REPO" --clobber
+      - name: Attest the installer
+        if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: release/*.exe

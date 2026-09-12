@@ -16,7 +16,7 @@
 <div class="wrap">
 <header class="top">
   <a class="brand" href="./" style="text-decoration:none"><img src="logo.png" alt="" width="44" height="44">JUST ZEN</a>
-  <nav><a href="./#apps">Apps</a><a href="./#copilot">Claude</a><a href="security.html" aria-current="page">Security</a><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg">Download</a></nav>
+  <nav><a href="./#apps">Apps</a><a href="./#copilot">Claude</a><a href="security.html" aria-current="page">Security</a><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg">Mac</a><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-Setup.exe">Windows</a></nav>
 </header>
 
 <div class="water" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -106,6 +106,7 @@
 <h2>Risks specific to Just Zen</h2>
 <ul>
 <li><strong>Browser vulnerabilities.</strong> Just Zen bundles its own copy of Chromium through Electron, so a new Chromium flaw can exist here until the next Electron patch ships. Sandboxing limits the impact; the automated update chain keeps that window to days.</li>
+<li><strong>Windows is newer and weaker than the Mac build.</strong> The same Chromium sandboxing, process isolation, content security policy, integrity-checked app archive and disabled Node entry points apply, and saved passwords and cookies are encrypted with Windows DPAPI instead of the Keychain. Three things do not carry over yet: the installer is not code-signed (Windows SmartScreen will warn, and you cannot verify the publisher), there is no Touch ID lock, and Claude is switched off entirely because the operating-system sandbox it runs in only exists on macOS; Just Zen will not run Claude unsandboxed. The Windows build has also not been through the adversarial test suite on Windows itself.</li>
 <li><strong>No independent audit yet.</strong> CodeQL and Semgrep scans, the adversarial and sandbox test suites and the code review all pass, but no third party has tested the running app. For regulated or highly sensitive work, commission an external assessment first.</li>
 </ul>
 

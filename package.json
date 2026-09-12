@@ -17,7 +17,9 @@
     "update:agent": "node scripts/install-update-agent.cjs",
     "release": "node scripts/release.cjs",
     "security:redteam": "cd security/promptfoo && npx --yes promptfoo@latest eval -c promptfooconfig.yaml -o results.json --no-cache --max-concurrency 1",
-    "electron:support": "node scripts/electron-support.cjs --check"
+    "electron:support": "node scripts/electron-support.cjs --check",
+    "dist:win": "electron-builder --win nsis --x64 --publish never",
+    "dist:win:publish": "electron-builder --win nsis --x64 --publish always"
   },
   "keywords": [],
   "author": "",
@@ -33,10 +35,6 @@
       "document-sanitize.cjs"
     ],
     "extraResources": [
-      {
-        "from": "build/node",
-        "to": "node"
-      },
       {
         "from": "build/build-info.json",
         "to": "build-info.json"
@@ -85,7 +83,13 @@
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Just Zen passes your microphone to the web app you are calling from, such as Slack or Google Meet.",
         "NSCameraUsageDescription": "Just Zen passes your camera to the web app you are calling from, such as Slack or Google Meet."
-      }
+      },
+      "extraResources": [
+        {
+          "from": "build/node",
+          "to": "node"
+        }
+      ]
     },
     "artifactName": "Just-Zen-${version}-${arch}.${ext}",
     "publish": [
@@ -95,7 +99,33 @@
         "repo": "${env.HEARTH_GITHUB_REPO}",
         "releaseType": "release"
       }
-    ]
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/justzen.png",
+      "extraResources": [
+        {
+          "from": "build/node.exe",
+          "to": "node.exe"
+        }
+      ],
+      "verifyUpdateCodeSignature": false,
+      "artifactName": "Just-Zen-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "Just Zen"
+    }
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.263",

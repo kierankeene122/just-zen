@@ -79,3 +79,7 @@ See `SECURITY-REVIEW-2026-09-08.md` for the findings. Fixes in this revision: El
 Documents render in a separate sandboxed WebContentsView, with Node integration disabled and a document-only preload. Main-process requests verify the exact document view and main-frame URL. The view has an ephemeral session, denies permissions, popups and navigation, and allows requests only for its bundled viewer assets. It cannot call the main app's Claude or filesystem bridge.
 
 PDF writing and DOCX/RTF conversion run in a separate process under macOS sandbox-exec. It denies network access and defaults to denied filesystem access, allowing runtime resources and a private per-job directory. Only selected document bytes enter the job; only output bytes return. Conversion times out after 30 seconds and temporary files are removed on completion or failure. Failure to start the sandbox fails closed. Original files and temporary copies are not independently encrypted by this feature.
+
+## Windows
+
+The Windows installer (`Just-Zen-Setup.exe`) is built from the same code and carries the same renderer protections (Chromium sandbox, context isolation, CSP, Electron fuses, asar integrity, encrypted cookies and passwords via DPAPI). It is not yet code-signed, has no Touch ID lock, and Claude is disabled on Windows because the operating-system sandbox Claude runs inside only exists on macOS. Report Windows-specific issues the same way as macOS ones.
