@@ -366,7 +366,7 @@ aside .group-card.open .hand>.service-row:hover{transform:translateY(calc(var(--
 .tile-urlbar>button{width:26px;height:26px;border-radius:7px;border:1px solid transparent;font-size:15px;color:var(--muted);background:transparent;display:inline-flex;align-items:center;justify-content:center}.tile-urlbar>button:hover{border-color:var(--line);color:inherit}.tile-urlbar>button:disabled{opacity:.35}
 .tile-urlbar .tile-url{flex:1;display:flex;margin:0 0 0 4px}.tile-urlbar .tile-address{width:100%;font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit}.tile-urlbar .tile-address:focus{border-color:var(--accent);outline:0}
 header{gap:10px}#jump{flex:0 1 280px;min-width:130px}header .bell{flex:0 0 auto}header .brand{white-space:nowrap;flex:0 0 auto}header .workspace-label,header>span:last-child{white-space:nowrap}
-.toasts{bottom:96px}
+.toasts{bottom:auto;top:12px;left:calc(50% - 150px);z-index:200;-webkit-app-region:no-drag;max-width:min(38vw,600px)}.toast{padding:8px 10px 8px 14px;font-size:12px;border-radius:10px}.centre-collapsed .toasts{left:50%}
 @media (prefers-reduced-motion:reduce){.service-row{transition:none}}
 
 

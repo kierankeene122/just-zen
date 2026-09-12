@@ -78,7 +78,7 @@ function validLayout(layout){
  return out;
 }
 async function clearSessionData(target){await target.clearStorageData();await target.clearCache();await target.clearAuthCache();await target.cookies.flushStore();}
-const hardenedSessions=new WeakSet();
+const hardenedSessions=new Set();
 // Muted apps: no notifications and no unread count until the mute ends (-1 = forever). Counts are still tracked so they reappear on unmute.
 function mutes(){const out={};const now=Date.now();for(const [key,until] of Object.entries(config.mutes || {}))if(until===-1 || until>now)out[key]=until;return out;}
 function isMuted(key){const until=(config.mutes || {})[key];return until===-1 || (typeof until==='number' && until>Date.now());}
@@ -98,8 +98,11 @@ function expireMutes(){const now=Date.now();let changed=false;for(const [key,unt
 // Chromium forgets session cookies (those without an expiry) when the app quits, so logins that rely on them are lost
 // between launches. Like other app-hosting shells, Just Zen gives such cookies a rolling 30-day expiry inside their own profile.
 const KEEP_LOGIN_DAYS=30;
+const flushTimers=new WeakMap();
+function flushSoon(target){clearTimeout(flushTimers.get(target));flushTimers.set(target,setTimeout(()=>{target.cookies.flushStore().catch(()=>{});},1500));}
 function keepSessionCookies(target){
   target.cookies.on('changed',(_event,cookie,_cause,removed)=>{
+    flushSoon(target);
     if(removed || !cookie.session || !cookie.name)return;
     const host=cookie.domain?.replace(/^\./,'');if(!host)return;
     const details={url:(cookie.secure?'https://':'http://')+host+(cookie.path || '/'),name:cookie.name,value:cookie.value,path:cookie.path || '/',secure:Boolean(cookie.secure),httpOnly:Boolean(cookie.httpOnly),expirationDate:Math.floor(Date.now()/1000)+KEEP_LOGIN_DAYS*86400};
@@ -717,3 +720,4 @@ app.whenReady().then(async () => {
 app.on('window-all-closed',() => app.quit());
 // Cookies are written to disk on quit, so a login made moments before closing survives.
 app.on('before-quit',()=>{for(const view of views.values()){try{view.view.webContents.session.cookies.flushStore().catch(()=>{});}catch{}}});
+setInterval(()=>{for(const target of hardenedSessions){try{target.cookies.flushStore().catch(()=>{});}catch{}}},30000).unref?.();
