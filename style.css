@@ -439,3 +439,5 @@ body{--document-space:0px}#documents{display:none}
 #app-search-manage{font-size:12px;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:transparent;color:inherit;white-space:nowrap}#app-search-manage:hover{border-color:var(--accent)}
 
 .tile-tabbar .tile-tabs{flex:1;max-width:none;margin-left:0}.tile-tabbar{padding:4px 8px}
+
+.recent-row span{display:block;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35}

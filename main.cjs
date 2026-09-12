@@ -93,6 +93,10 @@ function applyZoom(serviceKey){const z=zoomFor(serviceKey);for(const entry of vi
 // Recent: unread counts that rose while the app's pane was not on screen, so nothing has to be toured.
 const recent=[];
 function recentList(){return recent.slice(0,50);}
+// Chat apps stay alive in the background so their notifications keep arriving; they never sleep and every tab is loaded at startup.
+const CHAT_HOSTS=/(^|\.)(slack\.com|chat\.google\.com|teams\.microsoft\.com|teams\.live\.com|web\.whatsapp\.com|web\.telegram\.org|discord\.com|messenger\.com)$/i;
+function isChatItem(item){try{return Boolean(item?.url) && CHAT_HOSTS.test(new URL(item.url).hostname);}catch{return false;}}
+const NOTIFICATION_WRAPPER=`(()=>{try{const N=window.Notification;if(!N || N.__zen)return;const W=function(title,options){const n=new N(title,options);try{window.postMessage({__zen:'notification',title:String(title),body:String(options&&options.body||'')},'*');}catch{}return n;};W.prototype=N.prototype;W.__zen=true;W.requestPermission=(...a)=>N.requestPermission(...a);Object.defineProperty(W,'permission',{get:()=>N.permission});Object.defineProperty(W,'maxActions',{get:()=>N.maxActions});window.Notification=W;}catch{}})()`;
 function pushRecent(entry){recent.unshift({id:crypto.randomUUID(),at:Date.now(),...entry});if(recent.length>50)recent.length=50;send('recent-changed',recentList());}
 function expireMutes(){const now=Date.now();let changed=false;for(const [key,until] of Object.entries(config.mutes || {}))if(until!==-1 && until<=now){delete config.mutes[key];changed=true;updateServiceBadge(key,serviceBadges.get(key) || 0);}if(changed){persist();send('mutes-changed',mutes());}}
 // Chromium forgets session cookies (those without an expiry) when the app quits, so logins that rely on them are lost
@@ -301,6 +305,7 @@ function attachView(serviceKey,tabId,view,url){
   entry.scrollTimer=setInterval(()=>{if(contents.isDestroyed() || !entry.visible)return;contents.executeJavaScript('[window.scrollX|0,window.scrollY|0]',true).then(([x,y])=>{try{const live=tabOf(serviceKey,tabId);if(live.scroll?.x===x && live.scroll?.y===y)return;live.scroll={x,y};live.scrollURL=contents.getURL();persistSoon();}catch{}}).catch(()=>{});},3000);
   contents.once('destroyed',()=>clearInterval(entry.scrollTimer));
   contents.on('did-fail-load',(_e,code,description)=>{if(code!==-3)send('notice','Page could not load: '+description);});
+  if(!isBrowser)contents.on('dom-ready',()=>{contents.executeJavaScript(NOTIFICATION_WRAPPER,true).catch(()=>{});});
   contents.on('page-title-updated',(_event,title)=>{
     try{const live=tabOf(serviceKey,tabId);live.title=String(title).slice(0,200);persistSoon();}catch{}
     announceTab(entry);
@@ -317,6 +322,7 @@ function attachView(serviceKey,tabId,view,url){
   send('service-asleep',{key:serviceKey,asleep:false});
   return entry;
 }
+
 function clipBounds(box){const [w,h]=win.getContentSize();const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));return {x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))};}
 // ---- Pane search badges: a floating ⌕ over the top-right of each pane ----
 const badges=[];
@@ -331,7 +337,7 @@ function ensureBadge(i){if(badges[i] && !badges[i].view.webContents.isDestroyed(
   const entry={view,attached:false,visible:false};badges[i]=entry;return entry;}
 function placeBadges(list){const wanted=new Map();for(const p of list)if(Number.isInteger(p.slot) && p.slot>=0 && p.slot<4)wanted.set(p.slot,p);
   for(let i=0;i<4;i++){const p=wanted.get(i);if(!p){if(badges[i]?.visible){badges[i].view.setVisible(false);badges[i].visible=false;}continue;}
-    const b=ensureBadge(i);const box=clipBounds({x:p.x+p.width-50,y:p.y+6,width:44,height:44});
+    const b=ensureBadge(i);const box=clipBounds({x:p.x+p.width-92,y:p.y+6,width:86,height:44});
     if(!b.attached || !b.visible){win.contentView.addChildView(b.view);b.attached=true;}
     b.view.setBounds(box);if(!b.visible){b.view.setVisible(!locked);b.visible=true;}}}
 function retintBadges(){for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-theme',config.theme || 'light');}
@@ -372,7 +378,8 @@ function sleepSweep(){
   const now=Date.now();
   for(const [key,entry] of [...views]){
     const minutes=sleepMinutesFor(entry.serviceKey);
-    if(isBrowserItem(serviceItem(entry.serviceKey)) || !minutes || entry.visible || !entry.hiddenSince || now-entry.hiddenSince<minutes*60_000)continue;
+    const item=serviceItem(entry.serviceKey);const explicit=entry.serviceKey in sleepSettings().apps;
+    if(isBrowserItem(item) || (isChatItem(item) && !explicit) || !minutes || entry.visible || !entry.hiddenSince || now-entry.hiddenSince<minutes*60_000)continue;
     const contents=entry.view.webContents;
     if(contents.isDestroyed()){views.delete(key);continue;}
     if(contents.isCurrentlyAudible())continue;
@@ -532,6 +539,7 @@ app.whenReady().then(async () => {
   ipcMain.on('popover-edit',(e,id)=>{try{popoverTrusted(e);hidePopover();if(typeof id==='string' && (config.serviceFolders || []).some(f=>f.id===id))send('edit-group',id);}catch{}});
   ipcMain.on('popover-close',e=>{try{popoverTrusted(e);hidePopover();}catch{}});
   ipcMain.on('pane-search',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{search:i});});
+  ipcMain.on('pane-close',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{close:i});});
   ipcMain.on('popover-remove',async (e,input)=>{try{popoverTrusted(e);if(!input || typeof input.key!=='string' || typeof input.folderId!=='string')return;config.services=setFolder(config.services || [],input.key,null,config.serviceFolders || []);await persist();send('sidebar-changed',{services:config.services,folders:config.serviceFolders || []});const cb=win.getContentBounds();await showPopover({folderId:input.folderId,left:popover.__anchor.x-cb.x,top:popover.__anchor.y-cb.y});}catch{}});
   win.on('move',()=>hidePopover());win.on('resize',()=>hidePopover());
   handle('document-capture-all',()=>{dc.send('capture-selection','claude-all');return true;});
@@ -590,6 +598,8 @@ app.whenReady().then(async () => {
   ipcMain.on('web-deliver-result',(e,result)=>{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || !result?.id)return;const waiting=deliveries.get(result.id);if(waiting){deliveries.delete(result.id);waiting(result);}});
   handle('deliver-text',async ({serviceKey,tabId,text,mode}={})=>{if(typeof text!=='string' || !text.trim())throw Error('Nothing to paste');const item=serviceItem(serviceKey);if(!item)throw Error('App not found');const tabs=tabsFor(serviceKey);const id=tabId && tabs.items.some(t=>t.id===tabId)?tabId:tabs.active;const entry=ensureView(serviceKey,id);if(!entry)throw Error('That app has nothing open yet');const contents=entry.view.webContents;if(contents.isLoading())await new Promise(r=>{contents.once('did-stop-loading',r);setTimeout(r,8000);});const reqId=crypto.randomUUID();const result=await new Promise(resolve=>{deliveries.set(reqId,resolve);setTimeout(()=>{if(deliveries.delete(reqId))resolve({ok:false,reason:'The app did not respond.'});},12000);contents.send('web-deliver',{id:reqId,text:text.slice(0,20000),mode:mode==='reply'?'reply':'compose'});});if(!result.ok)throw Error(result.reason || 'Could not paste there');contents.focus();return {serviceKey,tabId:id};});
   ipcMain.on('web-items',(e,items)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;const source=notificationSources.get(e.sender);if(!source?.saved)return;const clean=(Array.isArray(items)?items:[]).slice(0,8).map(i=>({title:String(i?.title || '').slice(0,120),sub:String(i?.sub || '').slice(0,60),url:/^https?:/i.test(String(i?.url || ''))?String(i.url).slice(0,2000):''})).filter(i=>i.title);source.items=clean;source.itemsAt=Date.now();send('now-changed',nowFeed());}catch{}});
+  ipcMain.on('web-notification',(e,payload)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;const source=notificationSources.get(e.sender);if(!source?.saved || isMuted(entry.serviceKey))return;const title=String(payload?.title || '').slice(0,200),body=String(payload?.body || '').slice(0,500);if(!title && !body)return;pushRecent({key:entry.serviceKey,tabId:entry.tabId,name:source.name,title,body,added:1,count:visibleBadge(entry.serviceKey)});}catch{}});
+  ipcMain.on('web-message',(e,payload)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame || entry.visible)return;const source=notificationSources.get(e.sender);if(!source?.saved || isMuted(entry.serviceKey))return;const text=String(payload?.text || '').slice(0,300),sender=String(payload?.sender || '').slice(0,80);if(!text)return;if(recent[0] && recent[0].key===entry.serviceKey && recent[0].body===text)return;pushRecent({key:entry.serviceKey,tabId:entry.tabId,name:source.name,title:sender,body:text,added:1,count:visibleBadge(entry.serviceKey)});if(!source.notificationPermission && Notification.isSupported()){const alert=new Notification({title:source.name+(sender?' · '+sender:''),body:text,silent:false});alert.on('click',()=>{win.show();win.focus();send('open-service',entry.serviceKey);});alert.show();}}catch{}});
   ipcMain.on('web-unread',(e,count)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;const source=notificationSources.get(e.sender);if(!source?.saved)return;const n=Math.max(0,Math.min(9999,Number(count) || 0));if(source.domUnread===n)return;source.domUnread=n;const previous=serviceBadges.get(entry.serviceKey) || 0;const merged=Math.max(unreadCount(e.sender.getTitle()),n);updateServiceBadge(entry.serviceKey,merged);if(merged>previous && !entry.visible && !isMuted(entry.serviceKey))pushRecent({key:entry.serviceKey,name:source.name,count:merged});}catch{}});
   handle('peek-bounds',box=>{if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid peek bounds');peekPlace(box);return true;});
   handle('peek-close',()=>{peekClose();return true;});
@@ -670,6 +680,7 @@ app.whenReady().then(async () => {
   handle('test-notification',()=>{if(!Notification.isSupported())throw Error('Notifications are not supported on this Mac');const n=new Notification({title:'Just Zen',body:'Notifications are working. If you did not see this, allow Just Zen in System Settings → Notifications.'});n.show();return true;});
   handle('check-updates',()=>{if(!updates.checkNow)throw Error(updates.reason==='development'?'Update checks are off in a development build.':'Updates are not available in this build.');updates.checkNow();return true;});
   const sleeper=setInterval(()=>{sleepSweep();expireMutes();},30_000);sleeper.unref?.();
+  setTimeout(warmChatApps,6000).unref?.();
   if(!smoke){let index=0;const warm=()=>{if(!win || win.isDestroyed())return;const sites=(config.services || []).filter(s=>s.url);if(index>=sites.length)return;if(!locked){const item=sites[index++];const key=item.id || item.url;try{const tabs=tabsFor(key);ensureView(key,tabs.active);}catch{}}setTimeout(warm,1500);};setTimeout(warm,1500);}
   if(smoke) {
     try {
@@ -734,6 +745,7 @@ app.whenReady().then(async () => {
   }
 });
 // Closing the window quits. If anything stalls the quit (a child process, a pending dialog), force the exit so a relaunch starts clean.
+function warmChatApps(){if(locked)return;for(const item of (config.services || []).filter(openable)){if(!isChatItem(item))continue;const key=item.id || item.url;for(const tab of tabsFor(key).items){try{ensureView(key,tab.id);}catch{}}}}
 app.on('window-all-closed',()=>{app.quit();setTimeout(()=>app.exit(0),2500).unref?.();});
 // Cookies are written to disk on quit, so a login made moments before closing survives.
 app.on('before-quit',()=>{for(const view of views.values()){try{view.view.webContents.session.cookies.flushStore().catch(()=>{});}catch{}}});

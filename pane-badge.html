@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'"><style>
 html,body{margin:0;background:transparent;overflow:hidden;height:100%}
-button{position:absolute;inset:4px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(60,70,80,.18);background:rgba(255,255,255,.82);backdrop-filter:blur(8px);box-shadow:0 4px 14px -6px rgba(20,30,40,.45);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:#3a4553;opacity:.85;transition:opacity .15s,transform .15s}
+button{position:absolute;top:4px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(60,70,80,.18);background:rgba(255,255,255,.82);backdrop-filter:blur(8px);box-shadow:0 4px 14px -6px rgba(20,30,40,.45);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:#3a4553;opacity:.85;transition:opacity .15s,transform .15s}
 button:hover{opacity:1;transform:scale(1.06)}
 body[data-theme=dark] button{background:rgba(29,34,30,.85);border-color:rgba(255,255,255,.12);color:#d8ded4}
-svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
-</style></head><body><button id="b" title="Find an app for this pane"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.8 12.8 17 17"/></svg></button><script src="pane-badge.js"></script></body></html>
+#b{left:4px}#x{left:46px;font:20px/1 -apple-system,BlinkMacSystemFont,sans-serif}svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
+</style></head><body><button id="b" title="Find an app for this pane"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.8 12.8 17 17"/></svg></button><button id="x" title="Close this tab and choose another app">×</button><script src="pane-badge.js"></script></body></html>
