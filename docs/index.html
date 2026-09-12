@@ -8,7 +8,7 @@
 <meta name="color-scheme" content="light">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="fonts/fonts.css">
-<link rel="stylesheet" href="site.css?v=20260909b">
+<link rel="stylesheet" href="site.css?v=20260912">
 </head>
 <body>
 <!-- Fonts are served with the page: no third-party requests, no cookies, nothing to consent to. -->
@@ -29,9 +29,11 @@
       <a class="btn btn-primary" href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg" download>Download for Mac</a>
       <a class="btn btn-primary" href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-Setup.exe" download>Download for Windows</a>
       <a class="btn btn-secondary" href="security.html">How it keeps things private</a>
-      <small>Free and open source (ISC) · Mac: Apple silicon, macOS 13 or later, signed and notarized · Windows: 64-bit Windows 10 or later, unsigned for now, Claude not yet included · provided as is, without warranty</small>
+      <small>Free and open source (ISC) · Mac: Apple silicon, macOS 13 or later, signed and notarized · Windows: 64-bit Windows 10 or later · provided as is, without warranty</small>
+      <small class="win-note">Windows is new: the installer is not code-signed yet, so SmartScreen will ask you to confirm, and Claude is Mac-only for now because it runs inside a macOS sandbox. Everything else works the same.</small>
     </div>
   </div>
+  <div class="trust" aria-label="How it stays yours"><span>Stays on your Mac or PC, nothing synced</span><span>Logins and passwords encrypted in the Keychain or DPAPI</span><span>No telemetry, no account</span><span>Open source, ISC licence</span></div>
 </section>
 
 <div class="shot" id="tour">
@@ -77,12 +79,23 @@
   </div>
 </section>
 
+<section class="pillars" id="messages" style="padding-top:40px">
+  <div class="eyebrow">Messages come to you</div>
+  <h2 style="margin-top:14px">One bell. Every chat. The message itself, not just a count.</h2>
+  <p class="sub">Slack, Google Chat, Teams, WhatsApp, Telegram and Discord keep running in the background, every workspace of them. When something arrives in a pane you are not looking at, the bell in the header shows who said what. Click it and that app opens in the pane you are in, on that conversation. Nothing to go and check.</p>
+  <div class="facts" style="grid-template-columns:repeat(3,1fr)">
+    <div class="fact"><svg class="art" viewBox="0 0 160 96" aria-hidden="true"><rect class="w" x="14" y="16" width="132" height="64" rx="10"/><circle class="badge" cx="130" cy="28" r="7"/><rect class="t" x="26" y="32" width="70" height="9" rx="4"/><rect class="k2" x="26" y="48" width="100" height="8" rx="4"/><rect class="k2" x="26" y="62" width="60" height="8" rx="4"/></svg><b>Who said what</b><p>Each entry carries the sender and the first line of the message, for every workspace and every chat tool, in one list.</p></div>
+    <div class="fact"><svg class="art" viewBox="0 0 160 96" aria-hidden="true"><rect class="f" x="14" y="16" width="60" height="64" rx="8"/><rect class="w" x="86" y="16" width="60" height="64" rx="8"/><path class="k" d="M74 48h12m-4-4 4 4-4 4"/></svg><b>Opens where you are</b><p>Clicking a message swaps its app into the pane you are looking at and lands on that conversation, instead of dragging you somewhere else.</p></div>
+    <div class="fact"><svg class="art" viewBox="0 0 160 96" aria-hidden="true"><path class="kt" d="M80 20c-14 0-22 10-22 24v14l-8 10h60l-8-10V44c0-14-8-24-22-24z"/><path class="k" d="M70 72c2 6 18 6 20 0"/><path class="k" d="M40 30l80 40"/></svg><b>Quiet when you say so</b><p>Mute any app for an hour, a day, or until you say otherwise. A soft chime, or none. Unread counts stay honest either way.</p></div>
+  </div>
+</section>
+
 <section class="copilot" id="copilot">
   <div class="panel">
     <div>
       <div class="eyebrow">Send anything, from anywhere, to Claude</div>
       <h2 style="margin-top:14px">Select it. Right-click. Summarise, reply, or turn it into tasks.</h2>
-      <p>An email in Gmail, a thread in Slack, a paragraph in a PDF, a note you're writing, output in the terminal: select any of it, right-click or press ⌘⇧A, and it lands in front of Claude with one-click actions. Summarise it, draft a reply, turn it into tasks, or ask your own question. Nothing selected? Choose "Ask about…" beside New chat and pick an open tab, the open document, the note you're writing or your task list; its text lands in front of Claude the same way. Or skip Claude altogether: ⌘⇧T turns the selection straight into a task. No copying and pasting between tools, and nothing is sent until you choose.</p>
+      <p>An email in Gmail, a thread in Slack, a paragraph in a PDF, a note you're writing, output in the terminal: select any of it, right-click or press ⌘⇧A, and it lands in front of Claude with one-click actions. Summarise it, draft a reply, turn it into tasks, or ask your own question. Nothing selected? The About dropdown under the message box lists every open pane, the open document, the note you're writing and your task list; pick one and Claude reads it before answering. Or skip Claude altogether: ⌘⇧T turns the selection straight into a task. No copying and pasting between tools, and nothing is sent until you choose.</p>
       <p>You stay in control. Claude only sees the folder you connect, runs inside an operating-system sandbox, and asks before it runs a command or touches anything outside your notes.</p>
     </div>
     <div class="chat" aria-label="Example conversation">
@@ -99,8 +112,8 @@
 <div class="ripple" aria-hidden="true"></div>
 <section class="pillars" id="room" style="padding-top:40px">
   <div class="eyebrow">Room to work</div>
-  <h2 style="margin-top:14px">Two apps side by side. Four when you need them. Tabs in all of them.</h2>
-  <p class="sub">The centre of the window is yours to arrange. Put the brief next to the design, the inbox next to the calendar, or four dashboards in a grid, and switch layouts from the header whenever the work changes.</p>
+  <h2 style="margin-top:14px">One app. Two side by side. Two thin and one wide. Four. Tabs in all of them.</h2>
+  <p class="sub">The centre of the window is yours to arrange. Put the brief next to the design, the inbox next to the calendar, two chats down the side of a document, or four dashboards in a grid, and switch layouts from the header whenever the work changes. Documents open in a pane like anything else: PDFs, Word files, text, annotated and saved beside your apps.</p>
   <div class="facts" style="grid-template-columns:repeat(3,1fr)">
     <div class="fact"><svg class="art" viewBox="0 0 160 96" aria-hidden="true"><rect class="f" x="14" y="18" width="132" height="62" rx="8"/><rect class="w" x="14" y="18" width="132" height="18" rx="8"/><rect class="t" x="22" y="23" width="30" height="9" rx="4"/><rect class="k2" x="56" y="23" width="30" height="9" rx="4"/><rect class="k2" x="90" y="23" width="30" height="9" rx="4"/><path class="k" d="M128 27.5h6M131 24.5v6"/><path class="k" d="M30 52h60M30 62h44"/></svg><b>Tabs everywhere</b><p>Every app has its own tabs: two inboxes, several Slack workspaces, a few Notion pages. ⌘T opens one, ⌘W closes it, and they come back where you left them.</p></div>
     <div class="fact"><img class="art photo" src="browser.png" alt="The pinned Browser with a tab strip, address bar and Google open" width="540" height="324"><b>Browsers, as many as you like</b><p>Add a browser for each client or project. Each has its own logins, cookies, tabs and icon, kept apart from every other browser and app, and links from notes and chat open in the first one.</p></div>
@@ -108,7 +121,25 @@
     <div class="fact"><svg class="art" viewBox="0 0 160 96" aria-hidden="true"><rect class="w" x="14" y="16" width="62" height="64" rx="8"/><path class="k" d="M24 30h42M24 42h30M24 54h38M24 66h22"/><rect class="dk" x="84" y="16" width="62" height="64" rx="8"/><path class="kl" d="M94 30h42M94 42h30M94 54h38M94 66h22"/></svg><b>Dark mode, even for light sites</b><p>Switch Just Zen to dark and pages that stay stubbornly light are inverted for you, images and video kept the right way round. In light mode nothing is touched.</p></div>
     <div class="fact"><svg class="art" viewBox="0 0 160 96" aria-hidden="true"><rect class="f" x="14" y="18" width="80" height="60" rx="8"/><path class="k" d="M26 36h40M26 48h30M26 60h44"/><path class="k" d="M112 26c-6 1-10 6-10 12 0 7 6 12 13 12 4 0 7-2 9-4-7 0-13-5-13-12 0-3 0-6 1-8z"/><text class="tx" x="120" y="66">z</text><text class="tx2" x="130" y="58">z</text></svg><b>Apps that sleep</b><p>Choose how long a hidden app stays awake, overall or per app. After that it is closed to free memory, and it reloads the moment you open it again.</p></div>
     <div class="fact"><img class="art photo" src="tasks.png" alt="A document with a paragraph selected and a right-click menu offering Send Selection to Tasks, beside the task list" width="540" height="324"><b>Straight to tasks</b><p>Select text in any app, note, PDF or terminal and press ⌘⇧T, or right-click. It becomes a task in the list on the right, no Claude involved.</p></div>
+    <div class="fact"><svg class="art" viewBox="0 0 160 96" aria-hidden="true"><rect class="w" x="30" y="40" width="100" height="40" rx="8"/><path class="k" d="M56 40V30a24 24 0 0 1 48 0v10"/><circle class="t" cx="80" cy="60" r="6"/></svg><b>Passwords, remembered</b><p>Sign in once and Just Zen offers to save it, like Safari does. Next time the fields fill themselves. Stored per site, encrypted with your Keychain, never listed in the clear.</p></div>
+    <div class="fact"><svg class="art" viewBox="0 0 160 96" aria-hidden="true"><rect class="w" x="20" y="24" width="84" height="52" rx="10"/><path class="kt" d="M104 40l30-14v44l-30-14z"/><circle class="t" cx="62" cy="50" r="10"/></svg><b>Calls that just work</b><p>Slack huddles, Google Meet, Teams: your camera and microphone are asked for once per app, remembered, and changeable under Privacy &amp; data.</p></div>
     <div class="fact"><img class="art photo contain" src="brain.png" alt="The AI Buster page with four puzzles: quick maths, word unscramble, memory grid and what comes next" width="540" height="171"><b>Brain break</b><p>AI Buster is a small set of puzzles, maths, words, memory and patterns, for keeping your own head in the game between the things the machines do for you.</p></div>
+  </div>
+</section>
+
+<section class="pillars" id="keys" style="padding-top:40px">
+  <div class="eyebrow">For your hands</div>
+  <h2 style="margin-top:14px">Everything reachable without the mouse.</h2>
+  <div class="keys">
+    <div><kbd>⌘1</kbd>–<kbd>⌘9</kbd><span>Switch to an app by its place in your list</span></div>
+    <div><kbd>⌘[</kbd> <kbd>⌘]</kbd><span>Previous and next app</span></div>
+    <div><kbd>⌃Tab</kbd><span>The companion app you keep pairing with this one</span></div>
+    <div><kbd>⌘T</kbd> <kbd>⌘W</kbd><span>New tab, close tab (another Slack workspace, another inbox)</span></div>
+    <div><kbd>⌘L</kbd><span>Address bar in a browser pane</span></div>
+    <div><kbd>⌘K</kbd><span>Jump to a note or task, or ask Claude something</span></div>
+    <div><kbd>⌘⇧A</kbd> <kbd>⌘⇧T</kbd><span>Selection to Claude, selection to tasks</span></div>
+    <div><kbd>⇧Space</kbd><span>Peek at the link under the pointer</span></div>
+    <div><kbd>⌘,</kbd> <kbd>⌘⇧D</kbd><span>Apps &amp; settings, Privacy &amp; data</span></div>
   </div>
 </section>
 
@@ -126,8 +157,8 @@
 </section>
 
 <footer>
-  <div><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg">Download for Mac</a><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-Setup.exe">Download for Windows</a><a href="https://github.com/kierankeene122/just-zen">Inspect the code</a><a href="https://github.com/kierankeene122/just-zen/releases">All releases</a><a href="#apps">Features</a><a href="security.html">Security</a></div>
-  <div>Just Zen · macOS · version 0.4</div>
+  <div><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg">Download for Mac</a><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-Setup.exe">Download for Windows</a><a href="https://github.com/kierankeene122/just-zen">Inspect the code</a><a href="https://github.com/kierankeene122/just-zen/releases">What's new</a><a href="#apps">Features</a><a href="security.html">Security</a></div>
+  <div>Just Zen · macOS and Windows · ships several times a week; see <a href="https://github.com/kierankeene122/just-zen/releases">what's new</a></div>
 </footer>
 </div>
 </body>
