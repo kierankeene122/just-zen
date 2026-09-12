@@ -116,7 +116,7 @@ function keepSessionCookies(target){
 async function mediaAllowed(source,contents,details){
   let origin='';try{origin=new URL(details?.requestingUrl || contents.getURL()).origin;}catch{return false;}
   if(!secureOrigin(origin))return false;
-  const kinds=(details?.mediaTypes || []).filter(k=>k==='audio' || k==='video');if(!kinds.length)return false;
+  let kinds=(details?.mediaTypes || []).filter(k=>k==='audio' || k==='video');if(!kinds.length)kinds=['audio','video'];
   config.mediaGrants=config.mediaGrants || {};const grantKey=source.key+' '+origin;
   if(config.mediaGrants[grantKey]===true)return systemMedia(kinds);
   if(config.mediaGrants[grantKey]===false)return false;
@@ -125,7 +125,7 @@ async function mediaAllowed(source,contents,details){
   config.mediaGrants[grantKey]=response===0;await persist();
   return response===0?systemMedia(kinds):false;
 }
-async function systemMedia(kinds){for(const kind of kinds){const type=kind==='video'?'camera':'microphone';try{if(systemPreferences.getMediaAccessStatus?.(type)!=='granted'){const ok=await systemPreferences.askForMediaAccess?.(type);if(ok===false)return false;}}catch{}}return true;}
+async function systemMedia(kinds){for(const kind of kinds){const type=kind==='video'?'camera':'microphone';try{const status=systemPreferences.getMediaAccessStatus?.(type);if(status==='granted')continue;if(status==='denied' || status==='restricted'){const {response}=await dialog.showMessageBox(win,{type:'warning',buttons:['Open System Settings','Cancel'],defaultId:0,cancelId:1,message:'macOS is blocking the '+type+' for Just Zen',detail:'Turn on Just Zen under Privacy & Security › '+(type==='camera'?'Camera':'Microphone')+', then try the call again.'});if(response===0)shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_'+(type==='camera'?'Camera':'Microphone')).catch(()=>{});return false;}const ok=await systemPreferences.askForMediaAccess?.(type);if(ok===false)return false;}catch{}}return true;}
 function hardenWebSession(target){
   if(hardenedSessions.has(target))return;
   hardenedSessions.add(target);
@@ -133,12 +133,14 @@ function hardenWebSession(target){
   const allowedOrigins=notificationOrigins.get(target) || new Set();notificationOrigins.set(target,allowedOrigins);
   target.setPermissionRequestHandler(async (contents,permission,callback,details)=>{
     const source=notificationSources.get(contents),origin=details?.requestingUrl || details?.securityOrigin || '';
-    if(permission==='media' && source?.saved){callback(await mediaAllowed(source,contents,details));return;}
+    if(permission==='media' && source){callback(await mediaAllowed(source,contents,details));return;}
     const allowed=permission==='notifications' && canNotify(source,contents,origin);
     if(allowed){source.notificationPermission=true;try{allowedOrigins.add(new URL(origin || contents.getURL()).origin);}catch{}}
     callback(allowed);
   });
   target.setPermissionCheckHandler((contents,permission,requestingOrigin)=>{
+    // Microphone and camera: a remembered refusal is final; anything else is left to the request handler, which asks.
+    if(permission==='media'){const source=contents?notificationSources.get(contents):null;if(!source || !secureOrigin(requestingOrigin))return false;try{return config.mediaGrants?.[source.key+' '+new URL(requestingOrigin).origin]!==false;}catch{return false;}}
     if(permission!=='notifications' || !secureOrigin(requestingOrigin))return false;
     if(contents){const source=notificationSources.get(contents);if(source?.key && isMuted(source.key))return false;return canNotify(source,contents,requestingOrigin);}
     try{return allowedOrigins.has(new URL(requestingOrigin).origin);}catch{return false;}
