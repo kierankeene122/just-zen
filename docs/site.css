@@ -220,3 +220,5 @@ html{overflow-x:hidden}
 .win-note-final{margin:22px auto 0;max-width:62ch;color:var(--muted);font-size:13px;line-height:1.55}
 @media (max-width:860px){.moment,.moment.flip{grid-template-columns:1fr}.moment.flip .moment-text{order:1}.moment.flip .mock{order:2}.why-grid{grid-template-columns:1fr 1fr}.mock-grid{grid-template-columns:repeat(3,1fr)}.mock-tile:nth-child(n+4){display:none}}
 @media (max-width:560px){.why-grid{grid-template-columns:1fr}}
+
+a.brand{text-decoration:none;color:inherit}
