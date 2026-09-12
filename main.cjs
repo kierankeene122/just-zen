@@ -73,7 +73,7 @@ function validLayout(layout){
  if(tiles && typeof tiles==='object'){
   const mode=['1','2h','2v','3','4'].includes(tiles.mode)?tiles.mode:'1';
   const slots=Array.from({length:4},(_,i)=>{const slot=Array.isArray(tiles.slots)?tiles.slots[i]:null;if(slot && slot.kind==='document')return {kind:'document'};return slot && typeof slot.serviceKey==='string' && slot.serviceKey.length<200 && typeof slot.tabId==='string' && slot.tabId.length<100?{serviceKey:slot.serviceKey,tabId:slot.tabId}:null;});
-  const ratio=Number(tiles.ratio);out.tiles={mode,slots,focus:Number.isInteger(tiles.focus) && tiles.focus>=0 && tiles.focus<4?tiles.focus:0,ratio:Number.isFinite(ratio)?Math.max(.2,Math.min(.8,ratio)):.5};
+  const ratio=Number(tiles.ratio);const clampR=v=>Number.isFinite(Number(v))?Math.max(.1,Math.min(.9,Number(v))):null;const ratios={};for(const [k,v] of Object.entries(tiles.ratios && typeof tiles.ratios==='object'?tiles.ratios:{}))if(['2h','2v','3','4'].includes(k)){const list=(Array.isArray(v)?v:[v]).slice(0,2).map(clampR);if(list.every(x=>x!==null))ratios[k]=list;}out.tiles={mode,slots,focus:Number.isInteger(tiles.focus) && tiles.focus>=0 && tiles.focus<4?tiles.focus:0,ratio:Number.isFinite(ratio)?Math.max(.2,Math.min(.8,ratio)):.5,ratios};
  }
  return out;
 }

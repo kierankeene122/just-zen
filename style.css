@@ -287,7 +287,7 @@ main>section.page-entering{opacity:0;transform:translateY(-3px)}
 .choosing-pane .tile{outline:2px dashed #5278c8;outline-offset:-2px}.tile-choose{margin-left:auto;padding:5px 12px;border-radius:999px;background:#5278c8;color:#fff;font-size:11px;font-weight:600;white-space:nowrap;animation:chip-pulse 1.2s ease-in-out infinite}.tile-surface .tile-choose{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:13px;padding:8px 16px}@keyframes chip-pulse{50%{box-shadow:0 0 0 6px #5278c840}}@media (prefers-reduced-motion:reduce){.tile-choose{animation:none}}
 
 /* Split divider */
-#browser-page{position:relative}.tile-divider{position:absolute;z-index:5;cursor:col-resize;background:transparent}.tile-divider.vertical{cursor:row-resize}.tile-divider::after{content:'';position:absolute;inset:0;margin:auto;width:2px;height:36px;border-radius:2px;background:var(--line)}.tile-divider.vertical::after{width:36px;height:2px}.tile-divider:hover::after,.resizing-split .tile-divider::after{background:var(--accent)}.resizing-split{cursor:col-resize;user-select:none}.resizing-split .tile-surface{background:var(--bg)}
+#browser-page{position:relative}.tile-divider{position:absolute;z-index:5;cursor:col-resize;background:transparent;touch-action:none}.tile-divider:hover::after,.resizing-split .tile-divider::after{height:56px}.tile-divider.vertical{cursor:row-resize}.tile-divider::after{content:'';position:absolute;inset:0;margin:auto;width:2px;height:36px;border-radius:2px;background:var(--line)}.tile-divider.vertical::after{width:36px;height:2px}.tile-divider:hover::after,.resizing-split .tile-divider::after{background:var(--accent)}.resizing-split{cursor:col-resize;user-select:none}.resizing-split .tile-surface{background:var(--bg)}
 #ask-about{white-space:nowrap;font-size:10px;margin-right:8px}
 
 /* Loading line under the tab strip while the active tab loads */
@@ -358,7 +358,7 @@ aside .group-card.open .hand>.service-row:hover{transform:translateY(calc(var(--
 #stack-edges{position:absolute;left:12px;right:12px;top:0;height:16px;pointer-events:none;z-index:1}
 #stack-edges .edge{position:absolute;left:var(--inset);right:var(--inset);top:var(--top);height:40px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 -2px 8px -5px rgba(20,30,40,.3)}
 [data-theme=dark] #stack-edges .edge{background:#1d221e}
-#tiles{position:relative;z-index:2;border-radius:12px;box-shadow:0 16px 44px -20px rgba(20,30,40,.55),0 0 0 1px var(--line);overflow:hidden}
+#tiles{position:relative;z-index:2;background:transparent;gap:10px}#tiles[data-mode="1"]{gap:0}.tile{border-radius:12px;box-shadow:0 16px 44px -20px rgba(20,30,40,.55),0 0 0 1px var(--line);overflow:hidden}.tile.hidden{display:none}
 .tile-bar{display:none!important}.tile.focused{outline:0}
 /* Browser panes keep an address bar pinned to their bottom edge; other apps show nothing but the page. */
 .tile-urlbar{display:flex;align-items:center;gap:4px;padding:5px 8px;border-top:1px solid var(--line);background:var(--bg);flex:0 0 auto}
