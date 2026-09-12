@@ -1,0 +1,37 @@
+# Just Zen
+
+> Just Zen is a free, open-source (ISC) desktop app for macOS (Apple silicon) and Windows that puts every web app you use — Gmail, Slack, Teams, Google Chat, Notion, WhatsApp, any website — in one window, side by side, with search instead of switching, and Claude Code working alongside you. Everything stays on your computer.
+
+Site: https://justzen.co · Code: https://github.com/kierankeene122/just-zen · Releases: https://github.com/kierankeene122/just-zen/releases
+
+## What it does
+
+- One window for all your web apps. Each app keeps its own login, cookies and tabs (several Slack workspaces, two inboxes), isolated from the others unless you choose to share a login.
+- Search, don't switch: a search button sits in the corner of every pane; type a couple of letters, press Enter, and the app snaps into that pane. There is no dock, sidebar or tab bar to hunt through.
+- Layouts: one pane, two side by side, two stacked, two thin columns beside one wide, or four in a grid. Layouts can be saved and switched.
+- Messages come to you: Slack, Google Chat, Teams, WhatsApp, Telegram and Discord keep running in the background; a bell in the header lists who said what, and clicking an entry opens that app in the current pane on that conversation.
+- Send anything to Claude: select text in any app, note, PDF or terminal and send it to Claude Code with one-click actions (summarise, draft a reply, turn into tasks), or send it straight to your task list. An "About" dropdown lets Claude read any open pane, document or note without selecting.
+- Documents open in a pane: PDF, Word (.docx), text and RTF, annotated and saved beside your apps.
+- Browser panes have an address bar, tabs and saved passwords (offered on sign-in, filled on return, encrypted with the macOS Keychain or Windows DPAPI).
+- Calls: Slack huddles, Google Meet and Teams work; camera and microphone are asked for once per app.
+- Dark mode, including for light websites; apps can sleep when hidden to save memory; per-app mute for an hour, a day or forever.
+- Keyboard: ⌘1–9 switch apps, ⌘[ / ⌘] previous and next, ⌃Tab companion app, ⌘T/⌘W tabs, ⌘L address, ⌘K notes/tasks/Claude, ⌘⇧A and ⌘⇧T send selection to Claude or tasks, ⇧Space peek at a link, ⌘, settings.
+
+## Privacy and security
+
+- Local first: notes, tasks, chats, layouts and passwords stay on the machine; there is no account, no sync and no telemetry.
+- Every web app runs in Chromium's sandbox with context isolation, a strict content security policy, and its own storage partition.
+- Claude Code runs inside an operating-system sandbox (macOS Seatbelt via Anthropic's sandbox runtime), sees only the folder you connect, and asks before running commands. Claude is macOS-only for now for that reason.
+- The macOS build is signed and notarized and updates itself with signature-verified releases; the Windows installer is not yet code-signed.
+- Full details, tests and remaining risks: https://justzen.co/security.html
+
+## Downloads
+
+- macOS (Apple silicon, macOS 13+): https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg
+- Windows (64-bit, Windows 10+): https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-Setup.exe
+
+## Pages
+
+- [Home](https://justzen.co/): features, layouts, messages, Claude, privacy, keyboard shortcuts
+- [Security](https://justzen.co/security.html): protections, automated updates, what is tested, what remains a risk
+- [Source code and releases](https://github.com/kierankeene122/just-zen)

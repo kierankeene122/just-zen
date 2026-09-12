@@ -1,0 +1,19 @@
+# Just Zen — everything here may be crawled and indexed.
+User-agent: *
+Allow: /
+
+# AI crawlers are welcome too; llms.txt has a plain-text summary.
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-Web
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://justzen.co/sitemap.xml
