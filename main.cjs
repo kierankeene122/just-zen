@@ -224,6 +224,7 @@ function ensureView(serviceKey,tabId){
 // Peek: a link opened from an app slides out in a drawer over the right of the centre instead of taking the whole pane.
 // Esc dismisses it; it can be promoted to a tab, or opened beside. Popups and Shift+Space on a hovered link both land here.
 let peek=null,peekStack=[];
+const AUTH_HOSTS=/(^|\.)(accounts\.google\.com|accounts\.youtube\.com|login\.microsoftonline\.com|login\.live\.com|appleid\.apple\.com|id\.atlassian\.com|login\.yahoo\.com|okta\.com|auth0\.com|login\.salesforce\.com|auth\.atlassian\.com|signin\.aws\.amazon\.com)$/i;
 // A popup from the drawer (Sign in with Google) keeps its opener alive underneath: OAuth talks back to it, then window.close() brings it back.
 function peekOpen(serviceKey,options,url,from=null){
   if(from && peek && peek.view.webContents===from){peek.view.setVisible(false);peek.visible=false;peekStack.push(peek);peek=null;}else peekClose();
@@ -231,7 +232,7 @@ function peekOpen(serviceKey,options,url,from=null){
   const view=new WebContentsView({...(options || {}),webPreferences:{...(options?.webPreferences || {}),...preferencesFor(serviceKey)}});
   win.contentView.addChildView(view);view.setVisible(false);
   const contents=view.webContents;
-  peek={view,serviceKey,visible:false,name:item.name,announce:null};
+  peek={view,serviceKey,visible:false,name:item.name,announce:null,opener:from && !from.isDestroyed()?from:null,auth:null};
   notificationSources.set(contents,{contents,saved:false,key:serviceKey,name:item.name+' (peek)',notificationPermission:false,badgeInitialized:false,origins:new Set(),landed:false});
   hardenWebSession(contents.session);
   configureWebContents(contents,win,message=>send('notice',message),contents,preferencesFor(serviceKey),o=>peekOpen(serviceKey,o,'',contents));
@@ -239,6 +240,8 @@ function peekOpen(serviceKey,options,url,from=null){
   const announce=()=>{if(!contents.isDestroyed() && peek?.view===view)send('peek-update',{url:contents.getURL(),title:contents.getTitle(),loading:contents.isLoading(),canGoBack:contents.navigationHistory.canGoBack()});};
   peek.announce=announce;for(const event of ['did-navigate','did-navigate-in-page','did-start-loading','did-stop-loading','page-title-updated'])contents.on(event,announce);
   contents.on('did-finish-load',()=>{contents.__darkKey=null;darkenIfLight(contents);});
+  // A sign-in popup that ends by landing on the app instead of closing itself: bring the result back to the pane that asked for it.
+  contents.on('did-navigate',(_e,url)=>{if(!peek || peek.view!==view || !/^https?:/i.test(url))return;let host='';try{host=new URL(url).hostname;}catch{return;}if(peek.auth===null){peek.auth=AUTH_HOSTS.test(host);return;}if(!peek.auth || AUTH_HOSTS.test(host))return;const opener=peek.opener;if(!opener || opener.isDestroyed())return;peek.auth=false;setTimeout(()=>{try{let same=false;try{same=new URL(opener.getURL()).hostname===host;}catch{}if(same)opener.loadURL(url);else opener.reload();}catch{}peekClose();},80);});
   contents.once('destroyed',()=>{if(peek?.view===view){peek=null;peekRestore();}else{const i=peekStack.indexOf(peekStack.find(p=>p.view===view));if(i>=0)peekStack.splice(i,1);}});
   if(url)contents.loadURL(url).catch(()=>{});
   send('peek-opened',{serviceKey,name:item.name});
@@ -325,7 +328,7 @@ function placeBadges(list){const wanted=new Map();for(const p of list)if(Number.
     if(!b.attached || !b.visible){win.contentView.addChildView(b.view);b.attached=true;}
     b.view.setBounds(box);if(!b.visible){b.view.setVisible(!locked);b.visible=true;}}}
 function retintBadges(){for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-theme',config.theme || 'light');}
-// Thin panes get the mobile web: a phone user agent and a mobile viewport, so sites serve their phone layout.
+// An app can opt into the mobile web when its pane is thin (phone user agent and viewport); by default a narrow pane is just the site in a smaller window.
 const MOBILE_WIDTH=480;
 const MOBILE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 function applyFormFactor(entry){const c=entry.view.webContents;if(c.isDestroyed())return;try{if(entry.mobile){c.setUserAgent(MOBILE_UA);const b=entry.view.getBounds();c.enableDeviceEmulation({screenPosition:'mobile',screenSize:{width:b.width,height:b.height},viewPosition:{x:0,y:0},deviceScaleFactor:0,viewSize:{width:0,height:0},scale:1});}else{c.setUserAgent(entry.desktopUA);c.disableDeviceEmulation();}}catch{}if(/^https?:/i.test(c.getURL()))c.reload();}
@@ -342,7 +345,7 @@ function placeViews(list){
   for(const [key,entry] of views){
     if(appPeek && entry===appPeek)continue;
     const box=wanted.get(key);
-    if(box){entry.view.setBounds({x:box.x,y:box.y,width:box.width,height:box.height});const mobile=box.width<MOBILE_WIDTH;if(entry.mobile!==mobile){entry.mobile=mobile;clearTimeout(entry.formTimer);entry.formTimer=setTimeout(()=>applyFormFactor(entry),400);}if(typeof entry.view.setBorderRadius==='function' && entry.radius!==box.radius){entry.radius=box.radius;try{entry.view.setBorderRadius(box.radius);}catch{}}if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
+    if(box){entry.view.setBounds({x:box.x,y:box.y,width:box.width,height:box.height});const mobile=box.width<MOBILE_WIDTH && serviceItem(entry.serviceKey)?.mobile===true;if(entry.mobile!==mobile){entry.mobile=mobile;clearTimeout(entry.formTimer);entry.formTimer=setTimeout(()=>applyFormFactor(entry),400);}if(typeof entry.view.setBorderRadius==='function' && entry.radius!==box.radius){entry.radius=box.radius;try{entry.view.setBorderRadius(box.radius);}catch{}}if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
     else if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}
   }
   placeBadges(list.filter(p=>p.document===true || wanted.has(viewKey(p.serviceKey,p.tabId))));
@@ -642,7 +645,7 @@ app.whenReady().then(async () => {
   handle('remove-service',async key=>{const index=(config.services || []).findIndex(s=>(s.id || s.url)===key);if(index<0)throw Error('App not found');const item=config.services[index];closeServiceViews(key);config.services=config.services.filter((_,i)=>i!==index);const snapshot={item,index,tabs:(config.tabs || {})[key] || null,sleep:config.sleep?.apps?.[key],zoom:config.zoom?.[key],mute:config.mutes?.[key]};delete (config.tabs || {})[key];if(config.sleep?.apps)delete config.sleep.apps[key];if(config.zoom)delete config.zoom[key];if(config.mutes)delete config.mutes[key];await persist();return {services:config.services,snapshot};});
   handle('restore-service',async snapshot=>{if(!snapshot || !snapshot.item || typeof snapshot.item!=='object')throw Error('Nothing to restore');const item=snapshot.item;const key=item.id || item.url;if(typeof key!=='string' || (config.services || []).some(s=>(s.id || s.url)===key))return config.services || [];if(item.url)validURL(item.url);const clean={...item,name:String(item.name || '').slice(0,50)};config.services=config.services || [];const at=Math.max(0,Math.min(config.services.length,Number(snapshot.index) || 0));config.services.splice(at,0,clean);if(snapshot.tabs && cleanTabs(key,snapshot.tabs)){config.tabs=config.tabs || {};config.tabs[key]=cleanTabs(key,snapshot.tabs);}if(SLEEP_CHOICES.has(snapshot.sleep)){config.sleep=sleepSettings();config.sleep.apps[key]=snapshot.sleep;}if(typeof snapshot.zoom==='number'){config.zoom=config.zoom || {};config.zoom[key]=snapshot.zoom;}if(snapshot.mute===-1 || (typeof snapshot.mute==='number' && snapshot.mute>Date.now())){config.mutes=config.mutes || {};config.mutes[key]=snapshot.mute;}await persist();return config.services;});
   handle('add-browser',async ({name,icon}={})=>{if(typeof name!=='string' || !name.trim())throw Error('Name is required');config.services=config.services || [];const item={id:crypto.randomUUID(),kind:'browser',name:name.trim().slice(0,50),icon:cleanEmoji(icon),profile:'isolated'};config.services.push(item);await persist();return {services:config.services,key:item.id};});
-  handle('update-service',async ({key,name,icon,pinned}={})=>{let found=false;config.services=(config.services || []).map(item=>{if((item.id || item.url)!==key)return item;found=true;const next={...item};if(typeof name==='string' && name.trim())next.name=name.trim().slice(0,50);if(icon!==undefined && isBrowserItem(item))next.icon=cleanEmoji(icon);if(typeof pinned==='boolean')next.pinned=pinned;return next;});if(!found)throw Error('App not found');await persist();return config.services;});
+  handle('update-service',async ({key,name,icon,pinned,mobile}={})=>{let found=false;config.services=(config.services || []).map(item=>{if((item.id || item.url)!==key)return item;found=true;const next={...item};if(typeof name==='string' && name.trim())next.name=name.trim().slice(0,50);if(icon!==undefined && isBrowserItem(item))next.icon=cleanEmoji(icon);if(typeof pinned==='boolean')next.pinned=pinned;if(typeof mobile==='boolean')next.mobile=mobile;return next;});if(!found)throw Error('App not found');await persist();return config.services;});
   handle('add-service',async ({name,url}) => { url = validURL(url); if(typeof name !== 'string' || !name.trim()) throw Error('Name is required'); config.services=config.services || [];if(!config.services.some(s=>s.url===url))config.services.push({id:require('node:crypto').randomUUID(),name:name.trim().slice(0,50),kind:'web',url,profile:'isolated'}); await persist(); return config.services; });
   handle('start-terminal',kind => { if(!['claude','shell','login'].includes(kind)) throw Error('Invalid session'); return startTerminal(kind); });
   handle('stop-terminal',() => { terminal?.kill(); });
