@@ -210,7 +210,7 @@ function viewKey(serviceKey,tabId){return serviceKey+'\n'+tabId;}
 function asleepKeys(){const out=[];for(const key of Object.keys(config.tabs || {})){const item=serviceItem(key);if(!item || isBrowserItem(item))continue;if(sleepMinutesFor(key)>0 && ![...views.values()].some(v=>v.serviceKey===key))out.push(key);}return out;}
 function tabInfo(entry){const c=entry.view.webContents;return {serviceKey:entry.serviceKey,tabId:entry.tabId,url:c.getURL(),title:c.getTitle(),loading:c.isLoading(),canGoBack:c.navigationHistory.canGoBack(),canGoForward:c.navigationHistory.canGoForward()};}
 function announceTab(entry){if(entry.view.webContents.isDestroyed())return;send('tab-update',tabInfo(entry));}
-function destroyView(key){const entry=views.get(key);if(!entry)return;views.delete(key);try{win.contentView.removeChildView(entry.view);}catch{}try{entry.view.webContents.close();}catch{}}
+function destroyView(key){const entry=views.get(key);if(!entry)return;views.delete(key);try{win.contentView.removeChildView(entry.view);}catch{}try{entry.view.webContents.close({waitForBeforeUnload:false});}catch{try{entry.view.webContents.close();}catch{}}}
 function closeServiceViews(serviceKey){for(const [key,entry] of views)if(entry.serviceKey===serviceKey)destroyView(key);updateServiceBadge(serviceKey,0);}
 function hideAllViews(){for(const entry of views.values())if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}}
 function preferencesFor(serviceKey){const item=serviceItem(serviceKey);if(!item)throw Error('App not found');return {...(isBrowserItem(item)?browserWebPreferences(serviceKey):webPreferences(item.profile || 'isolated',serviceKey)),backgroundThrottling:false};}
@@ -305,6 +305,7 @@ function attachView(serviceKey,tabId,view,url){
   entry.scrollTimer=setInterval(()=>{if(contents.isDestroyed() || !entry.visible)return;contents.executeJavaScript('[window.scrollX|0,window.scrollY|0]',true).then(([x,y])=>{try{const live=tabOf(serviceKey,tabId);if(live.scroll?.x===x && live.scroll?.y===y)return;live.scroll={x,y};live.scrollURL=contents.getURL();persistSoon();}catch{}}).catch(()=>{});},3000);
   contents.once('destroyed',()=>clearInterval(entry.scrollTimer));
   contents.on('did-fail-load',(_e,code,description)=>{if(code!==-3)send('notice','Page could not load: '+description);});
+  contents.on('will-prevent-unload',e=>e.preventDefault());
   if(!isBrowser)contents.on('dom-ready',()=>{contents.executeJavaScript(NOTIFICATION_WRAPPER,true).catch(()=>{});});
   contents.on('page-title-updated',(_event,title)=>{
     try{const live=tabOf(serviceKey,tabId);live.title=String(title).slice(0,200);persistSoon();}catch{}
@@ -518,7 +519,9 @@ app.whenReady().then(async () => {
   win.webContents.on('will-navigate', e => e.preventDefault());
   attachContextMenu(win.webContents,()=>'your workspace');
   win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
+  win.on('close',()=>{quitting=true;for(const key of [...views.keys()]){try{views.get(key)?.view.webContents.removeAllListeners('will-prevent-unload');destroyView(key);}catch{}}try{peekClose();}catch{}});
   win.on('closed',() => { try{terminal?.kill();}catch{} try{chat.stop();}catch{} for(const key of [...views.keys()]){try{destroyView(key);}catch{}} });
+  win.webContents.on('will-prevent-unload',e=>{if(quitting)e.preventDefault();});
   const documents=require('./documents.cjs').createDocuments(dialog,()=>win);
   const documentEntry=require('node:url').pathToFileURL(path.join(__dirname,'document-view.html')).href;
   const documentView=new WebContentsView({webPreferences:{preload:path.join(__dirname,'document-preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,partition:'documents-preview'}});
@@ -748,7 +751,11 @@ app.whenReady().then(async () => {
 });
 // Closing the window quits. If anything stalls the quit (a child process, a pending dialog), force the exit so a relaunch starts clean.
 function warmChatApps(){if(locked)return;for(const item of (config.services || []).filter(openable)){if(!isChatItem(item))continue;const key=item.id || item.url;for(const tab of tabsFor(key).items){try{ensureView(key,tab.id);}catch{}}}}
-app.on('window-all-closed',()=>{app.quit();setTimeout(()=>app.exit(0),2500).unref?.();});
+let quitting=false;
+app.on('window-all-closed',()=>{quitting=true;app.quit();setTimeout(()=>app.exit(0),2500);});
+app.on('before-quit',()=>{quitting=true;setTimeout(()=>app.exit(0),4000);});
+// Dock click with no window left (a quit that stalled): start over rather than sit there.
+app.on('activate',()=>{if(!BrowserWindow.getAllWindows().length){app.relaunch();app.exit(0);}});
 // Cookies are written to disk on quit, so a login made moments before closing survives.
 app.on('before-quit',()=>{for(const view of views.values()){try{view.view.webContents.session.cookies.flushStore().catch(()=>{});}catch{}}});
 setInterval(()=>{for(const target of hardenedSessions){try{target.cookies.flushStore().catch(()=>{});}catch{}}},30000).unref?.();
