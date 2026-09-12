@@ -241,7 +241,10 @@ function peekOpen(serviceKey,options,url,from=null){
   peek.announce=announce;for(const event of ['did-navigate','did-navigate-in-page','did-start-loading','did-stop-loading','page-title-updated'])contents.on(event,announce);
   contents.on('did-finish-load',()=>{contents.__darkKey=null;darkenIfLight(contents);});
   // A sign-in popup that ends by landing on the app instead of closing itself: bring the result back to the pane that asked for it.
-  contents.on('did-navigate',(_e,url)=>{if(!peek || peek.view!==view || !/^https?:/i.test(url))return;let host='';try{host=new URL(url).hostname;}catch{return;}if(peek.auth===null){peek.auth=AUTH_HOSTS.test(host);return;}if(!peek.auth || AUTH_HOSTS.test(host))return;const opener=peek.opener;if(!opener || opener.isDestroyed())return;peek.auth=false;setTimeout(()=>{try{let same=false;try{same=new URL(opener.getURL()).hostname===host;}catch{}if(same)opener.loadURL(url);else opener.reload();}catch{}peekClose();},80);});
+  const hostOfURL=u=>{try{return new URL(u).hostname;}catch{return '';}};
+  const sawAuth=(_e,url)=>{if(peek?.view===view && AUTH_HOSTS.test(hostOfURL(url)))peek.auth=true;};
+  contents.on('did-redirect-navigation',sawAuth);contents.on('did-start-navigation',sawAuth);
+  contents.on('did-navigate',(_e,url)=>{if(!peek || peek.view!==view || !/^https?:/i.test(url))return;const host=hostOfURL(url);if(AUTH_HOSTS.test(host)){peek.auth=true;return;}const opener=peek.opener;if(!opener || opener.isDestroyed())return;const openerHost=hostOfURL(opener.getURL());const callback=host===openerHost && /(auth|oauth|callback|login|signin|sso|session)/i.test(new URL(url).pathname);if(!peek.auth && !callback)return;peek.auth=false;setTimeout(()=>{try{if(host===openerHost)opener.loadURL(url);else opener.reload();}catch{}peekClose();},120);});
   contents.once('destroyed',()=>{if(peek?.view===view){peek=null;peekRestore();}else{const i=peekStack.indexOf(peekStack.find(p=>p.view===view));if(i>=0)peekStack.splice(i,1);}});
   if(url)contents.loadURL(url).catch(()=>{});
   send('peek-opened',{serviceKey,name:item.name});

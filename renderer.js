@@ -156,7 +156,8 @@ function renderTiles(){
   const tab=tabOf(slot);
   if(!tab || !(tab.current || tab.url)){const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));const empty=el('div','tile-empty');if(live)empty.append(el('span','tile-empty-mark','…'),el('p',null,'Opening…'));else empty.append(el('span','tile-empty-mark','⌕'),el('p',null,'Type an address above, or paste a link.'));surface.append(empty);}
   else if(asleep.has(slot.serviceKey)){const empty=el('div','tile-empty tile-waking');const img=el('img','site-favicon wake-icon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback wake-icon',item.name.slice(0,1).toUpperCase());empty.append(img,fallback,el('strong',null,tab.title || item.name),el('p',null,'Waking '+item.name+' up…'));if(!isBrowserItem(item))call('favicon',slot.serviceKey).then(icon=>paintIcon(img,icon)).catch(()=>{});surface.append(empty);}
-  tile.append(bar,surface);if(tile.__urlbar){const strip=bar.querySelector('.tile-tabs'),plus=bar.querySelector('.tile-new'),form=tile.__urlbar.querySelector('.tile-url');if(strip)tile.__urlbar.insertBefore(strip,form);if(plus)tile.__urlbar.append(plus);tile.append(tile.__urlbar);}host.append(tile);
+  if(!tile.__urlbar && (group.items.length>1 || isSlack(item))){const tabbar=el('div','tile-urlbar tile-tabbar');const strip=bar.querySelector('.tile-tabs'),plus=bar.querySelector('.tile-new');if(strip)tabbar.append(strip);if(plus)tabbar.append(plus);tile.__urlbar=tabbar;}
+  tile.append(bar,surface);if(tile.__urlbar){const strip=bar.querySelector('.tile-tabs'),plus=bar.querySelector('.tile-new'),form=tile.__urlbar.querySelector('.tile-url');if(strip && form)tile.__urlbar.insertBefore(strip,form);if(plus && form)tile.__urlbar.append(plus);tile.append(tile.__urlbar);}host.append(tile);
  }
  placeViews();updateZoomControl();deckSync();
 }

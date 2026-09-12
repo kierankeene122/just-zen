@@ -437,3 +437,5 @@ body{--document-space:0px}#documents{display:none}
 
 .app-tile .tile-more{position:absolute;top:8px;left:10px;width:22px;height:22px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--muted);font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}.app-tile:hover .tile-more,.app-tile[aria-selected=true] .tile-more,.app-tile .tile-more:focus-visible{opacity:1}.app-tile .tile-more:hover{color:inherit;border-color:var(--accent)}
 #app-search-manage{font-size:12px;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:transparent;color:inherit;white-space:nowrap}#app-search-manage:hover{border-color:var(--accent)}
+
+.tile-tabbar .tile-tabs{flex:1;max-width:none;margin-left:0}.tile-tabbar{padding:4px 8px}
