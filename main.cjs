@@ -340,7 +340,8 @@ function badgeLabelled(){return (config.searchUses || 0)<4;}
 function placeBadges(list){const wanted=new Map();for(const p of list)if(Number.isInteger(p.slot) && p.slot>=0 && p.slot<4)wanted.set(p.slot,p);
   for(let i=0;i<4;i++){const p=wanted.get(i);if(!p){if(badges[i]?.visible){badges[i].view.setVisible(false);badges[i].visible=false;}continue;}
     const b=ensureBadge(i);const wide=badgeLabelled()?184:86;const box=clipBounds({x:p.x+p.width-wide-6,y:p.y+6,width:wide,height:44});
-    if(!b.attached || !b.visible){win.contentView.addChildView(b.view);b.attached=true;}
+    // Re-adding raises the badge above any view added since (a new tab, the document viewer), so it never ends up buried.
+    win.contentView.addChildView(b.view);b.attached=true;
     b.view.setBounds(box);if(!b.visible){b.view.setVisible(!locked);b.visible=true;}}}
 function retintBadges(){for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-theme',config.theme || 'light');}
 // An app can opt into the mobile web when its pane is thin (phone user agent and viewport); by default a narrow pane is just the site in a smaller window.
