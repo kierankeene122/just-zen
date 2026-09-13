@@ -92,7 +92,7 @@ function normaliseSlots(){for(let i=0;i<4;i++){const slot=tiles.slots[i];if(!slo
 let placeScheduled=false;
 function placeViews(){if(placeScheduled)return;placeScheduled=true;requestAnimationFrame(()=>{placeScheduled=false;placeNow().catch(()=>{});});}
  
-async function placeNow(){peekBounds();
+async function placeNow(){peekBounds();healSuspension();
  const list=[];let docBox=null;
  if(page==='browser-page' && !layout.centreCollapsed && !viewsSuspended && !document.body.classList.contains('is-locked')){
   for(let i=0;i<slotCount();i++){const slot=tiles.slots[i];if(!slot)continue;if(slot.kind==='document'){const surface=$('tiles').children[i]?.querySelector('.tile-surface');const r=surface?.getBoundingClientRect();if(r && r.width>10 && r.height>10){docBox={x:r.x,y:r.y,width:r.width,height:r.height};list.push({document:true,slot:i,x:r.x,y:r.y,width:r.width,height:r.height});}continue;}const tab=tabOf(slot);if(!tab || !(tab.current || tab.url || tabLive.has(liveKey(slot.serviceKey,slot.tabId))))continue;const surface=$('tiles').children[i]?.querySelector('.tile-surface');if(!surface)continue;const r=surface.getBoundingClientRect();if(r.width<10 || r.height<10)continue;let width=r.width;if(peekOpenState && !$('peek').classList.contains('hidden')){const d=$('peek').getBoundingClientRect();if(d.width && r.x+width>d.left)width=Math.max(0,d.left-r.x);}list.push({serviceKey:slot.serviceKey,tabId:slot.tabId,x:r.x,y:r.y,width,height:r.height,radius:12,slot:i});}
@@ -114,7 +114,7 @@ function renderTiles(){
   if(n>1 && i===tiles.focus)tile.classList.add('focused');
   const slot=tiles.slots[i],item=slot?serviceOf(slot.serviceKey):null,group=slot?tabs[slot.serviceKey]:null;
   const bar=el('div','tile-bar'),surface=el('div','tile-surface'),progress=el('div','tile-progress');surface.append(progress);const ghost=el('button','pane-search');ghost.type='button';ghost.title='Find an app for this pane';ghost.append(searchGlyph(),el('span',null,'Find an app'));ghost.onclick=()=>{tiles.focus=i;openAppSearch(i);};surface.append(ghost);
-  tile.onmousedown=()=>{if(tiles.focus!==i && n>1){tiles.focus=i;for(const t of host.children)t.classList.toggle('focused',t===tile);saveLayout();updateZoomControl();}};
+  tile.onmousedown=()=>{if(tiles.focus!==i && n>1){lastFocus=tiles.focus;tiles.focus=i;for(const t of host.children)t.classList.toggle('focused',t===tile);saveLayout();updateZoomControl();}};
   if(slot && slot.kind==='document'){tile.classList.add('document');bar.classList.add('hidden');tile.append(bar,surface);host.append(tile);continue;}
   if(!slot || !item || !group){
    bar.classList.add('hidden');
@@ -221,10 +221,16 @@ function focusedSlot(){const n=slotCount();return tiles.slots[Math.min(tiles.foc
 async function setTilesMode(nextMode){if(!SLOTS[nextMode])return;tiles.mode=nextMode;if(page!=='browser-page')await show('browser-page');renderTiles();saveLayout();}
 function suspendViews(){viewsSuspended++;placeViews();}
 function resumeViews(){viewsSuspended=Math.max(0,viewsSuspended-1);placeViews();}
+// Some Chromium builds fire toggle rather than close for dialogs; listen to both and resume exactly once per opening.
+function onDialogClosed(dialog,fn){let armed=false;dialog.addEventListener('toggle',e=>{if(e.newState==='open')armed=true;else if(armed){armed=false;fn();}});dialog.addEventListener('close',()=>{if(armed){armed=false;fn();}});}
+// Nothing legitimately keeps views hidden once every dialog is closed; heal a stuck counter rather than show blank panes.
+function healSuspension(){if(viewsSuspended>0 && !document.querySelector('dialog[open]') && $('tour').classList.contains('hidden') && !document.body.classList.contains('resizing-split'))viewsSuspended=0;}
+// Read-only peek for diagnostics (nothing here can be changed from outside).
+window.__zen=Object.freeze({get suspended(){return viewsSuspended;},get page(){return page;},get focus(){return tiles.focus;}});
 for(const b of document.querySelectorAll('#layout-switch button'))b.onclick=()=>attempt(()=>setTilesMode(b.dataset.tiles));
 $('layout-switch').addEventListener('contextmenu',e=>{e.preventDefault();showMenu([{label:'Save current layout…',run:openPresetDialog},...(presets.length?['-',...presets.map(p=>({label:'Switch to '+p.name,run:()=>applyPreset(p)}))]:[])],e.clientX,e.clientY);});
 function openPresetDialog(){suspendViews();$('preset-dialog').showModal();$('preset-name').value='';$('preset-name').focus();}
-$('preset-cancel').onclick=()=>$('preset-dialog').close();$('preset-dialog').addEventListener('close',resumeViews);
+$('preset-cancel').onclick=()=>$('preset-dialog').close();onDialogClosed($('preset-dialog'),resumeViews);
 $('preset-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{presets=await call('save-preset',{name:$('preset-name').value,tiles});$('preset-dialog').close();notice('Layout saved. Switch to it from ⌘K.');});};
 async function applyPreset(p){tiles={mode:p.tiles.mode,slots:p.tiles.slots.map(s=>s?{...s}:null),focus:p.tiles.focus || 0,ratio:p.tiles.ratio || .5,ratios:p.tiles.ratios && typeof p.tiles.ratios==='object'?{...p.tiles.ratios}:{}};if(page!=='browser-page')await show('browser-page');renderTiles();saveLayout();notice('Layout: '+p.name);}
 window.hearth.on('tab-update',info=>{const fresh=!tabLive.has(liveKey(info.serviceKey,info.tabId));tabLive.set(liveKey(info.serviceKey,info.tabId),info);if(fresh)placeViews();const group=tabs[info.serviceKey];const tab=group?.items.find(t=>t.id===info.tabId);if(tab){if(info.url)tab.current=info.url;if(info.title)tab.title=info.title;}refreshTileBars();});
@@ -315,7 +321,7 @@ function muteMenu(item){const key=item.id || item.url;const set=hours=>async()=>
  for(const hours of [1,2,4,8,24])items.push({label:hours+' hour'+(hours===1?'':'s'),run:set(hours)});
  items.push({label:'Custom number of hours…',run:()=>openMuteDialog(item)},{label:'Forever',run:set('forever')});return items;}
 function openMuteDialog(item){const key=item.id || item.url;$('mute-title').textContent='Mute '+item.name+' for how long?';const dialog=$('mute-dialog');suspendViews();dialog.showModal();$('mute-hours').focus();$('mute-hours').select();$('mute-form').onsubmit=e=>{e.preventDefault();const hours=Number($('mute-hours').value);dialog.close();attempt(async()=>{mutes=await call('set-mute',{key,hours});services(sidebarItems,serviceFolders);notice(item.name+' muted for '+hours+' hour'+(hours===1?'':'s')+'.');});};}
-$('mute-cancel').onclick=()=>$('mute-dialog').close();$('mute-dialog').addEventListener('close',resumeViews);
+$('mute-cancel').onclick=()=>$('mute-dialog').close();onDialogClosed($('mute-dialog'),resumeViews);
 window.hearth.on('mutes-changed',next=>{mutes=next || {};services(sidebarItems,serviceFolders);});
 async function removeApp(item){const key=item.id || item.url;const result=await call('remove-service',key);services(result.services);undoable('Removed '+item.name,async()=>{services(await call('restore-service',result.snapshot));notice(item.name+' is back.');});}
 function rowMenu(item,x,y){
@@ -504,7 +510,7 @@ $('refresh').onclick=()=>attempt(()=>list(directory));$('save').onclick=()=>atte
 $('note-preview').onclick=()=>setNoteMode('preview');$('note-edit').onclick=()=>setNoteMode('edit');
 $('app-search').oninput=()=>{catalogPage=0;renderApps();};$('app-category').onchange=()=>{catalogPage=0;renderApps();};$('apps-prev').onclick=()=>{catalogPage--;renderApps();$('app-list').scrollTop=0;};$('apps-next').onclick=()=>{catalogPage++;renderApps();$('app-list').scrollTop=0;};$('cancel-app').onclick=()=>$('app-dialog').close();$('tab-installed').onclick=()=>pickerTab('installed');$('tab-website').onclick=()=>pickerTab('website');$('tab-browser').onclick=()=>pickerTab('browser');$('tab-group').onclick=()=>pickerTab('group');
 $('browser-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const name=$('browser-name').value.trim();const icon=$('browser-icon').value.trim() || '🌐';if(editingBrowser){services(await call('update-service',{key:editingBrowser.id,name,icon}));notice(name+' updated.');editingBrowser=null;$('app-dialog').close();$('browser-form').reset();return;}const added=await call('add-browser',{name,icon});services(added.services);$('app-dialog').close();$('browser-form').reset();await openInTile(added.key);notice(name+' added. It keeps its own logins, separate from every other browser and app.');});};
-$('app-dialog').addEventListener('close',()=>{editingGroup=null;editingBrowser=null;resumeViews();});
+onDialogClosed($('app-dialog'),()=>{editingGroup=null;editingBrowser=null;resumeViews();});
 $('website-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const raw=$('website-url').value.trim();const url=new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw)?raw:'https://'+raw);const name=$('website-name').value.trim() || url.hostname.replace(/^www\./,'');const items=await call('add-service',{name,url:url.href});services(items);const item=items.find(value=>value.url===url.href);$('app-dialog').close();$('website-form').reset();if(item)await openInTile(item.id || item.url);notice(name+' added. Cookies are saved on this Mac.');});};
 $('group-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const name=$('group-name').value.trim();const icon=$('group-icon').value.trim() || GROUP_ICONS[0];const keys=[...$('group-apps').querySelectorAll('input:checked')].map(box=>box.value);let state;
  if(editingGroup){const id=editingGroup.id;state=await call('update-service-folder',{id,name,icon});for(const item of sidebarItems.filter(s=>s.url)){const key=item.id || item.url;const wanted=keys.includes(key),has=item.folderId===id;if(wanted && !has)state=await call('set-service-folder',{key,folderId:id});else if(!wanted && has)state=await call('set-service-folder',{key,folderId:null});}notice('Group "'+name+'" updated.');}
@@ -524,7 +530,7 @@ function deckLayout(){deckCards().forEach((card,i)=>{card.dataset.slot=String(i+
 // Behind the active card, the rest of the deck peeks out as stacked edges.
 function renderStackEdges(front){const host=$('stack-edges');host.replaceChildren();if(!front)return;const others=Math.min(4,deckCards().length-1);for(let i=others;i>=1;i--){const edge=el('div','edge');edge.style.setProperty('--top',(16-i*4)+'px');edge.style.setProperty('--inset',(i*10)+'px');edge.style.zIndex=String(5-i);host.append(edge);}}
 // The header carries the current app: name, address or title, tabs, navigation, and the way back to the canvas.
-window.hearth.on('tab-focused',({serviceKey,tabId})=>{const n=slotCount();const i=tiles.slots.findIndex((s,at)=>at<n && s && s.serviceKey===serviceKey && s.tabId===tabId);if(i<0 || tiles.focus===i)return;tiles.focus=i;for(const t of $('tiles').children)t.classList.toggle('focused',t===$('tiles').children[i]);saveLayout();updateZoomControl();deckSync();});
+window.hearth.on('tab-focused',({serviceKey,tabId})=>{const n=slotCount();const i=tiles.slots.findIndex((s,at)=>at<n && s && s.serviceKey===serviceKey && s.tabId===tabId);if(i<0 || tiles.focus===i)return;lastFocus=tiles.focus;tiles.focus=i;for(const t of $('tiles').children)t.classList.toggle('focused',t===$('tiles').children[i]);saveLayout();updateZoomControl();deckSync();});
 function cardFor(key){if(!key)return null;return deckCards().find(c=>c.dataset.key===key || c.querySelector(`.hand>.service-row[data-key="${CSS.escape(key)}"]`)) || null;}
 function cardKey(card){if(!card)return null;if(card.dataset.key)return card.dataset.key;return card.dataset.active || card.querySelector('.hand>.service-row')?.dataset.key || null;}
 function companionFor(key){const counts=deckPairs[key] || {};let best=null,max=0;for(const [other,count] of Object.entries(counts))if(other!==key && count>max && serviceOf(other)){best=other;max=count;}return best;}
@@ -547,7 +553,15 @@ function searchResults(q){const needle=q.trim().toLowerCase();const out=[];for(c
 function openAppSearch(target=0){searchTarget=Math.max(0,Math.min(3,target));searchIndex=0;const dialog=$('find-app');const n=page==='browser-page'?slotCount():1;$('app-search-target').textContent=n>1?'Pane '+(searchTarget+1):'';$('app-search-input').value='';if(!dialog.open){suspendViews();dialog.showModal();}renderAppSearch();$('app-search-input').focus();}
 function closeAppSearch(){const dialog=$('find-app');if(dialog.open)dialog.close();}
 function pickApp(item){closeAppSearch();call('search-used').catch(()=>{});attempt(async()=>{if(page!=='browser-page')await show('browser-page');await openInTile(item.id || item.url,undefined,searchTarget);});}
-function renderAppSearch(){const grid=$('app-search-grid');const results=searchResults($('app-search-input').value);grid.replaceChildren();
+function renderWaiting(){const host=$('app-search-waiting');host.replaceChildren();const chips=[];const seen=new Set();
+ for(const entry of recent){if(seen.has(entry.key))continue;const item=serviceOf(entry.key);if(!item)continue;seen.add(entry.key);const count=serviceBadges.get(entry.key) || 0;chips.push({item,label:item.name+(count?' · '+count:''),detail:(entry.title?entry.title+': ':'')+(entry.body || (entry.added+' new'))});}
+ for(const feed of nowFeed){if(seen.has(feed.key) || !feed.count)continue;const item=serviceOf(feed.key);if(!item)continue;seen.add(feed.key);const first=feed.items?.[0];chips.push({item,label:item.name+' · '+feed.count,detail:first?(first.sub?first.sub+': ':'')+first.title:feed.count+' unread'});}
+ const nextTask=todos.find(t=>!t.done);
+ if(!chips.length && !nextTask){host.hidden=true;return;}host.hidden=false;
+ host.append(el('span','waiting-label','Waiting for you'));
+ for(const c of chips.slice(0,4)){const b=el('button','waiting-chip');b.type='button';b.append(iconFor(c.item),el('b',null,c.label),el('span',null,c.detail));b.title=c.detail;b.onclick=()=>pickApp(c.item);host.append(b);}
+ if(nextTask){const b=el('button','waiting-chip waiting-task');b.type='button';b.append(el('b',null,'Next task'),el('span',null,nextTask.text));b.onclick=()=>{closeAppSearch();$('tasks-rail').click();};host.append(b);}}
+function renderAppSearch(){renderWaiting();const grid=$('app-search-grid');const results=searchResults($('app-search-input').value);grid.replaceChildren();
  const extras=[{label:'A document',sub:'PDF, Word, PowerPoint, text',glyph:'▤',run:()=>{closeAppSearch();attempt(()=>openDocumentInTile(searchTarget));}}];if(page==='browser-page'){const slot=tiles.slots[searchTarget];const group=slot && slot.serviceKey?tabs[slot.serviceKey]:null;if(group && group.items.length>1)for(const tab of group.items)if(tab.id!==slot.tabId)extras.push({label:tabTitle(slot.serviceKey,tab),sub:'Tab in '+(serviceOf(slot.serviceKey)?.name || ''),glyph:'⧉',run:()=>{closeAppSearch();attempt(()=>activateTab(searchTarget,slot.serviceKey,tab.id));}});}
  const needle=$('app-search-input').value.trim().toLowerCase();const shownExtras=extras.filter(x=>!needle || x.label.toLowerCase().includes(needle));
  shownExtras.forEach((x,i)=>{const t=el('button','app-tile app-tile-extra');t.type='button';t.setAttribute('role','option');t.setAttribute('aria-selected',String(i===searchIndex));const art=el('span','art',x.glyph);t.append(art,el('span','app-tile-name',x.label),el('span','app-tile-group',x.sub));t.onclick=x.run;grid.append(t);});
@@ -557,14 +571,25 @@ function renderAppSearch(){const grid=$('app-search-grid');const results=searchR
  searchIndex=Math.max(0,Math.min(searchIndex,results.length+offset));for(const [i,t] of [...grid.querySelectorAll('.app-tile')].entries())t.setAttribute('aria-selected',String(i===searchIndex));
  if(!results.length && !shownExtras.length && $('app-search-input').value.trim())grid.prepend(el('div','app-search-empty','No app called "'+$('app-search-input').value.trim()+'". Add it, or try another name.'));
  grid.querySelector('[aria-selected=true]')?.scrollIntoView({block:'nearest'});}
-$('app-search-close').onclick=closeAppSearch;$('app-search-manage').onclick=()=>{closeAppSearch();attempt(()=>show('settings-page'));};$('app-search-add').onclick=()=>{closeAppSearch();attempt(()=>openPicker('choose'));};$('find-app').addEventListener('close',resumeViews);$('find-app').addEventListener('click',e=>{if(e.target===$('find-app'))closeAppSearch();});
+// Meeting mode: a live call in any pane offers a fresh note beside it and quiet chat apps until the call ends.
+let meeting=null;
+window.hearth.on('call-started',info=>{if(meeting)return;toast('In a call? Meeting mode opens a fresh note beside it and quiets chat pings until it ends.',{action:'Meeting mode',onAction:()=>attempt(()=>startMeeting(info)),duration:20000});});
+window.hearth.on('call-ended',info=>{if(!meeting || (meeting.key && info.key!==meeting.key))return;attempt(endMeeting);});
+async function startMeeting(info){if(info.peek){const opened=await call('peek-action',{action:'tab'});if(opened)await openInTile(opened.serviceKey,opened.tabId);}
+ meeting={key:info.key || null,startedAt:Date.now()};
+ const muted=await call('mute-chat',{minutes:120});
+ const stamp=new Date();const name='Meeting '+stamp.toISOString().slice(0,10)+' '+stamp.toTimeString().slice(0,5).replace(':','.');
+ try{if(!root){notice('Chat is quiet. Choose a folder for Claude and notes to get a note beside your calls.');}else{const relative=await call('create-note',{name,text:'# '+name+'\n\n'+(info.url?info.url+'\n\n':'')+'## Notes\n\n- \n\n## Actions\n\n- '});await openFiles();await openFile(relative);$('editor').focus();}}catch(e){notice(e.message);}
+ notice('Meeting mode: '+(muted?muted+' chat app'+(muted===1?'':'s')+' quiet ':'')+'until the call ends.');}
+async function endMeeting(){meeting=null;const n=await call('unmute-chat');if(n)notice('Call over. Chat pings are back on.');}
+$('app-search-close').onclick=closeAppSearch;$('app-search-manage').onclick=()=>{closeAppSearch();attempt(()=>show('settings-page'));};$('app-search-add').onclick=()=>{closeAppSearch();attempt(()=>openPicker('choose'));};onDialogClosed($('find-app'),resumeViews);$('find-app').addEventListener('click',e=>{if(e.target===$('find-app'))closeAppSearch();});
 $('app-search-input').oninput=e=>{const input=e.target;searchIndex=0;if(e.inputType==='insertText'){const typed=input.value;const top=searchResults(typed)[0];if(top && typed && top.item.name.toLowerCase().startsWith(typed.toLowerCase()) && top.item.name.length>typed.length){input.value=top.item.name;input.setSelectionRange(typed.length,input.value.length);}}renderAppSearch();};
 $('app-search-input').onkeydown=e=>{const options=$('app-search-grid').querySelectorAll('.app-tile');const cols=5;if(!options.length)return;const move=d=>{e.preventDefault();searchIndex=Math.max(0,Math.min(options.length-1,searchIndex+d));renderAppSearch();};if(e.key==='ArrowRight')move(1);else if(e.key==='ArrowLeft')move(-1);else if(e.key==='ArrowDown')move(cols);else if(e.key==='ArrowUp')move(-cols);else if(e.key==='Enter'){e.preventDefault();options[searchIndex]?.click();}};
 
 $('deck-zone').addEventListener('mouseover',e=>{if(!e.target.closest('.front'))fanDeck(true);});
 $('deck-zone').addEventListener('mouseout',e=>{const to=e.relatedTarget;if(!to || !$('deck-zone').contains(to) || to.closest('.front'))fanDeck(false);});
 $('deck-zone').addEventListener('wheel',e=>{if(e.deltaY<-12)fanDeck(true);else if(e.deltaY>12)fanDeck(false);},{passive:true});
-window.hearth.on('deck-command',cmd=>attempt(()=>{if(typeof cmd?.search==='number')return openAppSearch(cmd.search);if(typeof cmd?.close==='number')return closePane(cmd.close);if(cmd?.page)return show(cmd.page);if(typeof cmd?.slot==='number')return deckSelect(cmd.slot);if(cmd?.step)return deckStep(cmd.step);if(cmd?.companion)return deckCompanion();}));
+window.hearth.on('deck-command',cmd=>attempt(()=>{if(typeof cmd?.search==='number')return openAppSearch(cmd.search);if(typeof cmd?.close==='number')return closePane(cmd.close);if(cmd?.move)return movePane(cmd.move,cmd.from);if(cmd?.swap)return swapPanes();if(cmd?.wide)return widenPane();if(cmd?.page)return show(cmd.page);if(typeof cmd?.slot==='number')return deckSelect(cmd.slot);if(cmd?.step)return deckStep(cmd.step);if(cmd?.companion)return deckCompanion();}));
 new ResizeObserver(deckMetrics).observe(document.querySelector('main'));addEventListener('resize',deckMetrics);
 function sidebarMenu(x,y){showMenu([{label:'Add an app, website or group',run:()=>$('add-app').click()},{label:'Home · the canvas',hint:'⌘⇧H',run:()=>show('overview')}],x,y);}
 document.querySelector('body>aside').addEventListener('contextmenu',e=>{if(e.target.closest('.service-row,.service-group'))return;e.preventDefault();sidebarMenu(e.clientX,e.clientY);});
@@ -586,6 +611,12 @@ let lastActivity=0;for(const event of ['pointerdown','keydown'])document.addEven
 attempt(async()=>{const state=await call('state');applyTheme(state.theme || 'light');showVersion(state);if(state.locked)setLocked(true,state.lockMethod);else await hydrate(state);});
 
 // Documents open in a pane. Only one document viewer exists, so opening one elsewhere moves it.
+// Rearranging panes from the keyboard or the ⇄ badge: the focused pane trades places with its neighbour.
+let lastFocus=0;
+function swapSlots(a,b){const n=slotCount();if(a===b || a<0 || b<0 || a>=n || b>=n)return false;[tiles.slots[a],tiles.slots[b]]=[tiles.slots[b],tiles.slots[a]];lastFocus=a;tiles.focus=b;renderTiles();saveLayout();return true;}
+function movePane(direction,from){const n=slotCount();if(n<2){notice('Split the screen first, then panes can move.');return;}const i=Number.isInteger(from)?from:Math.min(tiles.focus,n-1);const j=(i+direction+n)%n;swapSlots(i,j);}
+function swapPanes(){const n=slotCount();if(n<2){notice('Split the screen first, then panes can swap.');return;}const i=Math.min(tiles.focus,n-1);const j=lastFocus!==i && lastFocus<n?lastFocus:(i+1)%n;swapSlots(i,j);}
+function widenPane(){if(tiles.mode!=='3'){notice('The wide pane belongs to the three-column layout (the fourth button up top).');return;}const i=Math.min(tiles.focus,2);if(i===2){notice('This is already the wide pane.');return;}swapSlots(i,2);}
 // Closing a pane closes its tab (the app itself stays), empties the pane, and asks what should go there instead.
 async function closePane(index){const n=slotCount();if(index<0 || index>=n)return;const slot=tiles.slots[index];if(!slot)return openAppSearch(index);if(slot.kind==='document'){tiles.slots[index]=null;renderTiles();saveLayout();return openAppSearch(index);}const group=tabs[slot.serviceKey];if(group && group.items.length>1){tabs[slot.serviceKey]=await call('close-tab',{serviceKey:slot.serviceKey,tabId:slot.tabId});tabLive.delete(liveKey(slot.serviceKey,slot.tabId));}tiles.slots[index]=null;tiles.focus=index;renderTiles();saveLayout();return openAppSearch(index);}
 function documentSlot(){return tiles.slots.findIndex((s,i)=>i<slotCount() && s && s.kind==='document');}
@@ -641,7 +672,7 @@ async function openPalette(){
  closePopovers();suspendViews();
  paletteInput.value='';palette.showModal();if(!paletteCatalog){paletteCatalog=[];call('web-apps').then(list=>{paletteCatalog=list;}).catch(()=>{});}await updatePalette();paletteInput.focus();
 }
-palette.addEventListener('close',resumeViews);
+onDialogClosed(palette,resumeViews);
 palette.addEventListener('click',e=>{if(e.target===palette)palette.close();});
 paletteInput.oninput=()=>attempt(updatePalette);
 paletteInput.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();paletteIndex=Math.min(paletteIndex+1,paletteItems.length-1);renderPalette();}else if(e.key==='ArrowUp'){e.preventDefault();paletteIndex=Math.max(paletteIndex-1,0);renderPalette();}else if(e.key==='Enter'){e.preventDefault();runPaletteItem(paletteIndex);}};

@@ -440,3 +440,11 @@ body{--document-space:0px}#documents{display:none}
 .tile-tabbar .tile-tabs{flex:1;max-width:none;margin-left:0}.tile-tabbar{padding:4px 8px}
 
 .recent-row span{display:block;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35}
+
+/* Waiting for you: the strip above the picker grid */
+.waiting{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 22px 0}
+.waiting-label{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.waiting-chip{display:inline-flex;align-items:center;gap:8px;max-width:320px;padding:6px 12px 6px 8px;border-radius:999px;border:1px solid var(--line);background:transparent;color:inherit;font-size:12px;cursor:pointer}.waiting-chip:hover{border-color:var(--accent);background:#c4d3ab33}
+.waiting-chip b{white-space:nowrap;font-weight:600}.waiting-chip span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.waiting-chip .icon-pair{display:inline-flex}.waiting-chip .site-favicon,.waiting-chip .site-fallback,.waiting-chip .group-icon{width:16px;height:16px;flex:0 0 16px!important;font-size:8px}
+.waiting-task b::before{content:'✓ ';color:var(--accent)}
