@@ -32,7 +32,8 @@
     "asarUnpack": [
       "node_modules/**/*",
       "document-worker.cjs",
-      "document-sanitize.cjs"
+      "document-sanitize.cjs",
+      "pptx.cjs"
     ],
     "extraResources": [
       {

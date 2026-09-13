@@ -3,8 +3,9 @@ const {promisify}=require('node:util'),execFile=promisify(require('node:child_pr
 const {PDFDocument,StandardFonts,rgb}=require('pdf-lib');
 const {sanitizeFormattedHtml}=require('./document-sanitize.cjs');
 (async()=>{const job=process.argv[2];const {type,input,action}=JSON.parse(await fs.readFile(path.join(job,'request.json'),'utf8'));const data=await fs.readFile(path.join(job,'input'));let output;
-if(action==='open'){output=(await execFile('/usr/bin/textutil',['-convert','html','-stdout',path.join(job,'source.'+type)],{maxBuffer:20*1024*1024,timeout:15000})).stdout;}else{
-  if(type==='pdf'){
+if(action==='open'){if(type==='pptx')output=JSON.stringify(require('./pptx.cjs').parsePptx(data));else output=(await execFile('/usr/bin/textutil',['-convert','html','-stdout',path.join(job,'source.'+type)],{maxBuffer:20*1024*1024,timeout:15000})).stdout;}else{
+  if(type==='pptx'){if(!Array.isArray(input.edits) || input.edits.length>2000)throw Error('Invalid edits');output=require('./pptx.cjs').savePptx(data,input.edits);}
+  else if(type==='pdf'){
    const doc=await PDFDocument.load(data),font=await doc.embedFont(StandardFonts.Helvetica);
    if(!Array.isArray(input.annotations) || input.annotations.length>1000)throw Error('Invalid annotations');
    for(const a of input.annotations){

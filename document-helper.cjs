@@ -3,12 +3,12 @@ const {promisify}=require('node:util'),exec=promisify(require('node:child_proces
 const {findNode}=require('./node-runtime.cjs');
 const {externalPath}=require('./bundle-paths.cjs');
 const q=value=>JSON.stringify(value);
-const worker=externalPath(path.join(__dirname,'document-worker.cjs')),sanitizer=externalPath(path.join(__dirname,'document-sanitize.cjs'));
+const worker=externalPath(path.join(__dirname,'document-worker.cjs')),sanitizer=externalPath(path.join(__dirname,'document-sanitize.cjs')),slides=externalPath(path.join(__dirname,'pptx.cjs'));
 function profile(job){return `(version 1)
 (deny default)
 (allow process* sysctl-read mach-lookup)
 (allow file-read-metadata)
-(allow file-read* (subpath "/opt/homebrew") (subpath "/System") (subpath "/usr") (subpath "/Library") (subpath "/private/var/db") (subpath "/dev") (literal "/") (literal "/private") (literal "/private/tmp") (literal "/private/var") (literal "/private/var/folders") (subpath ${q(path.dirname(path.dirname(process.execPath)))}) (subpath ${q(externalPath(path.join(__dirname,'node_modules')))}) (literal ${q(externalPath(path.join(__dirname,'package.json')))}) (literal ${q(worker)}) (literal ${q(sanitizer)}))
+(allow file-read* (subpath "/opt/homebrew") (subpath "/System") (subpath "/usr") (subpath "/Library") (subpath "/private/var/db") (subpath "/dev") (literal "/") (literal "/private") (literal "/private/tmp") (literal "/private/var") (literal "/private/var/folders") (subpath ${q(path.dirname(path.dirname(process.execPath)))}) (subpath ${q(externalPath(path.join(__dirname,'node_modules')))}) (literal ${q(externalPath(path.join(__dirname,'package.json')))}) (literal ${q(worker)}) (literal ${q(sanitizer)}) (literal ${q(slides)}))
 (allow file-read* file-write* (subpath ${q(job)}))
 `;}
 async function runDocumentJob(request,data){

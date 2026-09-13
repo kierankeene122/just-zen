@@ -1,15 +1,17 @@
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {promisify}=require('node:util'),execFile=promisify(require('node:child_process').execFile);
 const {runDocumentJob}=require('./document-helper.cjs');
+function devTestDocument(){try{return require('electron').app?.isPackaged===false && process.env.HEARTH_TEST_DOCUMENT || null;}catch{return null;}}
 function createDocuments(dialog,getWindow){
  let current=null;
  return {
  close(){current=null;return true;},
  async open(){
-  const choice=await dialog.showOpenDialog(getWindow(),{title:'Open local document',properties:['openFile'],filters:[{name:'Documents',extensions:['pdf','docx','txt','rtf']}]});
+  // Development only: a fixed file instead of the dialog, so the pane can be driven by tests.
+  const choice=devTestDocument()?{canceled:false,filePaths:[devTestDocument()]}:await dialog.showOpenDialog(getWindow(),{title:'Open local document',properties:['openFile'],filters:[{name:'Documents',extensions:['pdf','docx','txt','rtf','pptx']}]});
   if(choice.canceled || !choice.filePaths?.[0])return null;
   const file=choice.filePaths[0],type=path.extname(file).slice(1).toLowerCase();
-  if(!['pdf','docx','txt','rtf'].includes(type))throw Error('Unsupported document type');
+  if(!['pdf','docx','txt','rtf','pptx'].includes(type))throw Error('Unsupported document type');
   if((await fs.stat(file)).size>30*1024*1024)throw Error('Choose a document smaller than 30 MB.');
   const data=await fs.readFile(file);let content;
   if(type==='pdf')content=data.toString('base64');
