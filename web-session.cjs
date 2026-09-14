@@ -5,6 +5,8 @@ const PROFILES=new Set(['shared','personal','work','isolated']);
 function partitionFor(profile='isolated',key=''){
  if(!PROFILES.has(profile))throw Error('Invalid browser profile');
  if(profile==='shared')return SHARED_PARTITION;
+ // Google products are one account: every google.com app shares a login instead of asking three times.
+ if(profile==='isolated' && /^web-(gmail|google-|hangouts-)/.test(String(key)))return 'persist:google';
  if(profile==='isolated')return 'persist:isolated-'+require('node:crypto').createHash('sha256').update(String(key)).digest('hex').slice(0,24);
  return 'persist:profile-'+profile;
 }

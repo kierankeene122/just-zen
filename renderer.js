@@ -202,6 +202,7 @@ async function openInTile(serviceKey,tabId,forceIndex=null){cancelPaneChoice();i
  tabId=group.items.some(t=>t.id===tabId)?tabId:group.active;
  const n=slotCount();let index=Number.isInteger(forceIndex) && forceIndex>=0 && forceIndex<n?forceIndex:tiles.slots.findIndex((s,i)=>i<n && s && s.serviceKey===serviceKey);
  if(index<0)index=tiles.slots.findIndex((s,i)=>i<n && !s);
+ if(index<0 && n===1 && tiles.slots[0] && inCall(tiles.slots[0]) && tiles.slots[0].serviceKey!==serviceKey){await setTilesMode('2h');index=1;notice('Kept your call in the left pane.');}
  if(index<0)index=Math.min(tiles.focus,n-1);
  tiles.slots[index]={serviceKey,tabId};tiles.focus=index;
  if(group.active!==tabId){group.active=tabId;call('activate-tab',{serviceKey,tabId}).catch(()=>{});}
@@ -224,7 +225,7 @@ function resumeViews(){viewsSuspended=Math.max(0,viewsSuspended-1);placeViews();
 // Some Chromium builds fire toggle rather than close for dialogs; listen to both and resume exactly once per opening.
 function onDialogClosed(dialog,fn){let armed=false;dialog.addEventListener('toggle',e=>{if(e.newState==='open')armed=true;else if(armed){armed=false;fn();}});dialog.addEventListener('close',()=>{if(armed){armed=false;fn();}});}
 // Nothing legitimately keeps views hidden once every dialog is closed; heal a stuck counter rather than show blank panes.
-function healSuspension(){if(viewsSuspended>0 && !document.querySelector('dialog[open]') && $('tour').classList.contains('hidden') && !document.body.classList.contains('resizing-split'))viewsSuspended=0;}
+function healSuspension(){if(viewsSuspended>0 && !popoverSuspended && !document.querySelector('dialog[open]') && $('tour').classList.contains('hidden') && !document.body.classList.contains('resizing-split'))viewsSuspended=0;}
 // Read-only peek for diagnostics (nothing here can be changed from outside).
 window.__zen=Object.freeze({get suspended(){return viewsSuspended;},get page(){return page;},get focus(){return tiles.focus;}});
 for(const b of document.querySelectorAll('#layout-switch button'))b.onclick=()=>attempt(()=>setTilesMode(b.dataset.tiles));
@@ -573,8 +574,8 @@ function renderAppSearch(){renderWaiting();const grid=$('app-search-grid');const
  grid.querySelector('[aria-selected=true]')?.scrollIntoView({block:'nearest'});}
 // Meeting mode: a live call in any pane offers a fresh note beside it and quiet chat apps until the call ends.
 let meeting=null;
-window.hearth.on('call-started',info=>{if(meeting)return;toast('In a call? Meeting mode opens a fresh note beside it and quiets chat pings until it ends.',{action:'Meeting mode',onAction:()=>attempt(()=>startMeeting(info)),duration:20000});});
-window.hearth.on('call-ended',info=>{if(!meeting || (meeting.key && info.key!==meeting.key))return;attempt(endMeeting);});
+window.hearth.on('call-started',info=>{if(info.key)callSlots.add(info.key+'/'+info.tabId);if(meeting)return;toast('In a call? Meeting mode opens a fresh note beside it and quiets chat pings until it ends.',{action:'Meeting mode',onAction:()=>attempt(()=>startMeeting(info)),duration:20000});});
+window.hearth.on('call-ended',info=>{if(info.key)callSlots.delete(info.key+'/'+info.tabId);if(!meeting || (meeting.key && info.key!==meeting.key))return;attempt(endMeeting);});
 async function startMeeting(info){if(info.peek){const opened=await call('peek-action',{action:'tab'});if(opened)await openInTile(opened.serviceKey,opened.tabId);}
  meeting={key:info.key || null,startedAt:Date.now()};
  const muted=await call('mute-chat',{minutes:120});
@@ -611,6 +612,10 @@ let lastActivity=0;for(const event of ['pointerdown','keydown'])document.addEven
 attempt(async()=>{const state=await call('state');applyTheme(state.theme || 'light');showVersion(state);if(state.locked)setLocked(true,state.lockMethod);else await hydrate(state);});
 
 // Documents open in a pane. Only one document viewer exists, so opening one elsewhere moves it.
+// Panes that are in a call (a meeting page, or simply making sound, like a huddle) are not replaced by a new app in single-pane mode.
+const callSlots=new Set(),audibleSlots=new Set();
+function inCall(slot){if(!slot || !slot.serviceKey)return false;const k=slot.serviceKey+'/'+slot.tabId;return callSlots.has(k) || audibleSlots.has(k);}
+window.hearth.on('audio-state',({key,tabId,audible})=>{const k=key+'/'+tabId;if(audible)audibleSlots.add(k);else audibleSlots.delete(k);});
 // Rearranging panes from the keyboard or the ⇄ badge: the focused pane trades places with its neighbour.
 let lastFocus=0;
 function swapSlots(a,b){const n=slotCount();if(a===b || a<0 || b<0 || a>=n || b>=n)return false;[tiles.slots[a],tiles.slots[b]]=[tiles.slots[b],tiles.slots[a]];lastFocus=a;tiles.focus=b;renderTiles();saveLayout();return true;}
