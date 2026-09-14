@@ -131,7 +131,7 @@ function applyTextEdits(xml,edits){
   const body=/<p:txBody>[\s\S]*?<\/p:txBody>/.exec(block.text);if(!body)continue;
   const paras=body[0].match(/<a:p\b[\s\S]*?<\/a:p>|<a:p\/>/g) || [];
   const pPrOf=p=>(/<a:pPr\b[^>]*\/>|<a:pPr\b[\s\S]*?<\/a:pPr>/.exec(p) || [''])[0];
-  const rPrOf=p=>(/<a:rPr\b[^>]*\/>|<a:rPr\b[\s\S]*?<\/a:rPr>/.exec(p) || [''])[0].replace(/<a:rPr\b/,'<a:rPr').replace(/\s(?:dirty|err)="[^"]*"/g,'');
+  const rPrOf=p=>(/<a:rPr\b[^>]*\/>|<a:rPr\b[\s\S]*?<\/a:rPr>/.exec(p) || [''])[0].replace(/\s(?:dirty|err)="[^"]*"/g,'');
   const endOf=p=>(/<a:endParaRPr\b[^>]*\/>|<a:endParaRPr\b[\s\S]*?<\/a:endParaRPr>/.exec(p) || [''])[0];
   const lines=edit.paragraphs.map(t=>String(t).slice(0,20000));const rebuilt=[];
   for(let i=0;i<lines.length;i++){const src=paras[Math.min(i,paras.length-1)] || '<a:p/>';const pPr=pPrOf(src),rPr=rPrOf(src) || (i>0?rPrOf(paras[Math.min(i-1,paras.length-1)] || ''):'');const end=endOf(src);const segments=lines[i].split('\n');const runs=segments.map((seg,k)=>(k?'<a:br>'+(rPr?rPr:'')+'</a:br>':'')+(seg?'<a:r>'+rPr+'<a:t>'+escapeXml(seg)+'</a:t></a:r>':'')).join('');rebuilt.push('<a:p>'+pPr+runs+end+'</a:p>');}
