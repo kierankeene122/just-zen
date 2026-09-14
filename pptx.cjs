@@ -17,8 +17,8 @@ function readZip(buffer){
   at+=46+nameLen+extraLen+commentLen;
  }
  const raw=name=>{const e=entries.get(name);if(!e)return null;const h=e.local;const start=h+30+buffer.readUInt16LE(h+26)+buffer.readUInt16LE(h+28);return {method:e.method,crc:buffer.readUInt32LE(e.local+14),csize:e.csize,usize:e.usize,data:buffer.subarray(start,start+e.csize)};};
- const read=name=>{const e=entries.get(name);if(!e)return null;if(e.usize>64*1024*1024)throw Error('Presentation part too large');const h=e.local;if(buffer.readUInt32LE(h)!==0x04034b50)return null;const start=h+30+buffer.readUInt16LE(h+26)+buffer.readUInt16LE(h+28);const raw=buffer.subarray(start,start+e.csize);if(e.method===0)return raw;if(e.method===8)return zlib.inflateRawSync(raw);throw Error('Unsupported compression in presentation');};
- return {has:name=>entries.has(name),read,raw,text:name=>{const b=read(name);return b?b.toString('utf8'):null;},names:()=>[...entries.keys()]};
+ const read=name=>{const e=entries.get(name);if(!e)return null;if(e.usize>32*1024*1024)throw Error('Presentation part too large');const h=e.local;if(buffer.readUInt32LE(h)!==0x04034b50)return null;const start=h+30+buffer.readUInt16LE(h+26)+buffer.readUInt16LE(h+28);const raw=buffer.subarray(start,start+e.csize);if(e.method===0)return raw;if(e.method===8)return zlib.inflateRawSync(raw);throw Error('Unsupported compression in presentation');};
+ return {has:name=>entries.has(name),size:name=>entries.get(name)?.usize ?? 0,read,raw,text:name=>{const b=read(name);return b?b.toString('utf8'):null;},names:()=>[...entries.keys()]};
 }
 
 // ---- xml: a tolerant tokenizer that builds a tree; Office XML is well formed and free of CDATA
@@ -76,7 +76,7 @@ function parsePptx(buffer){
  const presRels=rels(zip,'ppt/presentation.xml');
  const slidePaths=findAll(pres,'p:sldId').map(s=>presRels.get(s.attrs['r:id'])?.path).filter(Boolean).slice(0,300);
  const cache=new Map();const load=path=>{if(!cache.has(path)){const t=zip.text(path);cache.set(path,t?parseXml(t):null);}return cache.get(path);};
- const slides=[];let images=0;
+ const slides=[];let images=0,imageBytes=0;const IMAGE_BUDGET=40*1024*1024;
  for(const slidePath of slidePaths){
   const tree=load(slidePath);if(!tree)continue;const slideRels=rels(zip,slidePath);
   const layoutPath=relOfType(slideRels,'/slideLayout')?.path;const layout=layoutPath?load(layoutPath):null;const layoutRels=layoutPath?rels(zip,layoutPath):new Map();
@@ -93,7 +93,7 @@ function parsePptx(buffer){
      const ph=phOf(node);let box=xfrmOf(node);let inherited=null;if(!box && ph){inherited=lookupPlaceholder(tables,ph);box=inherited?.box || null;}
      if(!box)continue;const placed=applyTransform(transform,box);
      const spPr=kid(node,'p:spPr');const geom=kid(spPr,'a:prstGeom')?.attrs.prst || 'rect';
-     if(node.name==='p:pic'){const blip=find(node,'a:blip');const target=blip?slideRels.get(blip.attrs['r:embed'])?.path:null;const data=target && images<60?zip.read(target):null;if(!data || data.length>8*1024*1024)continue;images++;const ext=target.slice(target.lastIndexOf('.')+1).toLowerCase();const mime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',svg:'image/svg+xml',webp:'image/webp',bmp:'image/bmp',tif:'image/tiff',tiff:'image/tiff'}[ext];if(!mime)continue;shapes.push({kind:'image',...placed,src:'data:'+mime+';base64,'+data.toString('base64'),geom});continue;}
+     if(node.name==='p:pic'){const blip=find(node,'a:blip');const target=blip?slideRels.get(blip.attrs['r:embed'])?.path:null;const data=target && images<60 && imageBytes<IMAGE_BUDGET && zip.size(target)<=8*1024*1024?zip.read(target):null;if(!data || imageBytes+data.length>IMAGE_BUDGET)continue;images++;imageBytes+=data.length;const ext=target.slice(target.lastIndexOf('.')+1).toLowerCase();const mime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',svg:'image/svg+xml',webp:'image/webp',bmp:'image/bmp',tif:'image/tiff',tiff:'image/tiff'}[ext];if(!mime)continue;shapes.push({kind:'image',...placed,src:'data:'+mime+';base64,'+data.toString('base64'),geom});continue;}
      const fill=fillOf(spPr,theme) ?? (ph?null:fillOf(kid(node,'p:style') && kid(kid(node,'p:style'),'a:fillRef'),theme));
      const line=kid(spPr,'a:ln');const lineColour=line && !kid(line,'a:noFill')?colourOf(kid(line,'a:solidFill'),theme):null;
      const isTitle=ph && (ph.type==='title' || ph.type==='ctrTitle');const isBody=ph && ['body','obj','subTitle'].includes(ph.type);
