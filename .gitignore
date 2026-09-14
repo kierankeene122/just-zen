@@ -10,3 +10,4 @@ security/promptfoo/results.json
 # Local Browser-pane preview server config
 .claude/launch.json
 .claude/tools/
+.claude/design/
