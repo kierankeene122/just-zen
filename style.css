@@ -448,3 +448,58 @@ body{--document-space:0px}#documents{display:none}
 .waiting-chip b{white-space:nowrap;font-weight:600}.waiting-chip span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .waiting-chip .icon-pair{display:inline-flex}.waiting-chip .site-favicon,.waiting-chip .site-fallback,.waiting-chip .group-icon{width:16px;height:16px;flex:0 0 16px!important;font-size:8px}
 .waiting-task b::before{content:'✓ ';color:var(--accent)}
+
+/* ---- Clean chrome: 48px header, quiet cards, one slim rail, 30px footer ---- */
+header{height:48px;padding:0 14px 0 84px;gap:10px}
+header .brand{font-size:11px;letter-spacing:3px;gap:9px}header .brand img{width:22px;height:22px;border-radius:50%;margin-right:0}
+.hdr-ghost{-webkit-app-region:no-drag;height:30px;min-width:30px;padding:0 11px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--muted);font-size:12px;font-weight:500;white-space:nowrap}
+.hdr-ghost:hover{color:inherit;background:#f3f6fa}[data-theme=dark] .hdr-ghost:hover{background:#242a26}
+.hdr-ghost svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:0 0 16px}
+#bell.hdr-ghost{width:30px;padding:0;margin-left:auto;font-size:0}#bell.hdr-ghost span{display:none}
+#bell-count{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#d9483b;color:#fff;font-size:9px;line-height:16px;text-align:center;font-weight:600;display:block}#bell-count[hidden]{display:none}
+#theme-toggle.hdr-ghost{width:30px;padding:0;margin-left:0}
+#collapse-centre.hdr-ghost{color:#526582}[data-theme=dark] #collapse-centre.hdr-ghost{color:#c7d0c3}
+.layout-switch{margin-left:0}
+main,#agent,#tasks{top:48px}
+/* rails */
+.agent-collapsed #agent{width:64px;background:#fbfcfe}[data-theme=dark] .agent-collapsed #agent{background:#1b1f1c}
+#agent-rail{padding:14px 0;gap:8px}
+#agent-rail span{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#526582}
+#agent-rail:hover span{background:#e8effc;color:#375b9b}
+#agent-rail b{writing-mode:horizontal-tb;font-size:9px;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:#526582;margin-top:-4px}
+#rail-state{font-size:9px}
+#tasks{width:64px;background:#fbfcfe}[data-theme=dark] #tasks{background:#1b1f1c}
+#tasks-rail{padding:14px 0;gap:8px}
+#tasks-rail span{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#526582;position:relative}
+#tasks-rail:hover span{background:#e8effc;color:#375b9b}
+#tasks-rail b{writing-mode:horizontal-tb;font-size:9px;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:#526582;margin-top:-4px}
+#tasks-rail small{position:absolute;top:2px;right:2px;min-width:16px;height:16px;font-size:9px;background:#d9483b}
+#tasks-rail{position:relative}
+body{--side-space:0px}
+#tasks{right:0;width:64px}.tasks-open #tasks{width:300px}
+#agent,.centre-collapsed #agent{right:64px}.tasks-open #agent,.tasks-open.centre-collapsed #agent{right:300px}
+main{right:calc(390px + 64px)}
+.agent-collapsed main{right:calc(64px + 64px)}
+.tasks-open main{right:calc(390px + 300px)}.tasks-open.agent-collapsed main{right:calc(64px + 300px)}
+.agent-collapsed #agent{width:64px}
+.hdr-ghost svg[hidden]{display:none}
+/* footer */
+footer{height:30px;padding:0 16px;font-size:11px;color:var(--muted)}
+footer .footer-actions{gap:14px}footer .footer-actions button{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);padding:0}footer .footer-actions button:hover{color:inherit}
+#app-version{font-size:10px;letter-spacing:1px}
+main{bottom:calc(30px + var(--deck-h))}#agent,#tasks{bottom:30px}
+
+/* One rail on the right: Claude and Tasks side by side in a 64px column; the Claude pane slides open beside it. */
+#agent-rail{display:none!important}
+.agent-collapsed #agent{width:0;border:0;overflow:hidden}
+#tasks{display:flex;flex-direction:column;align-items:center;padding:0;gap:0}
+#claude-rail{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 6px}
+#claude-rail span{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#526582}
+#claude-rail:hover span,#claude-rail.on span{background:#e8effc;color:#375b9b}
+#claude-rail b{font-size:9px;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:#526582}
+#tasks-rail{padding:6px 0;height:auto;width:100%}
+.tasks-open #claude-rail{display:none}
+#agent{right:64px}.tasks-open #agent{right:300px}
+main{right:calc(390px + 64px)}.agent-collapsed main{right:64px}
+.tasks-open main{right:calc(390px + 300px)}.tasks-open.agent-collapsed main{right:300px}
+[data-theme=dark] #claude-rail span,[data-theme=dark] #claude-rail b,[data-theme=dark] #tasks-rail span,[data-theme=dark] #tasks-rail b{color:#c7d0c3}
