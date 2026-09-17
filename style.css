@@ -136,10 +136,10 @@ header{position:relative}
 .ctx-menu button{display:flex;width:100%;text-align:left;padding:7px 10px 7px 26px;border-radius:6px;font-size:12px;position:relative;white-space:nowrap}.ctx-menu button:hover{background:#edf1f7}[data-theme=dark] .ctx-menu button:hover{background:#2a302c}.ctx-menu button.checked::before{content:'✓';position:absolute;left:10px}.ctx-menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 
 /* Tiles: one, two or four apps in the centre, each with its own tab strip. */
-#browser-page{height:100%}#tiles{display:grid;height:100%;gap:2px;background:var(--line)}#tiles[data-mode="1"]{grid-template-columns:1fr}#tiles[data-mode="2h"]{grid-template-columns:1fr 1fr}#tiles[data-mode="2v"]{grid-template-rows:1fr 1fr}#tiles[data-mode="4"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}#tiles[data-mode="3"]{grid-template-columns:1fr 1fr 2.2fr}
+#browser-page{height:100%}#tiles{display:flex;height:100%;gap:2px;background:var(--line)}.tile-col{display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:0;gap:inherit}.tile-col .tile{flex:1 1 0}
 .tile{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}.tile.hidden{display:none}
 .tile-bar{display:flex;align-items:center;gap:6px;height:38px;padding:0 8px;border-bottom:1px solid var(--line);flex-shrink:0;min-width:0}.tile-bar.hidden{display:none}
-#tiles:not([data-mode="1"]) .tile.focused .tile-bar{box-shadow:inset 0 2px var(--accent)}
+#tiles:not([data-panes="1"]) .tile.focused .tile-bar{box-shadow:inset 0 2px var(--accent)}
 .tile-surface{flex:1;min-height:0;position:relative}
 .tile-app{display:flex;align-items:center;gap:7px;padding:4px 8px 4px 4px;border-radius:7px;font-size:11px;font-weight:500;max-width:160px;min-width:0;flex-shrink:0}.tile-app .site-favicon,.tile-app .site-fallback{width:18px;height:18px;flex-basis:18px!important;font-size:9px}.tile-app>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tile-tabs{display:flex;gap:2px;min-width:0;overflow:hidden;flex:1}
@@ -358,7 +358,7 @@ aside .group-card.open .hand>.service-row:hover{transform:translateY(calc(var(--
 #stack-edges{position:absolute;left:12px;right:12px;top:0;height:16px;pointer-events:none;z-index:1}
 #stack-edges .edge{position:absolute;left:var(--inset);right:var(--inset);top:var(--top);height:40px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 -2px 8px -5px rgba(20,30,40,.3)}
 [data-theme=dark] #stack-edges .edge{background:#1d221e}
-#tiles{position:relative;z-index:2;background:transparent;gap:10px}#tiles[data-mode="1"]{gap:0}.tile{border-radius:12px;box-shadow:0 16px 44px -20px rgba(20,30,40,.55),0 0 0 1px var(--line);overflow:hidden}.tile.hidden{display:none}
+#tiles{position:relative;z-index:2;background:transparent;gap:10px}#tiles[data-panes="1"]{gap:0}.tile{border-radius:12px;box-shadow:0 16px 44px -20px rgba(20,30,40,.55),0 0 0 1px var(--line);overflow:hidden}.tile.hidden{display:none}
 .tile-bar{display:none!important}.tile.focused{outline:0}
 /* Browser panes keep an address bar pinned to their bottom edge; other apps show nothing but the page. */
 .tile-urlbar{display:flex;align-items:center;gap:4px;padding:5px 8px;border-top:1px solid var(--line);background:var(--bg);flex:0 0 auto}
@@ -503,3 +503,6 @@ main{bottom:calc(30px + var(--deck-h))}#agent,#tasks{bottom:30px}
 main{right:calc(390px + 64px)}.agent-collapsed main{right:64px}
 .tasks-open main{right:calc(390px + 300px)}.tasks-open.agent-collapsed main{right:300px}
 [data-theme=dark] #claude-rail span,[data-theme=dark] #claude-rail b,[data-theme=dark] #tasks-rail span,[data-theme=dark] #tasks-rail b{color:#c7d0c3}
+
+/* Panes: ＋ adds a column; the pill on each pane splits it top and bottom */
+#layout-switch #add-pane{font-size:18px;line-height:1;font-weight:400}

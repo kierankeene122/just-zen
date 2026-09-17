@@ -2,6 +2,7 @@
 document.getElementById('b').onclick=()=>window.badge.search();
 document.getElementById('x').onclick=()=>window.badge.close();
 document.getElementById('m').onclick=()=>window.badge.move();
+document.getElementById('s').onclick=()=>window.badge.split();
 window.badge.onTheme(theme=>{document.body.dataset.theme=theme;});
 window.badge.onLabelled(on=>{document.body.dataset.labelled=String(Boolean(on));});
 
@@ -10,4 +11,5 @@ window.badge.onLabelled(on=>{document.body.dataset.labelled=String(Boolean(on));
  g.addEventListener('mousedown',e=>{e.preventDefault();last={x:e.screenX,y:e.screenY};});
  window.addEventListener('mousemove',e=>{if(!last)return;const dx=e.screenX-last.x,dy=e.screenY-last.y;if(!dx && !dy)return;last={x:e.screenX,y:e.screenY};window.badge.drag({dx,dy});});
  window.addEventListener('mouseup',()=>{if(!last)return;last=null;window.badge.drag({dx:0,dy:0,done:true});});
- window.addEventListener('mouseleave',()=>{if(!last)return;last=null;window.badge.drag({dx:0,dy:0,done:true});});})();
+ window.addEventListener('mouseleave',()=>{if(!last)return;last=null;window.badge.drag({dx:0,dy:0,done:true});});
+ window.addEventListener('blur',()=>{if(!last)return;last=null;window.badge.drag({dx:0,dy:0,done:true});});})();

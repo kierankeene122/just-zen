@@ -8,7 +8,7 @@ Site: https://justzen.co · Code: https://github.com/kierankeene122/just-zen · 
 
 - One window for all your web apps. Each app keeps its own login, cookies and tabs (several Slack workspaces, two inboxes), isolated from the others unless you choose to share a login.
 - Search, don't switch: a search button sits in the corner of every pane; type a couple of letters, press Enter, and the app snaps into that pane. There is no dock, sidebar or tab bar to hunt through.
-- Layouts: one pane, two side by side, two stacked, two thin columns beside one wide, or four in a grid. Layouts can be saved and switched.
+- Layouts: one pane, two side by side, two stacked, three columns, four in a grid, or as many columns as you need (up to eight panes), with any column split top and bottom. Every gap is draggable. Layouts can be saved and switched.
 - Messages come to you: Slack, Google Chat, Teams, WhatsApp, Telegram and Discord keep running in the background; a bell in the header lists who said what, and clicking an entry opens that app in the current pane on that conversation.
 - Send anything to Claude: select text in any app, note, PDF or terminal and send it to Claude Code with one-click actions (summarise, draft a reply, turn into tasks), or send it straight to your task list. An "About" dropdown lets Claude read any open pane, document or note without selecting.
 - Documents open in a pane: PDF, Word (.docx), PowerPoint (.pptx, with in-place text editing and a Present mode), text and RTF, annotated and saved beside your apps.
