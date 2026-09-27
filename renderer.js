@@ -417,20 +417,6 @@ window.__zen=Object.freeze({get suspended(){return viewsSuspended;},get page(){r
 for(const b of document.querySelectorAll('#layout-switch button[data-tiles]'))b.onclick=()=>attempt(()=>setTilesMode(b.dataset.tiles));
 $('add-pane').onclick=()=>attempt(addPane);
 const LAYOUT_NAMES={'1':'One app','2h':'Two side by side','2v':'Two stacked','3':'Two narrow and one wide','4':'Four in a grid'};
-// The dock opens when the pointer rests on it, and the panes step aside rather than being covered.
-let dockTimer=null;
-function dockOpen(on){
- clearTimeout(dockTimer);
- dockTimer=setTimeout(()=>{
-  if(document.body.classList.contains('dock-open')===on)return;
-  document.body.classList.toggle('dock-open',on);
-  applySplit();placeViews();
- },on?260:180);
-}
-$('dock').addEventListener('mouseenter',()=>dockOpen(true));
-$('dock').addEventListener('mouseleave',()=>dockOpen(false));
-$('dock').addEventListener('focusin',()=>dockOpen(true));
-$('dock').addEventListener('focusout',()=>{if(!$('dock').matches(':hover'))dockOpen(false);});
 $('dock-layouts').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();const shape=modeOf();
  showMenu([...Object.entries(LAYOUT_NAMES).map(([mode,label])=>({label,checked:shape===mode,run:()=>setTilesMode(mode)})),'-',
   {label:'Add a pane',hint:'⌘⇧N',run:addPane},{label:'Split this pane top and bottom',hint:'⌘⇧B',run:()=>splitPane()},{label:'Close this pane',run:()=>closePane(Math.min(tiles.focus,slotCount()-1))},'-',
