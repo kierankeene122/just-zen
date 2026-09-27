@@ -530,9 +530,9 @@ main{right:calc(390px + 64px)}.agent-collapsed main{right:64px}
 .app-tile.on-screen .art{box-shadow:0 0 0 2px var(--accent)}
 
 /* The sidebar app: one app, every workspace, sliding over the panes from the right */
-#sidecar{position:absolute;right:0;left:auto;top:0;bottom:0;animation:sidecar-in .18s ease;width:50%;min-width:320px;max-width:calc(100% - 120px);background:var(--bg);border-left:1px solid var(--line);box-shadow:-18px 0 44px -28px rgba(10,20,30,.55);z-index:4;display:flex;flex-direction:column}
+#sidecar{position:absolute;right:0;left:0;top:0;bottom:0;animation:sidecar-in .18s ease;width:100%;background:var(--bg);border-left:1px solid var(--line);box-shadow:-18px 0 44px -28px rgba(10,20,30,.55);z-index:30;display:flex;flex-direction:column}
 #sidecar.hidden{display:none}
-.sidecar-bar{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 12px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.sidecar-bar{display:flex;align-items:center;gap:8px;height:38px;padding:0 8px 0 6px;border-bottom:1px solid var(--line);flex:0 0 auto}
 .sidecar-bar b{font-size:11px;font-weight:600;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
 .sidecar-bar button{width:24px;height:24px;border-radius:7px;color:var(--muted);font-size:14px;line-height:1;flex:0 0 auto}
 .sidecar-bar button:hover{background:rgba(120,140,160,.14);color:inherit}
@@ -582,3 +582,23 @@ main{right:calc(390px + 64px)}.agent-collapsed main{right:64px}
 #ws-dialog form{min-width:380px}
 .tile.blank .pane-search{opacity:.85}
 .tile-start-hint{letter-spacing:.2px}
+
+/* The app library scrolls as one region: no scrollbar inside a scrollbar */
+#app-dialog{display:flex;flex-direction:column;overflow:hidden;max-height:88vh}
+#app-dialog>*{flex:0 0 auto}
+#app-dialog>#picker-choice,#app-dialog>#installed-panel,#app-dialog>#website-panel,#app-dialog>#browser-panel{display:flex;flex-direction:column;min-height:0;flex:1 1 auto;overflow:auto;scrollbar-gutter:stable}
+#app-dialog #app-list{max-height:none;overflow:visible;flex:0 0 auto}
+#app-dialog .catalogue-pagination{padding-bottom:4px}
+
+/* Dragging a workspace tab into place */
+.ws-tab.dragging{opacity:.45}
+.ws-tab.drop-before{box-shadow:inset 2px 0 0 var(--accent)}
+.ws-tab.drop-after{box-shadow:inset -2px 0 0 var(--accent)}
+
+/* Full-width sidebar: a clear arrow slides it back out of the way */
+#sidecar-close{width:auto;min-width:34px;height:28px;padding:0 10px;border-radius:9px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--muted);border:1px solid var(--line)}
+#sidecar-close:hover{color:inherit;border-color:var(--muted);background:rgba(120,140,160,.12)}
+#sidecar-close svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sidecar-bar b{flex:0 1 auto}
+.sidecar-spacer{flex:1}
+body.sidecar-open #tiles .pane-search,body.sidecar-open #tiles .tile-empty,body.sidecar-open #tiles .tile-start{display:none}

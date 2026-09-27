@@ -27,6 +27,7 @@ const BROWSER_KEY='browser';
 const SLEEP_CHOICES=new Set([0,5,15,30,60,120]);
 const notificationSources=new WeakMap(),notificationOrigins=new WeakMap(),serviceBadges=new Map();
 const { pathToFileURL } = require('node:url');
+let documentShown=false;
 let win, terminal, root = null, claudeRoot = null, config = {}, secureStore, locked=false, lockTimer=null;
 const entry = pathToFileURL(path.join(__dirname, 'index.html')).href;
 // Test hooks are development-only: a packaged app ignores --smoke and HEARTH_DATA.
@@ -287,7 +288,7 @@ function peekOpen(serviceKey,options,url,from=null){
 let appPeek=null;
 function peekRestore(){const parent=peekStack.pop();if(!parent || parent.view.webContents.isDestroyed()){if(parent)peekRestore();else send('peek-closed');return;}peek=parent;send('peek-opened',{serviceKey:parent.serviceKey,name:parent.name});parent.announce?.();}
 function peekClose(){if(appPeek){appPeek=null;send('peek-closed');}for(const p of peekStack.splice(0)){try{win.contentView.removeChildView(p.view);}catch{}try{p.view.webContents.close();}catch{}}if(!peek)return;const {view}=peek;peek=null;try{win.contentView.removeChildView(view);}catch{}try{view.webContents.close();}catch{}send('peek-closed');}
-function peekPlace(box){if(appPeek){if(box?.visible){win.contentView.addChildView(appPeek.view);appPeek.view.setBounds(clipBounds(box));appPeek.view.setVisible(!locked);appPeek.visible=true;appPeek.hiddenSince=0;}return;}if(!peek)return;if(!box?.visible){peek.view.setVisible(false);peek.visible=false;return;}win.contentView.addChildView(peek.view);peek.view.setBounds(clipBounds(box));peek.view.setVisible(!locked);peek.visible=true;}
+function peekPlace(box){if(appPeek){if(box?.visible){win.contentView.addChildView(appPeek.view);setTimeout(()=>{try{raiseBadges();}catch{}},0);appPeek.view.setBounds(clipBounds(box));appPeek.view.setVisible(!locked);appPeek.visible=true;appPeek.hiddenSince=0;}return;}if(!peek)return;if(!box?.visible){peek.view.setVisible(false);peek.visible=false;return;}win.contentView.addChildView(peek.view);peek.view.setBounds(clipBounds(box));peek.view.setVisible(!locked);peek.visible=true;}
 function popupAsTab(serviceKey,options,opener=null){
   // Only a popup from an app the user is looking at gets the drawer; background apps (sign-in bounces, warm-up) get a quiet tab.
   const openerEntry=opener?[...views.values()].find(v=>v.view.webContents===opener):null;
@@ -306,7 +307,7 @@ function attachView(serviceKey,tabId,view,url){
   const isBrowser=isBrowserItem(item);
   const preferences=preferencesFor(serviceKey);
   const entry={view,serviceKey,tabId,visible:false,hiddenSince:Date.now(),mobile:false,desktopUA:view.webContents.getUserAgent()};
-  views.set(key,entry);win.contentView.addChildView(view);view.setVisible(false);
+  views.set(key,entry);win.contentView.addChildView(view);view.setVisible(false);setTimeout(()=>{try{raiseBadges();}catch{}},0);
   const contents=view.webContents;
   contents.once('destroyed',()=>{if(views.get(key)===entry){views.delete(key);try{win.contentView.removeChildView(view);}catch{}}});
   contents.on('focus',()=>send('tab-focused',{serviceKey,tabId}));
@@ -372,7 +373,13 @@ function ensureBadge(i){if(badges[i] && !badges[i].view.webContents.isDestroyed(
   c.on('render-process-gone',reset);c.on('unresponsive',reset);
   return entry;}
 // Views added since the last placement (a popup tab, a warmed chat app) can land above a badge; lift any buried badge back up.
-function raiseBadges(){if(!win || win.isDestroyed())return;const kids=win.contentView.children;let top=-1;kids.forEach((v,i)=>{if(v.getVisible?.() && !badges.some(b=>b && b.view===v))top=i;});for(const b of badges)if(b && b.visible && !b.view.webContents.isDestroyed() && kids.indexOf(b.view)<top)win.contentView.addChildView(b.view);}
+function raiseBadges(){if(!win || win.isDestroyed() || !badges.some(b=>b && b.visible))return;const kids=win.contentView.children;
+  // Work from what this process knows is on screen: View.getVisible is not available everywhere.
+  let top=-1;const note=v=>{const i=v?kids.indexOf(v):-1;if(i>top)top=i;};
+  for(const e of views.values())if(e.visible)note(e.view);
+  if(appPeek?.visible)note(appPeek.view);if(peek?.visible)note(peek.view);if(documentShown)note(documentView);
+  if(top<0)return;
+  for(const b of badges)if(b && b.visible && !b.view.webContents.isDestroyed() && kids.indexOf(b.view)<top)win.contentView.addChildView(b.view);}
 function badgeLabelled(){return (config.searchUses || 0)<4;}
 function placeBadges(list){const wanted=new Map();for(const p of list)if(Number.isInteger(p.slot) && p.slot>=0 && p.slot<MAX_PANES)wanted.set(p.slot,p);
   for(let i=0;i<MAX_PANES;i++){const p=wanted.get(i);if(!p){if(badges[i]?.visible){badges[i].view.setVisible(false);badges[i].visible=false;}continue;}
@@ -596,7 +603,7 @@ app.whenReady().then(async () => {
   ipcMain.on('popover-remove',async (e,input)=>{try{popoverTrusted(e);if(!input || typeof input.key!=='string' || typeof input.folderId!=='string')return;config.services=setFolder(config.services || [],input.key,null,config.serviceFolders || []);await persist();send('sidebar-changed',{services:config.services,folders:config.serviceFolders || []});const cb=win.getContentBounds();await showPopover({folderId:input.folderId,left:popover.__anchor.x-cb.x,top:popover.__anchor.y-cb.y});}catch{}});
   win.on('move',()=>hidePopover());win.on('resize',()=>hidePopover());
   handle('document-capture-all',()=>{dc.send('capture-selection','claude-all');return true;});
-  handle('document-bounds',box=>{if(!box || box.visible===false){documentView.setVisible(false);return;}const [w,h]=win.getContentSize();if(!['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid document bounds');const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));win.contentView.addChildView(documentView);documentView.setBounds({x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))});if(typeof documentView.setBorderRadius==='function')try{documentView.setBorderRadius(0);}catch{}documentView.setVisible(!locked);});
+  handle('document-bounds',box=>{if(!box || box.visible===false){documentShown=false;documentView.setVisible(false);return;}documentShown=true;const [w,h]=win.getContentSize();if(!['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid document bounds');const x=Math.max(0,Math.min(w,Math.round(box.x))),y=Math.max(0,Math.min(h,Math.round(box.y)));win.contentView.addChildView(documentView);documentView.setBounds({x,y,width:Math.max(0,Math.min(w-x,Math.round(box.width))),height:Math.max(0,Math.min(h-y,Math.round(box.height)))});if(typeof documentView.setBorderRadius==='function')try{documentView.setBorderRadius(0);}catch{}documentView.setVisible(!locked);});
   handle('document-request-open',()=>{dc.send('open-request');return true;});
   dc.loadURL(documentEntry);
   handle('state',stateSnapshot);
@@ -660,7 +667,7 @@ app.whenReady().then(async () => {
   ipcMain.on('web-unread',(e,count)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;const source=notificationSources.get(e.sender);if(!source?.saved)return;const n=Math.max(0,Math.min(9999,Number(count) || 0));if(source.domUnread===n)return;source.domUnread=n;const previous=serviceBadges.get(entry.serviceKey) || 0;const merged=Math.max(unreadCount(e.sender.getTitle()),n);updateServiceBadge(entry.serviceKey,merged);if(merged>previous && !entry.visible && !isMuted(entry.serviceKey))pushRecent({key:entry.serviceKey,name:source.name,count:merged});}catch{}});
   handle('peek-bounds',box=>{if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid peek bounds');peekPlace(box);return true;});
   handle('peek-close',()=>{peekClose();return true;});
-  if(!app.isPackaged)handle('debug-views',()=>({tiles:[...views.values()].map(v=>({key:v.serviceKey.slice(0,8),tab:v.tabId.slice(0,6),visible:v.visible,bounds:v.view.getBounds(),peeked:appPeek===v})),peek:peek?{visible:peek.visible,bounds:peek.view.getBounds()}:null,badges:badges.map(b=>b&&b.visible?b.view.getBounds():null)}));
+  if(!app.isPackaged)handle('debug-views',()=>({order:win.contentView.children.map(v=>{const b=badges.findIndex(x=>x && x.view===v);if(b>=0)return 'badge'+b;const e=[...views.values()].find(x=>x.view===v);return e?(e.serviceKey.slice(0,8)+(e.visible?'*':'')):(v===documentView?'document':'other');}),tiles:[...views.values()].map(v=>({key:v.serviceKey.slice(0,8),tab:v.tabId.slice(0,6),visible:v.visible,bounds:v.view.getBounds(),peeked:appPeek===v})),peek:peek?{visible:peek.visible,bounds:peek.view.getBounds()}:null,badges:badges.map(b=>b&&b.visible?b.view.getBounds():null)}));
   handle('peek-action',({action}={})=>{if(appPeek){const key=appPeek.serviceKey,tabId=appPeek.tabId;if(action==='tab' || action==='beside'){peekClose();return {serviceKey:key,tabId,tabs:tabsFor(key),beside:action==='beside'};}if(action==='reload'){appPeek.view.webContents.reload();return true;}return null;}if(!peek)return null;const c=peek.view.webContents;if(action==='back' && c.navigationHistory.canGoBack()){c.navigationHistory.goBack();return true;}if(action==='reload'){c.reload();return true;}const url=c.getURL(),key=peek.serviceKey;if(!/^https?:/i.test(url))return null;if(action==='tab'){const opened=openTab(key,url,true);peekClose();return opened;}if(action==='beside'){const opened=openTab(key,url,false);peekClose();return {...opened,beside:true};}return null;});
   handle('set-peek-links',async on=>{config.peekLinks=Boolean(on);await persist();return config.peekLinks;});
   ipcMain.on('web-peek-link',(e,url)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || locked || typeof url!=='string' || !/^https?:/i.test(url))return;peekOpen(entry.serviceKey,null,url);}catch{}});
@@ -742,7 +749,7 @@ app.whenReady().then(async () => {
   const sleeper=setInterval(()=>{sleepSweep();expireMutes();},30_000);sleeper.unref?.();
   // A hidden page is also told to throttle itself: Chromium slows timers and animations once the view is not visible.
   win.on('blur',()=>{for(const entry of views.values())if(!entry.visible)try{entry.view.webContents.setBackgroundThrottling(true);}catch{}});
-  const lifter=setInterval(()=>{try{raiseBadges();}catch{}},2500);lifter.unref?.();win.on('focus',()=>{try{raiseBadges();}catch{}});
+  const lifter=setInterval(()=>{try{raiseBadges();}catch{}},1200);lifter.unref?.();win.on('focus',()=>{try{raiseBadges();}catch{}});
   setTimeout(warmChatApps,6000).unref?.();
   if(!smoke){let index=0;const warm=()=>{if(!win || win.isDestroyed())return;const sites=(config.services || []).filter(s=>s.url);if(index>=sites.length)return;if(!locked){const item=sites[index++];const key=item.id || item.url;try{const tabs=tabsFor(key);ensureView(key,tabs.active);}catch{}}setTimeout(warm,1500);};setTimeout(warm,1500);}
   if(smoke) {
