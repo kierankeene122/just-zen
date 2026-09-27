@@ -584,9 +584,9 @@ main{right:calc(390px + 64px)}.agent-collapsed main{right:64px}
 .tile-start-hint{letter-spacing:.2px}
 
 /* The app library scrolls as one region: no scrollbar inside a scrollbar */
-#app-dialog{display:flex;flex-direction:column;overflow:hidden;max-height:88vh}
-#app-dialog>*{flex:0 0 auto}
-#app-dialog>#picker-choice,#app-dialog>#installed-panel,#app-dialog>#website-panel,#app-dialog>#browser-panel{display:flex;flex-direction:column;min-height:0;flex:1 1 auto;overflow:auto;scrollbar-gutter:stable}
+#app-dialog[open]{display:flex;flex-direction:column;overflow:hidden;max-height:88vh}
+#app-dialog[open]>*{flex:0 0 auto}
+#app-dialog[open]>#picker-choice,#app-dialog[open]>#installed-panel,#app-dialog[open]>#website-panel,#app-dialog[open]>#browser-panel{display:flex;flex-direction:column;min-height:0;flex:1 1 auto;overflow:auto;scrollbar-gutter:stable}
 #app-dialog #app-list{max-height:none;overflow:visible;flex:0 0 auto}
 #app-dialog .catalogue-pagination{padding-bottom:4px}
 
