@@ -230,7 +230,7 @@ async function switchWorkspace(id){
 async function addWorkspace(){
  if(workspaces.length>=9){notice('Nine workspaces is the limit. Close one first.');return;}
  const open=workspaces.find(w=>w.id===workspaceId);if(open)open.tiles=tiles;
- const id='w'+Date.now().toString(36);workspaces.push({id,name:'Workspace '+(workspaces.length+1),icon:Object.keys(WS_ICONS)[(workspaces.length+1)%Object.keys(WS_ICONS).length],colour:Object.keys(WS_COLOURS)[workspaces.length%7],tiles:{cols:[{rows:1,split:.5}],widths:[1],slots:[null],focus:0}});
+ const id='w'+Date.now().toString(36);workspaces.push({id,name:'Space '+(workspaces.length+1),icon:Object.keys(WS_ICONS)[(workspaces.length+1)%Object.keys(WS_ICONS).length],colour:Object.keys(WS_COLOURS)[workspaces.length%7],tiles:{cols:[{rows:1,split:.5}],widths:[1],slots:[null],focus:0}});
  workspaceId=id;tiles=normaliseTiles(workspaces[workspaces.length-1].tiles);
  if(page!=='browser-page')await show('browser-page');
  renderWorkspaces();renderTiles();await saveWorkspaces();openAppSearch(0);
@@ -278,12 +278,14 @@ function renderTiles(){
  normaliseSlots();
  const host=$('tiles');const shape=modeOf();host.dataset.mode=shape;host.dataset.panes=String(slotCount());host.replaceChildren();
  for(const b of document.querySelectorAll('#layout-switch button[data-tiles]'))b.setAttribute('aria-pressed',String(b.dataset.tiles===shape));
+ $('dock-layouts').title='Panes: '+(LAYOUT_NAMES[shape] || slotCount()+' panes')+' · click for splits';
  const n=slotCount();const colEls=tiles.cols.map((c,ci)=>{const colEl=el('div','tile-col');colEl.dataset.col=String(ci);colEl.style.flexGrow=String(tiles.widths[ci]*1000);host.append(colEl);return colEl;});
  for(let i=0;i<n;i++){
   const {col,row}=slotPos(i);const colEl=colEls[col];const tile=el('div','tile');tile.dataset.slot=String(i);if(tiles.cols[col].rows===2)tile.style.flexGrow=String((row===0?tiles.cols[col].split:1-tiles.cols[col].split)*1000);
   if(n>1 && i===tiles.focus)tile.classList.add('focused');
   const slot=tiles.slots[i],item=slot?serviceOf(slot.serviceKey):null,group=slot?tabs[slot.serviceKey]:null;
   const bar=el('div','tile-bar'),surface=el('div','tile-surface'),progress=el('div','tile-progress');surface.append(progress);const ghost=el('button','pane-search');ghost.type='button';ghost.title='Find an app for this pane';ghost.append(searchGlyph(),el('span',null,'Find an app'));ghost.onclick=()=>{tiles.focus=i;openAppSearch(i);};surface.append(ghost);
+  tile.onmouseenter=()=>call('badge-hover',{slot:i}).catch(()=>{});tile.onmouseleave=()=>call('badge-hover',{slot:-1}).catch(()=>{});
   tile.onmousedown=()=>{if(tiles.focus!==i && n>1){lastFocus=tiles.focus;tiles.focus=i;for(const t of host.querySelectorAll('.tile'))t.classList.toggle('focused',t===tile);saveLayout();updateZoomControl();}};
   if(slot && slot.kind==='document'){tile.classList.add('document');bar.classList.add('hidden');tile.append(bar,surface);colEl.append(tile);continue;}
   if(!slot || !item || !group){
@@ -414,6 +416,26 @@ function healSuspension(){if(viewsSuspended>0 && !popoverSuspended && !document.
 window.__zen=Object.freeze({get suspended(){return viewsSuspended;},get page(){return page;},get focus(){return tiles.focus;}});
 for(const b of document.querySelectorAll('#layout-switch button[data-tiles]'))b.onclick=()=>attempt(()=>setTilesMode(b.dataset.tiles));
 $('add-pane').onclick=()=>attempt(addPane);
+const LAYOUT_NAMES={'1':'One app','2h':'Two side by side','2v':'Two stacked','3':'Two narrow and one wide','4':'Four in a grid'};
+// The dock opens when the pointer rests on it, and the panes step aside rather than being covered.
+let dockTimer=null;
+function dockOpen(on){
+ clearTimeout(dockTimer);
+ dockTimer=setTimeout(()=>{
+  if(document.body.classList.contains('dock-open')===on)return;
+  document.body.classList.toggle('dock-open',on);
+  applySplit();placeViews();
+ },on?260:180);
+}
+$('dock').addEventListener('mouseenter',()=>dockOpen(true));
+$('dock').addEventListener('mouseleave',()=>dockOpen(false));
+$('dock').addEventListener('focusin',()=>dockOpen(true));
+$('dock').addEventListener('focusout',()=>{if(!$('dock').matches(':hover'))dockOpen(false);});
+$('dock-layouts').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();const shape=modeOf();
+ showMenu([...Object.entries(LAYOUT_NAMES).map(([mode,label])=>({label,checked:shape===mode,run:()=>setTilesMode(mode)})),'-',
+  {label:'Add a pane',hint:'⌘⇧N',run:addPane},{label:'Split this pane top and bottom',hint:'⌘⇧B',run:()=>splitPane()},{label:'Close this pane',run:()=>closePane(Math.min(tiles.focus,slotCount()-1))},'-',
+  {label:'Swap panes',hint:'⌘⇧S',run:swapPanes},{label:'Make this the wide one',hint:'⌘⇧=',run:widenPane}],r.right+6,r.top);};
+$('dock-layouts').oncontextmenu=e=>{e.preventDefault();$('dock-layouts').click();};
 $('layout-switch').addEventListener('contextmenu',e=>{e.preventDefault();showMenu([{label:'Save current layout…',run:openPresetDialog},...(presets.length?['-',...presets.map(p=>({label:'Switch to '+p.name,run:()=>applyPreset(p)}))]:[])],e.clientX,e.clientY);});
 function openPresetDialog(){suspendViews();$('preset-dialog').showModal();$('preset-name').value='';$('preset-name').focus();}
 $('preset-cancel').onclick=()=>$('preset-dialog').close();onDialogClosed($('preset-dialog'),resumeViews);
@@ -845,6 +867,12 @@ new ResizeObserver(size).observe($('terminal'));
 window.addEventListener('beforeunload',e=>{if(dirty() || running || chatState.busy){if(!confirm('Close Just Zen? Unsaved edits and running work will be stopped.')){e.preventDefault();e.returnValue=false;}}});
 for(const id of ['markdown-preview','chat-messages'])$(id).addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;e.preventDefault();const href=a.getAttribute('href');attempt(async()=>{if(href.startsWith('#vault-note=')){const target=decodeURIComponent(href.slice(12)).split('#')[0];await openFile(await call('resolve-note',{target,from:currentFile}));}else if(/^https?:/i.test(href)){await openBrowser(href);}else if(!href.startsWith('#')){const target=decodeURIComponent(href).split('#')[0];await openFile(await call('resolve-note',{target,from:currentFile}));}});});
 document.addEventListener('keydown',e=>{if(e.key==='Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && (document.activeElement===document.body || document.activeElement===null) && !document.querySelector('dialog[open]') && deckCards().some(c=>c.classList.contains('companion'))){e.preventDefault();attempt(deckCompanion);return;}if(!e.metaKey)return;if(e.key==='s' && page==='files-page'){e.preventDefault();attempt(save);}if(e.shiftKey && e.key.toLowerCase()==='f'){e.preventDefault();attempt(openFiles);}if(e.key===',' && !e.shiftKey){e.preventDefault();attempt(()=>show('settings-page'));}if(e.shiftKey && e.key.toLowerCase()==='d'){e.preventDefault();attempt(()=>show('security-page'));}if(/^[1-9]$/.test(e.key) && !e.shiftKey && !e.altKey){e.preventDefault();attempt(()=>deckSelect(Number(e.key)-1));}if((e.key==='[' || e.key===']') && !e.shiftKey && !e.altKey){e.preventDefault();attempt(()=>deckStep(e.key===']'?1:-1));}if(e.key.toLowerCase()==='k' && !e.shiftKey && !e.altKey){e.preventDefault();attempt(openPalette);}});
+// Quiet chrome: the pane buttons stay out of the way and come back on hover, or while ⌘ is held.
+let revealHeld=false;
+function holdReveal(on){if(on===revealHeld)return;revealHeld=on;call('badge-reveal',{on}).catch(()=>{});}
+document.addEventListener('keydown',e=>{if(e.key==='Meta' || e.key==='Control')holdReveal(true);});
+document.addEventListener('keyup',e=>{if(e.key==='Meta' || e.key==='Control')holdReveal(false);});
+window.addEventListener('blur',()=>holdReveal(false));
 let lastActivity=0;for(const event of ['pointerdown','keydown'])document.addEventListener(event,()=>{const now=Date.now();if(now-lastActivity>60_000){lastActivity=now;call('app-activity').catch(()=>{});}},{capture:true});
 attempt(async()=>{const state=await call('state');applyTheme(state.theme || 'light');showVersion(state);if(state.locked)setLocked(true,state.lockMethod);else await hydrate(state);});
 

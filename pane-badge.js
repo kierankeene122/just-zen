@@ -3,6 +3,9 @@ document.getElementById('b').onclick=()=>window.badge.search();
 document.getElementById('x').onclick=()=>window.badge.close();
 document.getElementById('m').onclick=()=>window.badge.move();
 document.getElementById('s').onclick=()=>window.badge.split();
+window.addEventListener('mouseenter',()=>window.badge.hover(true));
+window.addEventListener('mouseleave',()=>window.badge.hover(false));
+document.addEventListener('mouseover',()=>window.badge.hover(true));
 window.badge.onTheme(theme=>{document.body.dataset.theme=theme;});
 window.badge.onLabelled(on=>{document.body.dataset.labelled=String(Boolean(on));});
 

@@ -602,3 +602,101 @@ main{right:calc(390px + 64px)}.agent-collapsed main{right:64px}
 .sidecar-bar b{flex:0 1 auto}
 .sidecar-spacer{flex:1}
 body.sidecar-open #tiles .pane-search,body.sidecar-open #tiles .tile-empty,body.sidecar-open #tiles .tile-start{display:none}
+
+/* ---------- Direction 01+02: one dock on the left, no top bar ---------- */
+body{--dock:56px;--wintop:0px}
+body.platform-win{--wintop:32px}
+#winbar{display:none}
+body.platform-win #winbar{display:block;position:fixed;left:0;right:0;top:0;height:var(--wintop);-webkit-app-region:drag;background:var(--bg);border-bottom:1px solid var(--line);z-index:6}
+
+#dock{position:fixed;left:0;top:var(--wintop);bottom:0;width:var(--dock);z-index:6;display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 0 8px;background:var(--bg);border-right:1px solid var(--line);border-bottom:0;height:auto;overflow:visible}
+.dock-drag{height:74px;width:100%;flex:0 0 74px;-webkit-app-region:drag}
+body.platform-win .dock-drag{height:10px;flex-basis:10px}
+#dock .brand{display:flex;align-items:center;justify-content:center;width:32px;height:32px;margin:0 0 8px;font-size:0;flex:0 0 auto}
+#dock .brand img{width:24px;height:24px}
+.dock-spacer{flex:1 1 auto;min-height:8px}
+#dock button{-webkit-app-region:no-drag}
+
+/* Every dock button reads the same: a 40px tile with a whisper of a label. */
+#dock>button,#dock .ws-tab,#dock .ws-add{width:44px;min-width:44px;max-width:44px;height:auto;padding:6px 0 5px;border:0;background:transparent;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);box-shadow:none}
+#dock>button svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#dock>button b,#dock .ws-tab .ws-label{font-size:8px;line-height:1.1;letter-spacing:.5px;text-transform:uppercase;font-weight:600;max-width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+#dock>button:hover,#dock .ws-tab:hover{background:rgba(120,140,160,.13);color:inherit}
+#dock>button.on{background:rgba(120,140,160,.16);color:inherit}
+#dock #layout-switch,#dock #zoom-switch,#dock #collapse-centre{display:none!important}
+
+/* Workspaces: a stack of coloured marks, the open one carried by its colour */
+#dock .ws-switch{flex-direction:column;gap:2px;margin:0;overflow:visible;width:100%;align-items:center}
+#dock .ws-tab{gap:3px}
+#dock .ws-tab .ws-icon,#dock .ws-tab .ws-dot{color:var(--ws-colour,#8a97a4)}
+#dock .ws-tab .ws-dot{width:9px;height:9px;margin:5px 0}
+#dock .ws-tab .ws-glyph{width:19px;height:19px;stroke-width:1.6}
+#dock .ws-tab[aria-pressed=true]{background:color-mix(in srgb,var(--ws-colour) 16%,transparent);color:inherit;box-shadow:none}
+#dock .ws-tab[aria-pressed=true] .ws-label{color:inherit}
+#dock .ws-tab.drop-before{box-shadow:inset 0 2px 0 var(--accent)}
+#dock .ws-tab.drop-after{box-shadow:inset 0 -2px 0 var(--accent)}
+#dock .ws-add{font-size:17px;color:var(--muted);padding:2px 0 4px}
+#dock .ws-add:hover{background:rgba(120,140,160,.13);color:inherit}
+
+/* Bell and theme keep their shapes but lose their frames */
+#dock #bell,#dock #theme-toggle{width:44px;height:36px;border:0;border-radius:10px;margin:0}
+#dock #bell svg,#dock #theme-toggle svg{width:19px;height:19px}
+#dock #bell-count{position:absolute;top:2px;right:8px}
+#dock #sidecar-rail .sidecar-art{width:22px;height:22px;font-size:17px;border-radius:7px;background:transparent}
+#dock #sidecar-rail .sidecar-art img,#dock #sidecar-rail .sidecar-art .site-fallback{width:20px;height:20px;flex:0 0 20px!important;border-radius:6px}
+#dock #claude-rail,#dock #tasks-rail{width:44px;padding:6px 0 5px;gap:3px}
+#dock #claude-rail span,#dock #tasks-rail span{width:auto;height:auto;background:transparent;font-size:17px;color:inherit}
+#dock #claude-rail:hover span,#dock #claude-rail.on span,#dock #tasks-rail:hover span{background:transparent}
+#dock #tasks-rail small{top:2px;right:6px}
+
+/* The panes own the window: nothing above them, one rail beside them */
+main{left:var(--dock);top:var(--wintop);right:0;bottom:30px}
+#browser-page{top:0}
+#agent{top:var(--wintop);right:0}
+#tasks{top:var(--wintop);right:0;width:0;padding:0;border:0}
+#tasks>button{display:none!important}
+.tasks-open #tasks{width:300px;border-left:1px solid var(--line)}
+.agent-collapsed main{right:0}
+main{right:390px}
+.agent-collapsed main{right:0}
+.tasks-open main{right:300px}
+.tasks-open:not(.agent-collapsed) main{right:calc(390px + 300px)}
+.tasks-open #agent{right:300px}
+footer{left:var(--dock)}
+
+/* Dock order: workspaces at the top, tools at the foot */
+#dock .dock-drag{order:-5}
+#dock .brand{order:-4}
+#dock .ws-switch{order:-3}
+#dock #dock-layouts{order:-2;margin-top:6px;position:relative}
+#dock #dock-layouts::before{content:'';position:absolute;top:-4px;left:10px;right:10px;height:1px;background:var(--line)}
+#dock .dock-spacer{order:0}
+#dock #sidecar-rail{order:1}
+#dock #claude-rail{order:2}
+#dock #tasks-rail{order:3}
+#dock #bell{order:4;position:relative}
+#dock #theme-toggle{order:5}
+
+/* The dock opens on hover: names in full, and the panes make room rather than being covered */
+body{--dock:60px}
+body.dock-open{--dock:184px}
+body.dock-open #dock{align-items:stretch;padding-left:8px;padding-right:8px}
+body.dock-open #dock .brand{align-self:flex-start;margin-left:2px}
+body.dock-open #dock>button,body.dock-open #dock .ws-tab,body.dock-open #dock .ws-add{width:100%;min-width:0;max-width:none;flex-direction:row;justify-content:flex-start;gap:10px;padding:8px 10px;height:36px}
+body.dock-open #dock>button b,body.dock-open #dock .ws-tab .ws-label{font-size:11px;letter-spacing:.2px;text-transform:none;font-weight:500;max-width:none;text-align:left;flex:1;min-width:0}
+body.dock-open #dock .ws-tab .ws-dot{margin:0 5px}
+body.dock-open #dock .ws-switch{width:100%}
+body.dock-open #dock #dock-layouts::before{left:2px;right:2px}
+body.dock-open #dock #bell-count{position:static;margin-left:auto}
+body.dock-open #dock #tasks-rail small{position:static;margin-left:auto}
+body.dock-open #dock #bell,body.dock-open #dock #theme-toggle{justify-content:flex-start}
+body.dock-open #dock #bell::after{content:'Recent';font-size:11px;font-weight:500;color:inherit}
+body.dock-open #dock #theme-toggle::after{content:'Theme';font-size:11px;font-weight:500;color:inherit}
+/* Collapsed, only the open workspace says its name; the rest are their colour and mark */
+#dock .ws-tab .ws-label{display:none}
+#dock .ws-tab[aria-pressed=true] .ws-label{display:block}
+body.dock-open #dock .ws-tab .ws-label{display:block}
+
+body.dock-open #dock #sidecar-rail,body.dock-open #dock #claude-rail,body.dock-open #dock #tasks-rail,body.dock-open #dock #bell,body.dock-open #dock #theme-toggle,body.dock-open #dock #dock-layouts{width:100%;max-width:none;flex-direction:row;justify-content:flex-start;gap:10px;padding:8px 10px;height:36px}
+body.dock-open #dock #claude-rail b,body.dock-open #dock #tasks-rail b,body.dock-open #dock #sidecar-rail b{font-size:11px;letter-spacing:.2px;text-transform:none;font-weight:500;max-width:none;text-align:left}
+body.dock-open #dock #sidecar-rail .sidecar-art,body.dock-open #dock #claude-rail span,body.dock-open #dock #tasks-rail span{width:22px;flex:0 0 22px;justify-content:center}

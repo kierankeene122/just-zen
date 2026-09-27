@@ -83,3 +83,17 @@ const MESSAGE_PROBES={
  'teams.microsoft.com':()=>{const nodes=[...document.querySelectorAll('[data-tid="chat-pane-message"], [data-tid="message-body-content"], .message-body')];const last=nodes[nodes.length-1];if(!last)return null;const text=(last.textContent || '').trim();const sender=(last.closest('[data-tid="chat-pane-item"]')?.querySelector('[data-tid="message-author-name"]')?.textContent || '').trim();return text?{sender:sender.slice(0,80),text:text.slice(0,300)}:null;}
 };
 if(window===window.top){const probe=Object.entries(MESSAGE_PROBES).find(([host])=>location.hostname===host || location.hostname.endsWith('.'+host))?.[1];if(probe){let last='',armed=false,timer=null;const run=()=>{timer=null;let m=null;try{m=probe();}catch{}if(!m)return;const sig=m.sender+'\0'+m.text;if(sig===last)return;const first=!armed;last=sig;armed=true;if(first || !document.hidden)return;ipcRenderer.send('web-message',m);};const observer=new MutationObserver(()=>{if(!timer)timer=setTimeout(run,1200);});observer.observe(document.documentElement,{childList:true,subtree:true});setTimeout(run,3000);}}
+
+// Quiet chrome: tell the app when the pointer is near the top of this pane, so the pane's buttons
+// can stay out of the way the rest of the time. Only a boolean ever leaves the page.
+if(window===window.top){
+ let band=false,sent=0;
+ const set=value=>{const now=Date.now();if(value===band && now-sent<2000)return;band=value;sent=now;ipcRenderer.send('pane-pointer',{band:value});};
+ window.addEventListener('mousemove',e=>{set(e.clientY<96);},{passive:true,capture:true});
+ window.addEventListener('mouseleave',()=>set(false),{passive:true,capture:true});
+ window.addEventListener('blur',()=>set(false));
+ const hold=on=>ipcRenderer.send('pane-reveal',{on});
+ window.addEventListener('keydown',e=>{if(e.key==='Meta' || e.key==='Control')hold(true);},{capture:true});
+ window.addEventListener('keyup',e=>{if(e.key==='Meta' || e.key==='Control')hold(false);},{capture:true});
+ window.addEventListener('blur',()=>hold(false));
+}

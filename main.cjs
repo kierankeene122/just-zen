@@ -373,20 +373,34 @@ function ensureBadge(i){if(badges[i] && !badges[i].view.webContents.isDestroyed(
   c.on('render-process-gone',reset);c.on('unresponsive',reset);
   return entry;}
 // Views added since the last placement (a popup tab, a warmed chat app) can land above a badge; lift any buried badge back up.
-function raiseBadges(){if(!win || win.isDestroyed() || !badges.some(b=>b && b.visible))return;const kids=win.contentView.children;
+function raiseBadges(){if(!win || win.isDestroyed() || !badges.some(b=>b && b.placed))return;const kids=win.contentView.children;
   // Work from what this process knows is on screen: View.getVisible is not available everywhere.
   let top=-1;const note=v=>{const i=v?kids.indexOf(v):-1;if(i>top)top=i;};
   for(const e of views.values())if(e.visible)note(e.view);
   if(appPeek?.visible)note(appPeek.view);if(peek?.visible)note(peek.view);if(documentShown)note(documentView);
   if(top<0)return;
-  for(const b of badges)if(b && b.visible && !b.view.webContents.isDestroyed() && kids.indexOf(b.view)<top)win.contentView.addChildView(b.view);}
+  for(const b of badges)if(b && b.placed && !b.view.webContents.isDestroyed() && kids.indexOf(b.view)<top)win.contentView.addChildView(b.view);}
 function badgeLabelled(){return (config.searchUses || 0)<4;}
+// Quiet chrome: a pane's buttons are placed all the time but only shown when they are wanted —
+// while the pointer is near the top of that pane, while the pointer is on the buttons themselves,
+// or while ⌘ is held. Until search has been used a few times they simply stay visible.
+let badgeReveal=false,badgeHover=-1;const badgeBand=new Set();
+function badgeWanted(i){return badgeLabelled() || badgeReveal || badgeHover===i || badgeBand.has(i);}
+function applyBadgeVisibility(){
+  for(let i=0;i<MAX_PANES;i++){const b=badges[i];if(!b || b.view.webContents.isDestroyed())continue;
+    const show=Boolean(b.placed) && !locked && badgeWanted(i);
+    if(b.visible!==show){b.view.setVisible(show);b.visible=show;}}
+}
+function setBadgeReveal(on){if(badgeReveal===on)return;badgeReveal=on;applyBadgeVisibility();}
+function setBadgeHover(i){if(badgeHover===i)return;badgeHover=i;applyBadgeVisibility();}
+function setBadgeBand(i,inBand){if(i<0)return;const had=badgeBand.has(i);if(inBand===had)return;if(inBand)badgeBand.add(i);else badgeBand.delete(i);applyBadgeVisibility();}
 function placeBadges(list){const wanted=new Map();for(const p of list)if(Number.isInteger(p.slot) && p.slot>=0 && p.slot<MAX_PANES)wanted.set(p.slot,p);
-  for(let i=0;i<MAX_PANES;i++){const p=wanted.get(i);if(!p){if(badges[i]?.visible){badges[i].view.setVisible(false);badges[i].visible=false;}continue;}
+  for(let i=0;i<MAX_PANES;i++){const p=wanted.get(i);if(!p){const b=badges[i];if(b){b.placed=false;if(b.visible){b.view.setVisible(false);b.visible=false;}}badgeBand.delete(i);continue;}
     const b=ensureBadge(i);const wide=badgeLabelled()?286:184;const spot=(config.badgeSpots || {})[i];const bx=spot?Math.round(p.x+Math.max(0,Math.min(1,spot.fx))*(p.width-wide)):p.x+p.width-wide-6;const by=spot?Math.round(p.y+Math.max(0,Math.min(1,spot.fy))*(p.height-44)):p.y+6;b.pane={x:p.x,y:p.y,width:p.width,height:p.height,wide};const box=clipBounds({x:bx,y:by,width:wide,height:44});
     // Re-adding raises the badge above any view added since (a new tab, the document viewer), so it never ends up buried.
-    win.contentView.addChildView(b.view);b.attached=true;
-    b.view.setBounds(box);if(!b.visible){b.view.setVisible(!locked);b.visible=true;}}}
+    win.contentView.addChildView(b.view);b.attached=true;b.placed=true;
+    b.view.setBounds(box);}
+  applyBadgeVisibility();}
 function retintBadges(){for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-theme',config.theme || 'light');}
 // An app can opt into the mobile web when its pane is thin (phone user agent and viewport); by default a narrow pane is just the site in a smaller window.
 const MOBILE_WIDTH=480;
@@ -401,15 +415,15 @@ function placeViews(list){
     if(p && p.document===true && ['x','y','width','height'].every(k=>Number.isFinite(p[k])))continue;
     if(!p || typeof p.serviceKey!=='string' || typeof p.tabId!=='string' || !['x','y','width','height'].every(k=>Number.isFinite(p[k])))throw Error('Invalid placement');
     let entry=null;try{entry=ensureView(p.serviceKey,p.tabId);}catch{}
-    if(entry)wanted.set(viewKey(p.serviceKey,p.tabId),{...clipBounds(p),radius:Number.isFinite(p.radius)?Math.max(0,Math.min(24,Math.round(p.radius))):0});
+    if(entry)wanted.set(viewKey(p.serviceKey,p.tabId),{...clipBounds(p),radius:Number.isFinite(p.radius)?Math.max(0,Math.min(24,Math.round(p.radius))):0,slot:Number.isInteger(p.slot)?p.slot:-1});
   }
   if(locked){placeBadges([]);return [];}
   const sideEntry=list.find(p=>p && p.sidecar===true && typeof p.serviceKey==='string');
   for(const [key,entry] of views){
     if(appPeek && entry===appPeek)continue;
     const box=wanted.get(key);
-    if(box){entry.view.setBounds({x:box.x,y:box.y,width:box.width,height:box.height});const mobile=box.width<MOBILE_WIDTH && serviceItem(entry.serviceKey)?.mobile===true;if(entry.mobile!==mobile){entry.mobile=mobile;clearTimeout(entry.formTimer);entry.formTimer=setTimeout(()=>applyFormFactor(entry),400);}if(typeof entry.view.setBorderRadius==='function' && entry.radius!==box.radius){entry.radius=box.radius;try{entry.view.setBorderRadius(box.radius);}catch{}}if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
-    else if(entry.visible){entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}
+    if(box){entry.slot=Number.isInteger(box.slot)?box.slot:-1;entry.view.setBounds({x:box.x,y:box.y,width:box.width,height:box.height});const mobile=box.width<MOBILE_WIDTH && serviceItem(entry.serviceKey)?.mobile===true;if(entry.mobile!==mobile){entry.mobile=mobile;clearTimeout(entry.formTimer);entry.formTimer=setTimeout(()=>applyFormFactor(entry),400);}if(typeof entry.view.setBorderRadius==='function' && entry.radius!==box.radius){entry.radius=box.radius;try{entry.view.setBorderRadius(box.radius);}catch{}}if(!entry.visible){entry.view.setVisible(true);entry.visible=true;entry.hiddenSince=0;}}
+    else if(entry.visible){entry.slot=-1;entry.view.setVisible(false);entry.visible=false;entry.hiddenSince=Date.now();}
   }
   // The sidebar app slides over the panes, so its view is re-added last of the app views to sit on top.
   if(sideEntry){const side=views.get(viewKey(sideEntry.serviceKey,sideEntry.tabId));if(side && side.visible)win.contentView.addChildView(side.view);}
@@ -605,10 +619,16 @@ app.whenReady().then(async () => {
   ipcMain.on('popover-edit',(e,id)=>{try{popoverTrusted(e);hidePopover();if(typeof id==='string' && (config.serviceFolders || []).some(f=>f.id===id))send('edit-group',id);}catch{}});
   ipcMain.on('popover-close',e=>{try{popoverTrusted(e);hidePopover();}catch{}});
   ipcMain.on('pane-search',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{search:i});});
-  handle('search-used',async(payload)=>{config.searchUses=(config.searchUses || 0)+1;const key=typeof payload?.key==='string' && payload.key.length<200?payload.key:'';if(key){const uses=config.appUses && typeof config.appUses==='object'?config.appUses:{};uses[key]=Math.min(9999,(Number(uses[key]) || 0)+1);const keys=Object.keys(uses);if(keys.length>400)for(const k of keys.sort((a,b)=>(uses[a]||0)-(uses[b]||0)).slice(0,keys.length-400))delete uses[k];config.appUses=uses;}await persist();if(!badgeLabelled())for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-labelled',false);return true;});
+  handle('search-used',async(payload)=>{config.searchUses=(config.searchUses || 0)+1;const key=typeof payload?.key==='string' && payload.key.length<200?payload.key:'';if(key){const uses=config.appUses && typeof config.appUses==='object'?config.appUses:{};uses[key]=Math.min(9999,(Number(uses[key]) || 0)+1);const keys=Object.keys(uses);if(keys.length>400)for(const k of keys.sort((a,b)=>(uses[a]||0)-(uses[b]||0)).slice(0,keys.length-400))delete uses[k];config.appUses=uses;}await persist();if(!badgeLabelled()){for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-labelled',false);applyBadgeVisibility();}return true;});
   // Dragging the grip moves the badge; the drop point is kept as a fraction of the pane, so it survives resizes.
   ipcMain.on('pane-drag',(e,delta)=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);const b=badges[i];if(i<0 || !b?.pane || !delta)return;const cur=b.view.getBounds();const nx=Math.max(b.pane.x,Math.min(b.pane.x+b.pane.width-b.pane.wide,cur.x+Number(delta.dx || 0))),ny=Math.max(b.pane.y,Math.min(b.pane.y+b.pane.height-44,cur.y+Number(delta.dy || 0)));b.view.setBounds({x:Math.round(nx),y:Math.round(ny),width:cur.width,height:cur.height});if(delta.done){config.badgeSpots=config.badgeSpots || {};config.badgeSpots[i]={fx:(nx-b.pane.x)/Math.max(1,b.pane.width-b.pane.wide),fy:(ny-b.pane.y)/Math.max(1,b.pane.height-44)};persistSoon();}});
   ipcMain.on('pane-move',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{move:1,from:i});});
+  ipcMain.on('pane-pointer',(e,payload)=>{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;setBadgeBand(entry.slot ?? -1,payload?.band===true);});
+  ipcMain.on('pane-reveal',(e,payload)=>{if(![...views.values()].some(v=>v.view.webContents===e.sender))return;setBadgeReveal(payload?.on===true);});
+  ipcMain.on('pane-hover',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0)setBadgeHover(i);});
+  ipcMain.on('pane-unhover',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && badgeHover===i)setBadgeHover(-1);});
+  handle('badge-reveal',({on}={})=>{setBadgeReveal(on===true);return true;});
+  handle('badge-hover',({slot}={})=>{setBadgeHover(Number.isInteger(slot)?slot:-1);return true;});
   ipcMain.on('pane-split',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{split:i});});
   ipcMain.on('pane-close',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{close:i});});
   ipcMain.on('popover-remove',async (e,input)=>{try{popoverTrusted(e);if(!input || typeof input.key!=='string' || typeof input.folderId!=='string')return;config.services=setFolder(config.services || [],input.key,null,config.serviceFolders || []);await persist();send('sidebar-changed',{services:config.services,folders:config.serviceFolders || []});const cb=win.getContentBounds();await showPopover({folderId:input.folderId,left:popover.__anchor.x-cb.x,top:popover.__anchor.y-cb.y});}catch{}});
