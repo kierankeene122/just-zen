@@ -526,6 +526,9 @@ function subscriptionEnv(){
 // Claude runs inside an operating-system sandbox, which this app only provides on macOS. Elsewhere it stays off rather than run unsandboxed.
 const CLAUDE_SUPPORTED=process.platform==='darwin';
 const CLAUDE_UNAVAILABLE='Claude is not available on Windows yet: it runs inside a macOS sandbox, and Just Zen will not run it without one.';
+// findClaude throws when the bundled binary is missing (every non-macOS build). Nothing at startup may depend on it.
+function claudeBinary(){try{return findClaude();}catch{return null;}}
+function requireClaude(){if(!CLAUDE_SUPPORTED)throw Error(CLAUDE_UNAVAILABLE);return findClaude();}
 function startTerminal(kind = 'claude') {
   if(!CLAUDE_SUPPORTED && kind!=='shell')throw Error(CLAUDE_UNAVAILABLE);
   if (kind!=='login' && !claudeRoot) throw Error('Choose a Claude workspace first');
@@ -534,12 +537,20 @@ function startTerminal(kind = 'claude') {
   if(chat?.state.busy)throw Error('Stop the chat turn before starting a terminal');
   const env=subscriptionEnv();
   // 'login' runs the CLI's browser sign-in against Just Zen's own Claude config directory.
-  terminal = pty.spawn(kind === 'shell' ? '/bin/zsh' : findClaude(), kind === 'shell' ? ['-l'] : kind==='login' ? ['auth','login','--claudeai'] : [], {name:'xterm-256color',cols:70,rows:32,cwd:claudeRoot || app.getPath('userData'),env});
+  terminal = pty.spawn(kind === 'shell' ? (process.platform==='win32'?(process.env.COMSPEC || 'cmd.exe'):'/bin/zsh') : requireClaude(), kind === 'shell' ? ['-l'] : kind==='login' ? ['auth','login','--claudeai'] : [], {name:'xterm-256color',cols:70,rows:32,cwd:claudeRoot || app.getPath('userData'),env});
   const current = terminal;
   current.onData(data => send('terminal-data',data));
   current.onExit(({exitCode}) => { if(terminal === current) terminal = null; send('terminal-exit',exitCode); });
   return true;
 }
+// A failure during startup must never leave a running process with no window: say what went wrong and stop.
+function startupFailed(error){
+  const detail=String(error && error.stack || error);
+  try{require('node:fs').appendFileSync(path.join(app.getPath('userData'),'startup-error.log'),new Date().toISOString()+' '+detail+'\n');}catch{}
+  try{dialog.showErrorBox('Just Zen could not start',detail.slice(0,2000));}catch{}
+  app.exit(1);
+}
+process.on('uncaughtException',error=>{if(!win)startupFailed(error);else console.error(error);});
 app.whenReady().then(async () => {
   secureStore=createSecureStore({fs,safeStorage,userData:app.getPath('userData')});
   passwords=createPasswordVault({fs,safeStorage,userData:app.getPath('userData')});
@@ -550,7 +561,7 @@ app.whenReady().then(async () => {
   locked=Boolean(config.appLock);
   favicon=createFaviconCache(path.join(app.getPath('userData'),'favicons'),net,createImageDecoder({BrowserWindow}));
   nativeTheme.themeSource=config.theme || 'light';
-  chat=new ChatSession({claudePath:findClaude(),emit:state=>send('chat-state',state),policy:()=>({mode:config.claudePolicy || 'notes',root:claudeRoot}),env:()=>({...subscriptionEnv(),ANTHROPIC_API_KEY:undefined,ANTHROPIC_AUTH_TOKEN:undefined,ANTHROPIC_BASE_URL:undefined,CLAUDE_CODE_USE_BEDROCK:undefined,CLAUDE_CODE_USE_VERTEX:undefined,CLAUDE_CODE_USE_FOUNDRY:undefined}),save:async state=>{if(!claudeRoot)return;config.chats=config.chats || {};config.chats[claudeRoot]=state;await persist();}});
+  chat=new ChatSession({claudePath:claudeBinary(),emit:state=>send('chat-state',state),policy:()=>({mode:config.claudePolicy || 'notes',root:claudeRoot}),env:()=>({...subscriptionEnv(),ANTHROPIC_API_KEY:undefined,ANTHROPIC_AUTH_TOKEN:undefined,ANTHROPIC_BASE_URL:undefined,CLAUDE_CODE_USE_BEDROCK:undefined,CLAUDE_CODE_USE_VERTEX:undefined,CLAUDE_CODE_USE_FOUNDRY:undefined}),save:async state=>{if(!claudeRoot)return;config.chats=config.chats || {};config.chats[claudeRoot]=state;await persist();}});
   chat.restore(config.chats?.[claudeRoot]);
   win = new BrowserWindow({show:false,width:1440,height:940,minWidth:1100,minHeight:700,title:'Just Zen',icon:path.join(__dirname,'assets','justzen.png'),titleBarStyle:process.platform==='darwin'?'hiddenInset':'hidden',...(process.platform==='win32'?{titleBarOverlay:{color:'#ffffff',symbolColor:'#354258',height:44}}:{}),backgroundColor:'#ffffff',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
   // Send the current selection, wherever the focus is, to the Claude context card or to Tasks. Nothing is sent to Claude until the user picks an action.
@@ -633,8 +644,8 @@ app.whenReady().then(async () => {
   handle('appearance',async ({theme,mode,layout,sidecar})=>{if(sidecar && typeof sidecar==='object'){const key=typeof sidecar.key==='string' && sidecar.key.length<200?sidecar.key:'';config.sidecar={key,open:key?sidecar.open===true:false};}if(theme && !['light','dark'].includes(theme))throw Error('Invalid theme');if(mode && !['chat','terminal','files'].includes(mode))throw Error('Invalid mode');if(layout && typeof layout==='object')config.layout=validLayout(layout);if(theme){config.theme=theme;nativeTheme.themeSource=theme;retheme();}if(mode)config.mode=mode;await persist();return true;});
   handle('chat-send',async (prompt,meta)=>{if(!CLAUDE_SUPPORTED)throw Error(CLAUDE_UNAVAILABLE);if(!claudeRoot)throw Error('Choose a Claude workspace first');if(terminal)throw Error('Stop the terminal session before sending a chat message');if(chat.state.busy)throw Error('Wait for the current reply');const sandbox=await prepareClaudeSandbox({fs,root:claudeRoot,mode:config.claudePolicy || 'notes',userData:app.getPath('userData'),packageRoot:__dirname,nodePath:findNode(),claudePath:findClaude(),configDir:claudeConfigDir});const openApps=(config.services || []).filter(openable).map(s=>s.name);chat.run(prompt,claudeRoot,sandbox.executable,{from:cleanFrom(meta?.from),apps:openApps}).catch(error=>send('notice',error.message));return true;});
   handle('chat-stop',()=>chat.stop());
-  handle('claude-logout',async()=>{if(terminal || chat.state.busy)throw Error('Stop Claude before signing out');try{await execFile(findClaude(),['auth','logout'],{env:subscriptionEnv(),timeout:15000});}catch(error){if(!/not logged in/i.test(String(error.stdout || '')+String(error.stderr || '')))throw Error('Sign-out failed: '+String(error.stderr || error.message).trim().slice(0,200));}chat.restore(null);chat.publish();config.chats={};await persist();return true;});
-  handle('claude-auth-status',async()=>{let auth={loggedIn:false};try{auth=JSON.parse((await execFile(findClaude(),['auth','status','--json'],{env:subscriptionEnv(),timeout:15000})).stdout);}catch(error){try{auth=JSON.parse(String(error.stdout || '{}'));}catch{}}return {loggedIn:Boolean(auth.loggedIn && auth.authMethod==='claude.ai'),installed:!(auth.loggedIn===false && !auth.authMethod && false)};});
+  handle('claude-logout',async()=>{if(terminal || chat.state.busy)throw Error('Stop Claude before signing out');try{await execFile(requireClaude(),['auth','logout'],{env:subscriptionEnv(),timeout:15000});}catch(error){if(!/not logged in/i.test(String(error.stdout || '')+String(error.stderr || '')))throw Error('Sign-out failed: '+String(error.stderr || error.message).trim().slice(0,200));}chat.restore(null);chat.publish();config.chats={};await persist();return true;});
+  handle('claude-auth-status',async()=>{let auth={loggedIn:false};try{auth=JSON.parse((await execFile(requireClaude(),['auth','status','--json'],{env:subscriptionEnv(),timeout:15000})).stdout);}catch(error){try{auth=JSON.parse(String(error.stdout || '{}'));}catch{}}return {loggedIn:Boolean(auth.loggedIn && auth.authMethod==='claude.ai'),installed:!(auth.loggedIn===false && !auth.authMethod && false)};});
   handle('chat-permission',value=>chat.respond(value));
   handle('chat-new',async ()=>{if(chat.state.busy)throw Error('Stop the current reply first');chat.restore(null);chat.publish();config.chats=config.chats || {};delete config.chats[claudeRoot];await persist();});
   handle('files',files);
@@ -813,7 +824,7 @@ app.whenReady().then(async () => {
       console.log('SMOKE PASS: renderer, bridge, vault, path containment, tabs, groups, real PTY'); app.quit();
     } catch(e) {console.error(e);app.exit(1);}
   }
-});
+}).catch(startupFailed);
 // Closing the window quits. If anything stalls the quit (a child process, a pending dialog), force the exit so a relaunch starts clean.
 function warmChatApps(){if(locked)return;for(const item of (config.services || []).filter(openable)){if(!isChatItem(item))continue;const key=item.id || item.url;for(const tab of tabsFor(key).items){try{ensureView(key,tab.id);}catch{}}}}
 let quitting=false;
