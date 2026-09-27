@@ -304,9 +304,9 @@ main>section.page-entering{opacity:0;transform:translateY(-3px)}
 /* Dock: the app nav as a floating pill along the bottom of the centre. The centre leaves a band for it, since web views are native layers. */
 /* Card deck: the active app is one elevated card over the canvas; the rest stack behind it and are represented by a 32px icon strip. */
 body{--deck-h:0px;--spring:cubic-bezier(.34,1.45,.64,1)}
-aside{display:none!important}
+body>aside{display:none!important}
 main{left:0;bottom:calc(34px + var(--deck-h))}
-.centre-collapsed aside{display:none}
+.centre-collapsed body>aside{display:none}
 aside{left:var(--main-left,0px);top:var(--main-top,64px);width:var(--main-width,100%);height:calc(var(--main-height,0px) + var(--deck-h));bottom:auto;padding:0;display:block;overflow:visible;pointer-events:none;z-index:100;background:transparent!important;border:0!important}
 #deck-zone{position:absolute;left:0;right:0;bottom:0;height:var(--deck-h);pointer-events:auto;display:flex;align-items:flex-end;justify-content:center}
 #deck-strip{display:flex;align-items:flex-end;gap:4px;height:32px;margin-bottom:4px;padding:0 6px;overflow:visible}
@@ -321,12 +321,12 @@ aside .floating-add-app{position:static;transform:none;width:36px;height:32px;bo
 .pane-search svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.1;stroke-linecap:round}
 #overview{position:relative}
 .tile-empty .tile-find{display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:14px;border:1px solid var(--line);font-size:13px;background:transparent;color:inherit}.tile-empty .tile-find svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}.tile-empty .tile-find:hover{border-color:var(--accent)}
-#find-app{width:760px;max-width:calc(100vw - 80px);max-height:82vh;padding:0;border-radius:20px;overflow:hidden;position:fixed;inset:0;margin:auto;height:fit-content;box-shadow:0 30px 80px -30px rgba(10,20,30,.6)}
+#find-app{width:900px;max-width:calc(100vw - 80px);max-height:82vh;padding:0;border-radius:20px;overflow:hidden;position:fixed;inset:0;margin:auto;height:fit-content;box-shadow:0 30px 80px -30px rgba(10,20,30,.6)}
 #find-app::backdrop{background:rgba(20,26,32,.45);backdrop-filter:blur(6px)}
 .app-search-head{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}.app-search-head>svg{width:22px;height:22px;flex:0 0 22px;fill:none;stroke:var(--muted);stroke-width:1.9;stroke-linecap:round}
 #app-search-input{flex:1;font:22px Georgia,serif;border:0;background:transparent;color:inherit;outline:0;min-width:0}#app-search-input::placeholder{color:var(--muted)}
 #app-search-target{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap}#app-search-close{font-size:24px;color:var(--muted);width:32px;height:32px;border-radius:9px}#app-search-close:hover{background:var(--line)}
-#app-search-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding:18px 22px 22px;overflow:auto;max-height:calc(82vh - 80px)}
+#app-search-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:6px 8px;padding:12px 18px 18px;overflow:auto;max-height:calc(82vh - 80px)}
 .app-tile{display:flex;flex-direction:column;align-items:center;gap:9px;padding:16px 10px 12px;border-radius:16px;border:1px solid transparent;background:transparent;color:inherit;position:relative;cursor:pointer;text-align:center;min-width:0;width:100%}.app-tile:hover{background:var(--line)}.app-tile[aria-selected=true]{border-color:var(--accent);background:#c4d3ab33}
 .app-tile .art{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--line);overflow:hidden}.app-tile .art img,.app-tile .art .site-fallback{width:44px;height:44px;flex:0 0 44px!important;object-fit:contain;font-size:18px;background:transparent}.app-tile .art .group-icon{width:44px;height:44px;flex:0 0 44px;display:flex;align-items:center;justify-content:center;font-size:24px}.app-tile .art .ms-icon{width:28px;height:28px}
 .app-tile .app-tile-name{display:block;width:100%;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.app-tile .app-tile-group{display:block;width:100%;font-size:10px;color:var(--muted);margin-top:-5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -354,11 +354,8 @@ aside .group-card.open .hand>.service-row{opacity:1;pointer-events:auto;transfor
 aside .group-card.open .hand>.service-row:hover{transform:translateY(calc(var(--hand-i,0)*-40px - 3px)) scale(1.02);z-index:40}
 .group-card.open{z-index:90}
 /* The active app is a card: rounded, elevated, with the rest of the deck peeking out behind its top edge. */
-#browser-page{position:absolute;left:0;right:0;top:0;bottom:0;height:auto;padding:16px 12px 8px}
-#stack-edges{position:absolute;left:12px;right:12px;top:0;height:16px;pointer-events:none;z-index:1}
-#stack-edges .edge{position:absolute;left:var(--inset);right:var(--inset);top:var(--top);height:40px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 -2px 8px -5px rgba(20,30,40,.3)}
-[data-theme=dark] #stack-edges .edge{background:#1d221e}
-#tiles{position:relative;z-index:2;background:transparent;gap:10px}#tiles[data-panes="1"]{gap:0}.tile{border-radius:12px;box-shadow:0 16px 44px -20px rgba(20,30,40,.55),0 0 0 1px var(--line);overflow:hidden}.tile.hidden{display:none}
+#browser-page{position:absolute;left:0;right:0;top:0;bottom:0;height:auto;padding:0}
+[data-theme=dark] #tiles{position:relative;z-index:2;background:var(--line);gap:1px}#tiles[data-panes="1"]{gap:0}.tile{border-radius:0;box-shadow:none;overflow:hidden;background:var(--bg)}.tile.hidden{display:none}
 .tile-bar{display:none!important}.tile.focused{outline:0}
 /* Browser panes keep an address bar pinned to their bottom edge; other apps show nothing but the page. */
 .tile-urlbar{display:flex;align-items:center;gap:4px;padding:5px 8px;border-top:1px solid var(--line);background:var(--bg);flex:0 0 auto}
@@ -492,8 +489,14 @@ main{bottom:calc(30px + var(--deck-h))}#agent,#tasks{bottom:30px}
 /* One rail on the right: Claude and Tasks side by side in a 64px column; the Claude pane slides open beside it. */
 #agent-rail{display:none!important}
 .agent-collapsed #agent{width:0;border:0;overflow:hidden}
-#tasks{display:flex;flex-direction:column;align-items:center;padding:0;gap:0}
-#claude-rail{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 6px}
+#tasks{display:flex;flex-direction:column;align-items:center;padding:8px 0 0;gap:0}
+#sidecar-rail{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 6px}
+#sidecar-rail b{font-size:9px;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:#526582;max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sidecar-rail .sidecar-art{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#526582}
+#sidecar-rail:hover .sidecar-art,#sidecar-rail.on .sidecar-art{background:#e8effc;color:#375b9b}
+[data-theme=dark] #sidecar-rail b,[data-theme=dark] #sidecar-rail .sidecar-art{color:#c7d0c3}
+.tasks-open #sidecar-rail{display:none}
+#claude-rail{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 0}
 #claude-rail span{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#526582}
 #claude-rail:hover span,#claude-rail.on span{background:#e8effc;color:#375b9b}
 #claude-rail b{font-size:9px;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:#526582}
@@ -506,3 +509,76 @@ main{right:calc(390px + 64px)}.agent-collapsed main{right:64px}
 
 /* Panes: ＋ adds a column; the pill on each pane splits it top and bottom */
 #layout-switch #add-pane{font-size:18px;line-height:1;font-weight:400}
+
+/* Workspaces: named arrangements of the same apps, switched from the header */
+.ws-switch{display:flex;align-items:center;gap:2px;-webkit-app-region:no-drag;margin-left:10px;min-width:0;overflow:hidden}
+.ws-tab{height:26px;max-width:150px;padding:0 10px;border-radius:8px;font-size:11px;font-weight:600;letter-spacing:.2px;color:var(--muted);background:transparent;border:1px solid transparent;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+.ws-tab:hover{background:rgba(120,140,160,.12);color:inherit}
+.ws-tab[aria-pressed=true]{background:var(--bg);border-color:var(--line);color:inherit;box-shadow:0 1px 2px rgba(20,30,40,.06)}
+.ws-add{width:24px;height:24px;border-radius:8px;font-size:15px;line-height:1;color:var(--muted);flex:0 0 auto}
+.ws-add:hover{background:rgba(120,140,160,.12);color:inherit}
+.ws-switch.single .ws-tab{opacity:.75}
+
+/* Picker with many apps: section headings, and a mark on the ones already on screen */
+.app-search-section{grid-column:1/-1;font-size:10px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);padding:12px 4px 2px;border-top:1px solid var(--line);margin-top:4px}
+.app-search-section:first-child{border-top:0;margin-top:0;padding-top:2px}
+#app-search-grid .app-tile{padding:11px 8px 9px;gap:7px}
+#app-search-grid .app-tile .art,#app-search-grid .app-tile .art img,#app-search-grid .app-tile .art .site-fallback{width:34px;height:34px;flex-basis:34px!important}
+#app-search-grid .app-tile .app-tile-name{font-size:11.5px}
+#app-search-grid .app-tile .app-tile-group{margin-top:-4px;min-height:12px}
+.app-tile.on-screen .app-tile-group{color:var(--accent);font-weight:600}
+.app-tile.on-screen .art{box-shadow:0 0 0 2px var(--accent)}
+
+/* The sidebar app: one app, every workspace, sliding over the panes from the right */
+#sidecar{position:absolute;right:0;left:auto;top:0;bottom:0;animation:sidecar-in .18s ease;width:50%;min-width:320px;max-width:calc(100% - 120px);background:var(--bg);border-left:1px solid var(--line);box-shadow:-18px 0 44px -28px rgba(10,20,30,.55);z-index:4;display:flex;flex-direction:column}
+#sidecar.hidden{display:none}
+.sidecar-bar{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 12px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.sidecar-bar b{font-size:11px;font-weight:600;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.sidecar-bar button{width:24px;height:24px;border-radius:7px;color:var(--muted);font-size:14px;line-height:1;flex:0 0 auto}
+.sidecar-bar button:hover{background:rgba(120,140,160,.14);color:inherit}
+.sidecar-surface{flex:1;min-height:0}
+#sidecar-rail .sidecar-art{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:17px}
+#sidecar-rail .sidecar-art img,#sidecar-rail .sidecar-art .site-fallback{width:24px;height:24px;flex:0 0 24px!important;border-radius:7px;object-fit:contain}
+#sidecar-rail.on{background:rgba(120,140,160,.16)}
+
+/* Workspace tabs carry a colour and an icon so the right one is easy to land on */
+.ws-tab{display:flex;align-items:center;gap:6px}
+.ws-tab .ws-dot{width:7px;height:7px;border-radius:50%;background:var(--ws-colour,#8a97a4);flex:0 0 7px}
+.ws-tab .ws-icon{font-size:13px;line-height:1;flex:0 0 auto}
+.ws-tab .ws-icon+.ws-dot,.ws-tab .ws-dot+.ws-icon{display:none}
+.ws-tab[aria-pressed=true]{border-color:var(--ws-colour,var(--line));box-shadow:inset 0 -2px 0 var(--ws-colour,transparent)}
+.ws-colours{display:flex;gap:8px;margin:6px 0 2px}
+.ws-colours button{width:26px;height:26px;border-radius:50%;border:2px solid transparent;background:var(--swatch)}
+.ws-colours button[aria-checked=true]{border-color:var(--accent);box-shadow:0 0 0 2px rgba(120,140,160,.25)}
+#ws-dialog form{display:flex;flex-direction:column;gap:10px;min-width:320px}
+
+/* An empty browser pane: one big search in the middle, no bottom bar until something is loaded */
+.tile.blank .tile-urlbar{display:none}
+.tile-start{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;background:var(--bg)}
+.tile-start-mark{font-size:34px;line-height:1;opacity:.9}
+.tile-start-form{display:flex;align-items:center;gap:10px;width:min(560px,86%);padding:0 8px 0 16px;height:52px;border-radius:26px;border:1px solid var(--line);background:var(--bg);box-shadow:0 10px 30px -22px rgba(20,30,40,.6)}
+.tile-start-form:focus-within{border-color:var(--accent);box-shadow:0 10px 30px -20px rgba(20,30,40,.7)}
+.tile-start-form>svg{width:18px;height:18px;flex:0 0 18px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round}
+.tile-start-input{flex:1;min-width:0;border:0;background:transparent;color:inherit;font-size:15px;outline:0}
+.tile-start-go{width:36px;height:36px;border-radius:50%;flex:0 0 36px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#42b5f5 0%,#39c7c0 50%,#a8d88b 100%);color:#0f3346}
+.tile-start-go svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.tile-start-hint{margin:0;font-size:11.5px;color:var(--muted);max-width:420px}
+
+@keyframes sidecar-in{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){#sidecar{animation:none}}
+.tile.covered .pane-search,.tile.covered .tile-empty,.tile.covered .tile-start{display:none}
+
+/* Flat icons for workspace tabs */
+.ws-glyph{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;display:block}
+.ws-tab .ws-icon{display:flex;align-items:center;justify-content:center;color:var(--ws-colour,#8a97a4)}
+.ws-tab[aria-pressed=true] .ws-icon{color:var(--ws-colour,inherit)}
+.ws-icons{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin:2px 0 6px}
+.ws-icon-choice{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);background:transparent}
+.ws-icon-choice .ws-glyph{width:17px;height:17px}
+.ws-icon-choice .ws-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.ws-icon-choice:hover{color:inherit;border-color:var(--muted)}
+.ws-icon-choice[aria-checked=true]{border-color:var(--accent);color:inherit;box-shadow:inset 0 0 0 1px var(--accent)}
+.ws-field-label{font-size:11px;color:var(--muted);letter-spacing:.3px}
+#ws-dialog form{min-width:380px}
+.tile.blank .pane-search{opacity:.85}
+.tile-start-hint{letter-spacing:.2px}

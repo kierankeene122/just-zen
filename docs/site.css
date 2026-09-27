@@ -225,3 +225,14 @@ a.brand{text-decoration:none;color:inherit}
 
 .shot.film{margin-top:44px}.shot.film video{display:block;width:100%;height:auto;background:#eef4f7}
 .explore{padding:110px 0 0}.explore h2{font-size:clamp(28px,3.4vw,42px);font-variation-settings:"opsz" 144}
+
+/* Workspaces mock */
+.mock-ws-tabs{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mock-ws-tab{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:9px;font-size:13px;font-weight:600;color:var(--ink-2);border:1px solid transparent}
+.mock-ws-tab::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--c)}
+.mock-ws-tab.on{border-color:var(--c);color:var(--ink);box-shadow:inset 0 -2px 0 var(--c)}
+.mock-ws-add{color:var(--ink-2);font-size:16px;padding:0 6px}
+.mock-ws-panes{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px;margin-top:16px;height:150px}
+.mock-ws-panes span{background:var(--line);border-radius:10px;display:block}
+.mock-ws-panes span.tall{background:linear-gradient(180deg,var(--line) 0 48%,transparent 48% 52%,var(--line) 52% 100%)}
+.mock-ws-note{margin-top:14px;font-size:13px;color:var(--ink-2)}
