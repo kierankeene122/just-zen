@@ -651,13 +651,20 @@ async function newTaskList(name){
  const result=await call('create-task-folder',{name:clean});
  taskFolders=result.folders;taskTarget=result.id;renderTodos();return result.id;
 }
+function caretGlyph(){const ns='http://www.w3.org/2000/svg';const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 20 20');svg.setAttribute('aria-hidden','true');svg.classList.add('caret');const p=document.createElementNS(ns,'path');p.setAttribute('d','M7 5l6 5-6 5');svg.append(p);return svg;}
 function listHead(folder,count){
  const id=folder?folder.id:'';const head=el('div','task-list-head');head.dataset.list=id;
- const twist=el('button','task-twist',foldedLists.has(id)?'▸':'▾');twist.type='button';twist.title=foldedLists.has(id)?'Show these tasks':'Hide these tasks';
- twist.onclick=()=>{if(foldedLists.has(id))foldedLists.delete(id);else foldedLists.add(id);rememberFolded();renderTodos();};
+ const folded=foldedLists.has(id);
+ const toggle=()=>{if(foldedLists.has(id))foldedLists.delete(id);else foldedLists.add(id);rememberFolded();renderTodos();};
+ const twist=el('button','task-twist');twist.type='button';twist.setAttribute('aria-expanded',String(!folded));
+ twist.title=folded?'Show these tasks':'Hide these tasks';twist.append(caretGlyph());
+ twist.onclick=e=>{e.stopPropagation();toggle();};
  const name=el('b',null,folder?folder.name:'Everything else');
  const n=el('small',null,count?String(count):'');
  head.append(twist,name,n);
+ head.classList.toggle('folded',folded);
+ head.title=(folded?'Show':'Hide')+' the tasks in '+(folder?folder.name:'Everything else');
+ head.onclick=e=>{if(e.target.closest('.task-list-add,.task-list-more'))return;toggle();};
  if(folder){
   const add=el('button','task-list-add','＋');add.type='button';add.title='Add a task to '+folder.name;
   add.onclick=()=>{taskTarget=folder.id;renderTodos();$('todo-input').focus();};
