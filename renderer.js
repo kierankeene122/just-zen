@@ -634,9 +634,20 @@ function taskMenu(todo,x,y){
  ],x,y);
 }
 async function moveTask(id,folderId){todos=await call('move-task',{id,folderId});renderTodos();}
+// Electron does not implement window.prompt, so short names are asked for in a dialog of our own.
+let namePending=null;
+function askName(title,value=''){
+ return new Promise(resolve=>{
+  namePending=resolve;$('name-title').textContent=title;$('name-input').value=value;
+  suspendViews();$('name-dialog').showModal();$('name-input').focus();$('name-input').select();
+ });
+}
+$('name-cancel').onclick=()=>$('name-dialog').close();
+$('name-form').onsubmit=e=>{e.preventDefault();const value=$('name-input').value.trim().slice(0,40);const done=namePending;namePending=null;$('name-dialog').close();if(done)done(value || null);};
+onDialogClosed($('name-dialog'),()=>{resumeViews();const done=namePending;namePending=null;if(done)done(null);});
 async function newTaskList(name){
- const clean=(name===undefined?prompt('Name this list','Client work'):name);
- if(clean===null || clean===undefined)return null;
+ const clean=name===undefined?await askName('Name this list','Client work'):name;
+ if(!clean)return null;
  const result=await call('create-task-folder',{name:clean});
  taskFolders=result.folders;taskTarget=result.id;renderTodos();return result.id;
 }
@@ -653,7 +664,7 @@ function listHead(folder,count){
   const more=el('button','task-list-more','⋯');more.type='button';more.title=folder.name+' list';
   more.onclick=e=>{const r=more.getBoundingClientRect();showMenu([
    {label:'Add a task here',run:()=>{taskTarget=folder.id;renderTodos();$('todo-input').focus();}},
-   {label:'Rename…',run:()=>attempt(async()=>{const next=prompt('Rename this list',folder.name);if(next===null)return;taskFolders=await call('rename-task-folder',{id:folder.id,name:next});if(taskTarget===folder.id)renderTodos();else renderTodos();})},
+   {label:'Rename…',run:()=>attempt(async()=>{const next=await askName('Rename this list',folder.name);if(!next)return;taskFolders=await call('rename-task-folder',{id:folder.id,name:next});renderTodos();})},
    '-',
    {label:'Delete the list',hint:'Tasks move to Everything else',run:()=>attempt(async()=>{const result=await call('remove-task-folder',{id:folder.id});taskFolders=result.folders;todos=result.todos;if(taskTarget===folder.id)taskTarget=null;renderTodos();})}
   ],r.left-150,r.bottom+4);};

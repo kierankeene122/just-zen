@@ -727,3 +727,9 @@ body{--dock:178px}
 
 /* The left rail is independent of the panels on the right */
 .tasks-open #dock #claude-rail,.tasks-open #dock #sidecar-rail,.tasks-open #dock #tasks-rail{display:flex!important}
+
+/* Electron has no window.prompt, so naming happens in a small dialog of our own */
+#name-dialog{width:340px;max-width:calc(100vw - 48px)}
+#name-dialog form{display:flex;flex-direction:column;gap:12px}
+#name-dialog p{margin:0;font-size:13px}
+#name-dialog input{width:100%}
