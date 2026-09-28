@@ -57,7 +57,7 @@ async function show(next){if(next===page && !$(next).classList.contains('hidden'
 async function renderSecurityStatus(){if(securityLoading)return;securityLoading=true;try{const status=securityStatus=await call('security-status');$('security-signature').textContent=status.signature;$('security-gatekeeper').textContent=status.gatekeeper;$('security-updates').textContent=status.updates;$('security-engine').textContent='Electron '+status.electron+' · Chromium '+status.chromium;$('security-engine').title=status.engineSupport || '';$('security-engine-support').textContent=status.engineSupport || '';const p=status.profiles,c=status.claude,l=status.lock;$('security-profile-summary').textContent=`${status.encrypted?'Keychain-encrypted state':'Encryption unavailable'} · ${p.shared} Shared · ${p.personal} Personal · ${p.work} Work · ${p.isolated} Isolated · ${status.liveViews} web page${status.liveViews===1?'':'s'} in memory · Claude Chat: ${c.sandboxed?'OS sandbox active':'not sandboxed'}.`;$('lock-description').textContent=l.enabled?`${l.method==='passcode'?'Passcode':'Touch ID'} lock is enabled and activates after ${l.minutes} minutes of inactivity.`:l.touchID?'Local state is encrypted. Enable Touch ID to lock the visible workspace after inactivity.':'Touch ID is unavailable. Choose a passcode of at least six characters; local state remains Keychain-encrypted.';$('auto-lock-minutes').value=String(l.minutes);$('auto-lock-minutes').disabled=false;$('new-lock-passcode').classList.toggle('hidden',l.touchID || l.enabled);$('toggle-app-lock').disabled=false;$('toggle-app-lock').textContent=l.enabled?'Disable app lock':l.touchID?'Enable Touch ID lock':'Enable passcode lock';$('lock-now').disabled=!l.enabled;sleep=status.sleep || sleep;$('sleep-default').value=String(sleep.defaultMinutes);const custom=Object.keys(sleep.apps || {}).length;$('sleep-summary').textContent=custom?custom+' app'+(custom===1?' has':'s have')+' their own setting.':'';const target=$('clear-profile-target'),selected=target.value;target.replaceChildren(new Option('Shared login group','shared'),new Option('Personal login group','personal'),new Option('Work login group','work'));for(const item of sidebarItems.filter(isBrowserItem))target.add(new Option('Browser · '+item.name,'browser:'+encodeURIComponent(item.id)));for(const item of sidebarItems.filter(item=>item.url && (item.profile || 'isolated')==='isolated'))target.add(new Option('Isolated · '+item.name,'isolated:'+encodeURIComponent(item.id || item.url)));if([...target.options].some(option=>option.value===selected))target.value=selected;}finally{securityLoading=false;}}
 function setLocked(value,method){if(typeof value==='object'){method=value.method;value=value.locked;}document.body.classList.toggle('is-locked',value);$('lock-screen').classList.toggle('hidden',!value);if(value){const passcode=method==='passcode';$('unlock-passcode').classList.toggle('hidden',!passcode);$('lock-screen-copy').textContent=passcode?'Enter your Just Zen passcode to restore this workspace.':'Use Touch ID to restore your workspace.';$('unlock-app').textContent=passcode?'Unlock':'Unlock with Touch ID';(passcode?$('unlock-passcode'):$('unlock-app')).focus();closePopovers();}else $('unlock-passcode').value='';placeViews();}
 function showVersion(state){if(state?.version)$('app-version').textContent='JUST ZEN · '+state.version;}
-function hydrate(state){homeDir=state.home || homeDir;document.body.classList.toggle('platform-win',state.platform==='win32');if(state.claudeSupported===false){$('agent-state').textContent='Not available on Windows yet';const card=$('chat-signin');if(card){card.replaceChildren(el('h3',null,'Claude is macOS-only for now'),el('p',null,'Claude runs inside a macOS sandbox, and Just Zen will not run it without one. Everything else works: your apps, splits, search, tasks and documents.'));}}showVersion(state);attempt(refreshClaudeAuth);serviceBadges.clear();for(const [key,count] of Object.entries(state.serviceBadges || {}))serviceBadges.set(key,count);setLocked(false);setRoot(state.root);renderConnectedFolders(state.connectedFolders || []);setClaudeAccess({root:state.claudeRoot,policy:state.claudePolicy,workspaces:state.claudeWorkspaces});tabs=state.tabs || {};sleep=state.sleep || sleep;asleep.clear();for(const key of state.asleep || [])asleep.add(key);mutes=state.mutes || {};zoomByApp=state.zoom || {};$('peek-toggle').checked=state.peekLinks!==false;nowFeed=state.now || [];presets=state.presets || [];appUses=state.appUses || {};sidecar={key:typeof state.sidecar?.key==='string'?state.sidecar.key:'',open:state.sidecar?.open===true};renderNow();recent=state.recent || [];renderRecent();chimeOn=Boolean(state.layout?.chime);$('chime-toggle').checked=chimeOn;if(!state.tourDone)setTimeout(()=>attempt(startTour),800);setWorkspaces(state.workspaces,state.layout?.tiles);services(state.services,state.serviceFolders,state.sidebarOrder);todos=state.todos;whiteboard.setBoard(state.whiteboard);renderTodos();applyTheme(state.theme);renderChat(state.chat);applyMode(state.mode);renderTiles();renderSidecar();const startPage=state.layout?.page;setTimeout(()=>attempt(async()=>{const target=startPage && !['overview','browser-page'].includes(startPage) && $(startPage)?startPage:'browser-page';await show(target);if(target==='browser-page' && !tiles.slots.slice(0,slotCount()).some(Boolean)){let item=defaultBrowser();if(!item){const added=await call('add-browser',{name:'Browser',icon:'🌐'});services(added.services);item=serviceOf(added.key);}if(!tabs[item.id])tabs=await call('tabs');const group=tabs[item.id];const active=group?.items.find(t=>t.id===group.active);if(active && !active.current && !active.url){tabs[item.id]=await call('navigate-tab',{serviceKey:item.id,tabId:active.id,url:'https://justzen.co'});await openInTile(item.id,active.id);}else await openInTile(item.id);}}),50);// The app opens with the Claude pane folded to its rail (Tasks and Documents start closed too); it unfolds when something is sent to it.
+function hydrate(state){homeDir=state.home || homeDir;document.body.classList.toggle('platform-win',state.platform==='win32');if(state.claudeSupported===false){$('agent-state').textContent='Not available on Windows yet';const card=$('chat-signin');if(card){card.replaceChildren(el('h3',null,'Claude is macOS-only for now'),el('p',null,'Claude runs inside a macOS sandbox, and Just Zen will not run it without one. Everything else works: your apps, splits, search, tasks and documents.'));}}showVersion(state);attempt(refreshClaudeAuth);serviceBadges.clear();for(const [key,count] of Object.entries(state.serviceBadges || {}))serviceBadges.set(key,count);setLocked(false);setRoot(state.root);renderConnectedFolders(state.connectedFolders || []);setClaudeAccess({root:state.claudeRoot,policy:state.claudePolicy,workspaces:state.claudeWorkspaces});tabs=state.tabs || {};sleep=state.sleep || sleep;asleep.clear();for(const key of state.asleep || [])asleep.add(key);mutes=state.mutes || {};zoomByApp=state.zoom || {};$('peek-toggle').checked=state.peekLinks!==false;nowFeed=state.now || [];presets=state.presets || [];appUses=state.appUses || {};sidecar={key:typeof state.sidecar?.key==='string'?state.sidecar.key:'',open:state.sidecar?.open===true};renderNow();recent=state.recent || [];renderRecent();chimeOn=Boolean(state.layout?.chime);$('chime-toggle').checked=chimeOn;if(!state.tourDone)setTimeout(()=>attempt(startTour),800);setWorkspaces(state.workspaces,state.layout?.tiles);services(state.services,state.serviceFolders,state.sidebarOrder);todos=state.todos;taskFolders=state.taskFolders || [];whiteboard.setBoard(state.whiteboard);renderTodos();applyTheme(state.theme);renderChat(state.chat);applyMode(state.mode);renderTiles();renderSidecar();const startPage=state.layout?.page;setTimeout(()=>attempt(async()=>{const target=startPage && !['overview','browser-page'].includes(startPage) && $(startPage)?startPage:'browser-page';await show(target);if(target==='browser-page' && !tiles.slots.slice(0,slotCount()).some(Boolean)){let item=defaultBrowser();if(!item){const added=await call('add-browser',{name:'Browser',icon:'🌐'});services(added.services);item=serviceOf(added.key);}if(!tabs[item.id])tabs=await call('tabs');const group=tabs[item.id];const active=group?.items.find(t=>t.id===group.active);if(active && !active.current && !active.url){tabs[item.id]=await call('navigate-tab',{serviceKey:item.id,tabId:active.id,url:'https://justzen.co'});await openInTile(item.id,active.id);}else await openInTile(item.id);}}),50);// The app opens with the Claude pane folded to its rail (Tasks and Documents start closed too); it unfolds when something is sent to it.
  return applyLayout({...state.layout,agentCollapsed:true,centreCollapsed:false,navCollapsed:layout.navCollapsed,navColumns:state.layout?.navColumns===2?2:1,navGrey:state.layout?.navGrey!==false,navDock:state.layout?.navDock!==false},false);}
 
 function setRoot(value){root=value;$('folder-name').textContent=value?value.split('/').pop():'Make yourself at home';$('folder-path').textContent=pretty(value) || 'Connect a vault or project to begin.';$('choose-folder').textContent='Add folder';}
@@ -605,7 +605,90 @@ $('now-hide').onclick=()=>{$('now').classList.add('hidden');};
 $('now-refresh').onclick=()=>attempt(async()=>{$('now-refresh').classList.add('spinning');await call('now-refresh');setTimeout(()=>$('now-refresh').classList.remove('spinning'),900);});
 // Ticking a task off asks first: a slip of the mouse should not silently close something you still meant to do.
 async function toggleTodo(todo,box){if(!todo.done){const ok=confirm('Mark "'+todo.text+'" as complete?');if(!ok){if(box)box.checked=false;return false;}}todos=await call('toggle-todo',todo.id);renderTodos();return true;}
-function renderTodos(){greeting();renderNow();const done=taskTab==='done';$('todo-tab').setAttribute('aria-pressed',!done);$('done-tab').setAttribute('aria-pressed',done);$('todo-form').classList.toggle('hidden',done);$('todo-list').replaceChildren();const list=todos.filter(todo=>todo.done===done);$('task-count').textContent=todos.filter(todo=>!todo.done).length || '';for(const todo of list){const row=document.createElement('label');row.className='todo-row';const box=document.createElement('input');box.type='checkbox';box.checked=todo.done;box.onchange=()=>attempt(()=>toggleTodo(todo,box));const text=document.createElement('span');text.textContent=todo.text;const chip=fromChip(todo.from);if(chip)text.append(document.createTextNode(' '),chip);const del=document.createElement('button');del.type='button';del.className='todo-delete';del.textContent='×';del.title='Delete task';del.setAttribute('aria-label','Delete task');del.onclick=e=>{e.preventDefault();e.stopPropagation();attempt(async()=>{const result=await call('delete-todo',todo.id);todos=result.todos;renderTodos();undoable('Deleted task',async()=>{todos=await call('restore-todo',result.snapshot);renderTodos();});});};row.append(box,text,del);$('todo-list').append(row);}if(!list.length){const empty=document.createElement('p');empty.className='todo-empty';empty.textContent=done?'Completed tasks will appear here.':'Nothing waiting. A clear list is a good list.';$('todo-list').append(empty);}}
+// Tasks live in lists the user makes; anything without one sits under "Everything else".
+let taskFolders=[],taskTarget=null,foldedLists=new Set();
+try{foldedLists=new Set(JSON.parse(localStorage.getItem('zen-folded-lists') || '[]'));}catch{}
+function rememberFolded(){try{localStorage.setItem('zen-folded-lists',JSON.stringify([...foldedLists]));}catch{}}
+function folderName(id){return taskFolders.find(f=>f.id===id)?.name || '';}
+function todoRow(todo){
+ const row=el('label','todo-row');const box=document.createElement('input');box.type='checkbox';box.checked=todo.done;box.onchange=()=>attempt(()=>toggleTodo(todo,box));
+ const text=el('span',null,todo.text);const chip=fromChip(todo.from);if(chip)text.append(document.createTextNode(' '),chip);
+ const move=el('button','todo-move','⋯');move.type='button';move.title='Move this task to a list';move.setAttribute('aria-label','Move task');
+ move.onclick=e=>{e.preventDefault();e.stopPropagation();const r=move.getBoundingClientRect();taskMenu(todo,r.left-150,r.bottom+4);};
+ const del=el('button','todo-delete','×');del.type='button';del.title='Delete task';del.setAttribute('aria-label','Delete task');
+ del.onclick=e=>{e.preventDefault();e.stopPropagation();attempt(async()=>{const result=await call('delete-todo',todo.id);todos=result.todos;renderTodos();undoable('Deleted task',async()=>{todos=await call('restore-todo',result.snapshot);renderTodos();});});};
+ row.append(box,text,move,del);
+ row.draggable=true;row.dataset.todo=todo.id;
+ row.ondragstart=e=>{taskDrag=todo.id;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',todo.text);}catch{}row.classList.add('dragging');};
+ row.ondragend=()=>{taskDrag=null;row.classList.remove('dragging');for(const h of document.querySelectorAll('.task-list-head'))h.classList.remove('drop');};
+ return row;
+}
+let taskDrag=null;
+function taskMenu(todo,x,y){
+ const others=taskFolders.filter(f=>f.id!==todo.folderId);
+ showMenu([
+  ...(todo.folderId?[{label:'Take out of '+folderName(todo.folderId),run:()=>moveTask(todo.id,null)}]:[]),
+  ...others.map(f=>({label:'Move to '+f.name,run:()=>moveTask(todo.id,f.id)})),
+  ...(others.length||todo.folderId?['-']:[]),
+  {label:'New list with this task…',run:()=>attempt(async()=>{const id=await newTaskList();if(id)await moveTask(todo.id,id);})}
+ ],x,y);
+}
+async function moveTask(id,folderId){todos=await call('move-task',{id,folderId});renderTodos();}
+async function newTaskList(name){
+ const clean=(name===undefined?prompt('Name this list','Client work'):name);
+ if(clean===null || clean===undefined)return null;
+ const result=await call('create-task-folder',{name:clean});
+ taskFolders=result.folders;taskTarget=result.id;renderTodos();return result.id;
+}
+function listHead(folder,count){
+ const id=folder?folder.id:'';const head=el('div','task-list-head');head.dataset.list=id;
+ const twist=el('button','task-twist',foldedLists.has(id)?'▸':'▾');twist.type='button';twist.title=foldedLists.has(id)?'Show these tasks':'Hide these tasks';
+ twist.onclick=()=>{if(foldedLists.has(id))foldedLists.delete(id);else foldedLists.add(id);rememberFolded();renderTodos();};
+ const name=el('b',null,folder?folder.name:'Everything else');
+ const n=el('small',null,count?String(count):'');
+ head.append(twist,name,n);
+ if(folder){
+  const add=el('button','task-list-add','＋');add.type='button';add.title='Add a task to '+folder.name;
+  add.onclick=()=>{taskTarget=folder.id;renderTodos();$('todo-input').focus();};
+  const more=el('button','task-list-more','⋯');more.type='button';more.title=folder.name+' list';
+  more.onclick=e=>{const r=more.getBoundingClientRect();showMenu([
+   {label:'Add a task here',run:()=>{taskTarget=folder.id;renderTodos();$('todo-input').focus();}},
+   {label:'Rename…',run:()=>attempt(async()=>{const next=prompt('Rename this list',folder.name);if(next===null)return;taskFolders=await call('rename-task-folder',{id:folder.id,name:next});if(taskTarget===folder.id)renderTodos();else renderTodos();})},
+   '-',
+   {label:'Delete the list',hint:'Tasks move to Everything else',run:()=>attempt(async()=>{const result=await call('remove-task-folder',{id:folder.id});taskFolders=result.folders;todos=result.todos;if(taskTarget===folder.id)taskTarget=null;renderTodos();})}
+  ],r.left-150,r.bottom+4);};
+  head.append(add,more);
+  if(taskTarget===folder.id)head.classList.add('target');
+ }
+ head.ondragover=e=>{if(!taskDrag)return;e.preventDefault();e.dataTransfer.dropEffect='move';head.classList.add('drop');};
+ head.ondragleave=()=>head.classList.remove('drop');
+ head.ondrop=e=>{e.preventDefault();head.classList.remove('drop');const id=taskDrag;taskDrag=null;if(id)attempt(()=>moveTask(id,folder?folder.id:null));};
+ return head;
+}
+function renderTodos(){
+ greeting();renderNow();
+ const done=taskTab==='done';
+ $('todo-tab').setAttribute('aria-pressed',!done);$('done-tab').setAttribute('aria-pressed',done);$('todo-form').classList.toggle('hidden',done);
+ const host=$('todo-list');host.replaceChildren();
+ const list=todos.filter(todo=>todo.done===done);
+ $('task-count').textContent=todos.filter(todo=>!todo.done).length || '';
+ if(taskTarget && !taskFolders.some(f=>f.id===taskTarget))taskTarget=null;
+ $('todo-input').placeholder=taskTarget?'Add to '+folderName(taskTarget)+'…':'Add a task…';
+ $('todo-target').textContent=taskTarget?folderName(taskTarget):'';
+ $('todo-target').hidden=!taskTarget;
+ const groups=[...taskFolders.map(f=>({folder:f,items:list.filter(t=>t.folderId===f.id)})),{folder:null,items:list.filter(t=>!t.folderId || !taskFolders.some(f=>f.id===t.folderId))}];
+ let shown=0;
+ for(const group of groups){
+  const id=group.folder?group.folder.id:'';
+  if(!group.folder && !group.items.length && taskFolders.length)continue;
+  if(taskFolders.length)host.append(listHead(group.folder,group.items.length));
+  if(taskFolders.length && foldedLists.has(id))continue;
+  for(const todo of group.items){host.append(todoRow(todo));shown++;}
+  if(taskFolders.length && !group.items.length)host.append(el('p','todo-empty todo-empty-list',done?'Nothing finished here yet.':'Nothing in this list.'));
+ }
+ if(!list.length && !taskFolders.length)host.append(el('p','todo-empty',done?'Completed tasks will appear here.':'Nothing waiting. A clear list is a good list.'));
+}
+
 async function openService(item){if(item.kind==='claude'){await applyLayout({agentCollapsed:false});if(mode==='terminal'){if(!running)await start('claude');terminal.focus();}else $('chat-input').focus();return;}if(item.kind==='vault'){if(!root){await choose();return;}await openFiles();return;}await openInTile(item.id || item.url);}
 const GROUP_ICONS=["💼","🏢","📈","📊","💰","🧾","🏦","🛒","🛍️","📦","🚚","🧑‍💻","💻","🔧","🛠️","⚙️","🧪","🔬","🧠","💡","🎯","🚀","📣","📰","✉️","💬","📞","🗓️","🗂️","📚","📝","✏️","🎨","🖌️","📷","🎬","🎵","🎧","🎮","🏡","🏠","🔑","🚗","✈️","🌍","🗺️","🧭","☕","🍵","🍎","🥗","🏋️","🧘","🌱","🌿","🐶","🐱","❤️","⭐","🔥","⚡","🌈","🎓","🏥","⚖️","🛡️","🔒","👥","👤","🤝","🧩","🎁"];
 function pickerTab(which){$('picker-choice').classList.toggle('hidden',which!=='choose');document.querySelector('.picker-tabs').classList.toggle('hidden',which==='choose');$('installed-panel').classList.toggle('hidden',which!=='installed');$('website-form').classList.toggle('hidden',which!=='website');$('browser-form').classList.toggle('hidden',which!=='browser');$('group-form').classList.toggle('hidden',which!=='group');$('tab-installed').setAttribute('aria-pressed',which==='installed');$('tab-website').setAttribute('aria-pressed',which==='website');$('tab-browser').setAttribute('aria-pressed',which==='browser');$('tab-group').setAttribute('aria-pressed',which==='group');if(which==='website')$('website-url').focus();if(which==='group'){renderGroupForm();$('group-name').focus();}else editingGroup=null;if(which==='browser'){renderBrowserForm();$('browser-name').focus();}else editingBrowser=null;}
@@ -840,7 +923,9 @@ $('sidecar-close').onclick=()=>attempt(toggleSidecar);
 $('sidecar-change').onclick=()=>{searchMode='sidecar';openAppSearch(0);};
 function sidecarMenu(x,y){const item=sidecarItem();showMenu([{label:item?'Choose another app…':'Choose an app…',run:()=>{searchMode='sidecar';openAppSearch(0);}},...(item?[{label:'Open '+item.name+' in this pane',run:()=>attempt(()=>openInTile(sidecar.key,undefined,Math.min(tiles.focus,slotCount()-1)))},'-',{label:'Remove from the sidebar',run:clearSidecar}]:[])],x,y);}
 $('tasks-rail').onclick=()=>{document.body.classList.add('tasks-open');requestAnimationFrame(()=>{placeViews();$('todo-input').focus();});};$('close-tasks').onclick=()=>{document.body.classList.remove('tasks-open');placeViews();};
-$('todo-tab').onclick=()=>{taskTab='todo';renderTodos();};$('done-tab').onclick=()=>{taskTab='done';renderTodos();};$('todo-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{todos=await call('add-todo',$('todo-input').value);$('todo-input').value='';taskTab='todo';renderTodos();});};
+$('todo-tab').onclick=()=>{taskTab='todo';renderTodos();};$('done-tab').onclick=()=>{taskTab='done';renderTodos();};$('todo-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{todos=await call('add-todo',{text:$('todo-input').value,folderId:taskTarget});$('todo-input').value='';taskTab='todo';renderTodos();});};
+$('new-list').onclick=()=>attempt(()=>newTaskList());
+$('todo-target').onclick=()=>{taskTarget=null;renderTodos();$('todo-input').focus();};
 window.hearth.on('todos-changed',list=>{todos=list;taskTab='todo';renderTodos();if(!document.body.classList.contains('tasks-open'))$('tasks-rail').click();});
 $('chat-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const prompt=$('chat-input').value;if(!prompt.trim())return;if(!claudeRoot && !await chooseClaude())return;let text=prompt,from=composerFrom;if(claudeContext && !claudeContext.sent && !prompt.includes(claudeContext.text.slice(0,200))){text=prompt+'\n\nThe text below came from '+claudeContext.source+'.\n\n"""\n'+claudeContext.text+'\n"""';from=from || claudeContext.from;claudeContext.sent=true;$('chat-context-title').textContent='Claude has read '+claudeContext.source+' · ask away';}await call('chat-send',text,{from});composerFrom=null;$('chat-input').value='';});};
 $('chat-input').onkeydown=e=>{if(e.key==='Enter' && !e.shiftKey && !e.isComposing){e.preventDefault();if(!chatState.busy)$('chat-form').requestSubmit();}};
