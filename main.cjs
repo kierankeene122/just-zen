@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification, webContents, clipboard, shell } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification, webContents, clipboard, shell, desktopCapturer } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const execFile = require('node:util').promisify(require('node:child_process').execFile);
@@ -159,6 +159,31 @@ async function mediaAllowed(source,contents,details){
   return response===0?systemMedia(kinds):false;
 }
 async function systemMedia(kinds){for(const kind of kinds){const type=kind==='video'?'camera':'microphone';try{const status=systemPreferences.getMediaAccessStatus?.(type);if(status==='granted')continue;if(status==='denied' || status==='restricted'){const {response}=await dialog.showMessageBox(win,{type:'warning',buttons:['Open System Settings','Cancel'],defaultId:0,cancelId:1,message:'macOS is blocking the '+type+' for Just Zen',detail:'Turn on Just Zen under Privacy & Security › '+(type==='camera'?'Camera':'Microphone')+', then try the call again.'});if(response===0)shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_'+(type==='camera'?'Camera':'Microphone')).catch(()=>{});return false;}const ok=await systemPreferences.askForMediaAccess?.(type);if(ok===false)return false;}catch{}}return true;}
+// The screen picker runs in the app's own window: thumbnails of every screen and window, and nothing shared until one is chosen.
+const screenPicks=new Map();
+function chooseScreenSource(appName,sources){
+  if(!win || win.isDestroyed())return Promise.resolve(null);
+  const id=crypto.randomUUID();
+  const payload=sources.map(s=>({id:s.id,name:String(s.name || '').slice(0,120),screen:String(s.id).startsWith('screen:'),thumb:(()=>{try{return s.thumbnail?.isEmpty?.()?'':s.thumbnail.toDataURL();}catch{return '';}})()}));
+  return new Promise(resolve=>{
+    screenPicks.set(id,resolve);
+    send('screen-pick',{id,app:String(appName).slice(0,60),sources:payload});
+    setTimeout(()=>{if(screenPicks.delete(id))resolve(null);},90_000);
+  });
+}
+// macOS asks for Screen Recording once per app; the system picker on macOS 15 does not need it, so this only warns when it is refused.
+async function systemScreen(){
+  if(process.platform!=='darwin')return true;
+  try{
+    const status=systemPreferences.getMediaAccessStatus?.('screen');
+    if(status==='denied' || status==='restricted'){
+      const {response}=await dialog.showMessageBox(win,{type:'warning',buttons:['Open System Settings','Cancel'],defaultId:0,cancelId:1,message:'macOS is blocking screen recording for Just Zen',detail:'Turn on Just Zen under Privacy & Security \u203a Screen & System Audio Recording, then start the share again.'});
+      if(response===0)shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture').catch(()=>{});
+      return false;
+    }
+  }catch{}
+  return true;
+}
 function hardenWebSession(target){
   if(hardenedSessions.has(target))return;
   hardenedSessions.add(target);
@@ -166,19 +191,47 @@ function hardenWebSession(target){
   const allowedOrigins=notificationOrigins.get(target) || new Set();notificationOrigins.set(target,allowedOrigins);
   target.setPermissionRequestHandler(async (contents,permission,callback,details)=>{
     const source=notificationSources.get(contents),origin=details?.requestingUrl || details?.securityOrigin || '';
-    if(permission==='media' && source){callback(await mediaAllowed(source,contents,details));return;}
+    // A screen share arrives as a media request with no camera or microphone in it; the picker that follows is its consent,
+    // so it is not gated on the camera and microphone answer.
+    if(permission==='media' && source){
+      const share=Array.isArray(details?.mediaTypes) && !details.mediaTypes.length;
+      if(share){callback(secureOrigin(details?.requestingUrl || details?.securityOrigin || contents.getURL()));return;}
+      callback(await mediaAllowed(source,contents,details));return;
+    }
+
     const allowed=permission==='notifications' && canNotify(source,contents,origin);
     if(allowed){source.notificationPermission=true;try{allowedOrigins.add(new URL(origin || contents.getURL()).origin);}catch{}}
     callback(allowed);
   });
   target.setPermissionCheckHandler((contents,permission,requestingOrigin)=>{
     // Microphone and camera: a remembered refusal is final; anything else is left to the request handler, which asks.
-    if(permission==='media'){const source=contents?notificationSources.get(contents):null;if(!source || !secureOrigin(requestingOrigin))return false;try{return config.mediaGrants?.[source.key+' '+new URL(requestingOrigin).origin]!==false;}catch{return false;}}
+    if(permission==='media'){const source=contents?notificationSources.get(contents):null;if(!source)return false;const origin=requestingOrigin || (contents?contents.getURL():'');
+      // Screen sharing checks with no origin at all; leave that to the request handler rather than refusing here.
+      if(!origin)return true;
+      if(!secureOrigin(origin))return false;try{return config.mediaGrants?.[source.key+' '+new URL(origin).origin]!==false;}catch{return false;}}
     if(permission!=='notifications' || !secureOrigin(requestingOrigin))return false;
     if(contents){const source=notificationSources.get(contents);if(source?.key && isMuted(source.key))return false;return canNotify(source,contents,requestingOrigin);}
     try{return allowedOrigins.has(new URL(requestingOrigin).origin);}catch{return false;}
   });
-  target.setDisplayMediaRequestHandler?.((_request,callback)=>callback({}));
+  // Screen sharing: Meet, Slack huddles and Teams ask for a screen or a window. macOS 15 shows its own picker;
+  // everywhere else Just Zen shows one of its own, built from desktopCapturer. Nothing is shared without a pick.
+  target.setDisplayMediaRequestHandler?.(async (request,callback)=>{
+    try{
+      const contents=(()=>{try{return request?.frame?webContents.fromFrame(request.frame):null;}catch{return null;}})();
+      const entry=[...views.values()].find(v=>v.view.webContents===contents) || null;
+      const source=contents?notificationSources.get(contents):null;
+      const name=source?.name || serviceItem(entry?.serviceKey)?.name || 'This app';
+      let origin='';try{origin=new URL(request?.securityOrigin || contents?.getURL() || '').origin;}catch{}
+      if(!entry || !secureOrigin(origin)){callback({});return;}
+      if(!await systemScreen()){callback({});return;}
+      const sources=await desktopCapturer.getSources({types:['screen','window'],thumbnailSize:{width:320,height:180}});
+      if(!sources.length){callback({});return;}
+      const chosenId=await chooseScreenSource(name,sources);
+      const chosen=sources.find(s=>s.id===chosenId);
+      if(!chosen){callback({});return;}
+      callback({video:chosen,...(request?.audioRequested && process.platform==='win32'?{audio:'loopback'}:{})});
+    }catch{callback({});}
+  },{useSystemPicker:false});
   // Downloads use Electron's own save dialog, configured synchronously here; a second, asynchronous dialog used to race it and
   // could leave the download cancelled. On completion a toast offers to reveal the file.
   target.on('will-download',(_event,item)=>{
@@ -629,6 +682,7 @@ app.whenReady().then(async () => {
   ipcMain.on('pane-reveal',(e,payload)=>{if(![...views.values()].some(v=>v.view.webContents===e.sender))return;setBadgeReveal(payload?.on===true);});
   ipcMain.on('pane-hover',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0)setBadgeHover(i);});
   ipcMain.on('pane-unhover',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && badgeHover===i)setBadgeHover(-1);});
+  handle('screen-picked',({id,sourceId}={})=>{const done=screenPicks.get(id);if(done){screenPicks.delete(id);done(typeof sourceId==='string'?sourceId:null);}return true;});
   handle('badge-reveal',({on}={})=>{setBadgeReveal(on===true);return true;});
   handle('badge-hover',({slot}={})=>{setBadgeHover(Number.isInteger(slot)?slot:-1);return true;});
   ipcMain.on('pane-split',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && !locked)send('deck-command',{split:i});});

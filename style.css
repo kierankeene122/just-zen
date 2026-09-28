@@ -743,3 +743,21 @@ body{--dock:178px}
 .task-list-head.folded b{opacity:.8}
 .task-list-head.folded small{background:rgba(120,140,160,.16);border-radius:999px;padding:1px 7px;opacity:1}
 @media (prefers-reduced-motion:reduce){.task-twist .caret{transition:none}}
+
+/* Screen sharing: pick a screen or a window, with a picture of each */
+#share-dialog{width:760px;max-width:calc(100vw - 60px);max-height:82vh;padding:0;border-radius:18px;overflow:hidden;display:none;flex-direction:column}
+#share-dialog[open]{display:flex}
+.share-head{display:flex;align-items:center;gap:10px;padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.share-head strong{display:block;font-size:15px}
+.share-head small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.share-head button{margin-left:auto;width:28px;height:28px;border-radius:8px;font-size:17px;color:var(--muted)}
+.share-head button:hover{background:rgba(120,140,160,.14);color:inherit}
+.share-tabs{display:flex;gap:6px;padding:10px 18px 0}
+.share-tabs button{font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:transparent}
+.share-tabs button[aria-pressed=true]{background:var(--line);color:inherit}
+#share-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;padding:14px 18px 20px;overflow:auto}
+.share-tile{display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:12px;border:1px solid var(--line);background:transparent;color:inherit;text-align:left;min-width:0}
+.share-tile:hover,.share-tile:focus-visible{border-color:var(--accent);background:rgba(120,140,160,.08)}
+.share-tile img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:8px;background:var(--line);display:block}
+.share-tile b{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.share-empty{grid-column:1/-1;color:var(--muted);font-size:12.5px;padding:18px 2px}

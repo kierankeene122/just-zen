@@ -9,6 +9,7 @@ Site: https://justzen.co · Code: https://github.com/kierankeene122/just-zen · 
 - One window for all your web apps. Each app keeps its own login, cookies and tabs (several Slack workspaces, two inboxes), isolated from the others unless you choose to share a login.
 - Search, don't switch: a search button sits in the corner of every pane; type a couple of letters, press Enter, and the app snaps into that pane. There is no dock, sidebar or tab bar to hunt through.
 - Chrome: there is no top bar. A fixed 178px rail on the left holds workspaces (by name), panes, the sidebar app, Claude, tasks, notifications and the theme. Each pane's floating buttons appear on hover or while Cmd is held.
+- Screen sharing works in calls (Meet, Slack huddles, Teams): Just Zen shows its own picker of screens and windows, and shares only what is chosen.
 - Tasks can be grouped into named lists the user creates; tasks are dragged between lists and anything ungrouped shows under "Everything else".
 - Workspaces: several named workspaces, each with its own split, its own apps in the panes, and a colour and icon on its tab. Tabs can be dragged into any order. One app of the user's choosing can be kept in a slide-out sidebar that opens full width in every workspace.
 - Background apps sleep: panes you are not looking at, other workspaces and background tabs are closed after a while (30 minutes by default, per-app settings available) and reload when you return.

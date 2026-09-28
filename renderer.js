@@ -634,6 +634,40 @@ function taskMenu(todo,x,y){
  ],x,y);
 }
 async function moveTask(id,folderId){todos=await call('move-task',{id,folderId});renderTodos();}
+// Screen sharing: the main process asks which screen or window to hand to the call.
+let sharePick=null,shareSources=[],shareKind='screen';
+function renderShare(){
+ const grid=$('share-grid');grid.replaceChildren();
+ $('share-screens').setAttribute('aria-pressed',String(shareKind==='screen'));
+ $('share-windows').setAttribute('aria-pressed',String(shareKind==='window'));
+ const list=shareSources.filter(s=>(shareKind==='screen')===Boolean(s.screen));
+ if(!list.length){grid.append(el('p','share-empty',shareKind==='screen'?'No screens available.':'No open windows to share.'));return;}
+ for(const source of list){
+  const tile=el('button','share-tile');tile.type='button';tile.setAttribute('role','option');
+  if(source.thumb){const img=document.createElement('img');img.src=source.thumb;img.alt='';tile.append(img);}else tile.append(el('div','share-thumb-empty'));
+  tile.append(el('b',null,source.name || (source.screen?'Screen':'Window')));
+  tile.title=source.name;
+  tile.onclick=()=>answerShare(source.id);
+  grid.append(tile);
+ }
+}
+function answerShare(sourceId){
+ const pick=sharePick;sharePick=null;
+ if($('share-dialog').open)$('share-dialog').close();
+ if(pick)call('screen-picked',{id:pick,sourceId}).catch(()=>{});
+}
+$('share-cancel').onclick=()=>answerShare(null);
+$('share-screens').onclick=()=>{shareKind='screen';renderShare();};
+$('share-windows').onclick=()=>{shareKind='window';renderShare();};
+onDialogClosed($('share-dialog'),()=>{resumeViews();answerShare(null);});
+window.hearth.on('screen-pick',({id,app,sources})=>attempt(async()=>{
+ sharePick=id;shareSources=Array.isArray(sources)?sources:[];
+ shareKind=shareSources.some(s=>s.screen)?'screen':'window';
+ $('share-title').textContent='Share your screen with '+(app || 'this app');
+ $('share-sub').textContent='Choose a screen or a window. Nothing is shared until you pick one.';
+ renderShare();
+ if(!$('share-dialog').open){suspendViews();$('share-dialog').showModal();}
+}));
 // Electron does not implement window.prompt, so short names are asked for in a dialog of our own.
 let namePending=null;
 function askName(title,value=''){
