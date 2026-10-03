@@ -1,25 +1,23 @@
 import {marked} from './node_modules/marked/lib/marked.esm.js';
-import {createWhiteboard} from './whiteboard.js';
-import {rank} from './palette-match.mjs';
-import {createBrain} from './brain.js';
 const $=id=>document.getElementById(id);
 let homeDir='';const pretty=value=>value && homeDir && value.startsWith(homeDir)?'~'+value.slice(homeDir.length):value;
 const call=(name,...args)=>window.hearth.call(name,...args);
-let root,claudeRoot=null,claudePolicy='notes',claudeWorkspaces=[],currentFile,original='',directory='',page='browser-page',running=false,mode='chat',theme='light';
-let layout={agentCollapsed:false,centreCollapsed:false,navCollapsed:true,navColumns:1,navDock:true,navGrey:true},catalog=[],catalogPage=0,noteMode='preview';
-let serviceFolders=[],todos=[],taskTab='todo';
+// Just Zen is a menu-bar app: the panel and ⌥Space live outside this window, which holds Claude, your notes, your tasks and the settings.
+let root=null,claudeRoot=null,claudePolicy='notes',claudeWorkspaces=[],running=false,mode='chat',theme='light';
+let layout={agentCollapsed:false};
+let todos=[],taskTab='todo',taskFolders=[],taskTarget=null,platform='darwin';
 let chatState={messages:[],busy:false,pending:[]};
-let securityLoading=false,securityStatus=null;
-// Web apps: tabs per app, up to four tiles on screen, and the pinned Browser.
-const isBrowserItem=item=>item?.kind==='browser';const openable=item=>Boolean(item && (item.url || isBrowserItem(item)));
-let platform='darwin';
-let tabs={},tiles={cols:[{rows:1,split:.5}],widths:[1],slots:[null],focus:0},workspaces=[],workspaceId='',viewsSuspended=0,sleep={defaultMinutes:0,apps:{}};
-const tabLive=new Map(),asleep=new Set();let nowFeed=[],presets=[];let mutes={},zoomByApp={},recent=[],paneChoice=null;
+let claudeContext=null,composerFrom=null,loginInProgress=false;
 const terminal=new Terminal({fontFamily:'Menlo, monospace',fontSize:12,lineHeight:1.25,cursorBlink:true,scrollback:5000});
 const fit=new FitAddon.FitAddon();terminal.loadAddon(fit);terminal.open($('terminal'));
-const whiteboard=createWhiteboard({save:value=>call('save-whiteboard',value),notice});
-// Toasts slide in near the bottom of the centre pane, stack, and fade. The footer keeps the last message as a quiet log.
+const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+const openable=item=>Boolean(item && item.url);
+let layoutSaveTimer=null;
+function saveLayout(){clearTimeout(layoutSaveTimer);return new Promise(resolve=>{layoutSaveTimer=setTimeout(()=>resolve(call('appearance',{layout}).catch(()=>{})),150);});}
+async function applyLayout(next,persist=true){layout={...layout,...next};document.body.classList.toggle('agent-collapsed',layout.agentCollapsed);$('claude-rail').classList.toggle('on',!layout.agentCollapsed);size();if(persist)await saveLayout();}
+function markdown(text){return DOMPurify.sanitize(marked.parse(String(text || ''),{gfm:true}),{FORBID_TAGS:['style','form','input','iframe','object','embed'],FORBID_ATTR:['style','srcset']});}
 function notice(text,options={}){$('status').textContent=text;return toast(text,options);}
+
 function toast(text,options={}){const {action,onAction,duration=4000}=options;
  const host=$('toasts');const node=document.createElement('div');node.className='toast';const span=document.createElement('span');span.textContent=text;node.append(span);
  let done=false;const finish=()=>{if(done)return;done=true;node.classList.add('toast-out');setTimeout(()=>node.remove(),200);};
@@ -29,445 +27,18 @@ function toast(text,options={}){const {action,onAction,duration=4000}=options;
  host.append(node);while(host.children.length>4)host.firstElementChild.remove();
  requestAnimationFrame(()=>node.classList.add('toast-in'));setTimeout(finish,duration);return finish;
 }
+
 function undoable(text,restore){return notice(text,{action:'Undo',onAction:restore,duration:8000});}
+
 async function attempt(fn){try{return await fn();}catch(e){notice(e.message.replace(/^Error invoking remote method '[^']+': Error: /,''));}}
-function dirty(){return currentFile && $('editor').value!==original;}
-function discard(){return !dirty() || confirm('Discard unsaved changes to this file?');}
-function markdown(text){return DOMPurify.sanitize(marked.parse(text,{gfm:true}),{FORBID_TAGS:['img','iframe','form','input','button','style'],FORBID_ATTR:['style']});}
-const brain=createBrain({menu:$('brain-menu'),play:$('brain-play'),stats:$('brain-stats'),notice});
-// Icons for groups and browsers: an emoji, or 'ms:<name>' from the bundled Material Symbols subset.
-const MS=window.MATERIAL_ICONS || {};
-function isSymbol(icon){return typeof icon==='string' && icon.startsWith('ms:') && Boolean(MS[icon.slice(3)]);}
-function iconNode(icon,cls){if(isSymbol(icon)){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('class','ms-icon'+(cls?' '+cls:''));svg.innerHTML=MS[icon.slice(3)];return svg;}const span=document.createElement('span');if(cls)span.className=cls;span.textContent=icon || '◫';return span;}
-function iconLabel(icon){return isSymbol(icon)?'':(icon || '');}
 
-function applyTheme(value){theme=value;document.body.dataset.theme=value;$('theme-moon').hidden=value!=='light';$('theme-sun').hidden=value==='light';$('theme-toggle').title=value==='light'?'Switch to dark mode':'Switch to light mode';$('theme-toggle').setAttribute('aria-label',value==='light'?'Switch to dark mode':'Switch to light mode');terminal.options.theme=value==='light'?{background:'#fbfcfe',foreground:'#354258',cursor:'#5278c8',selectionBackground:'#e6eefc'}:{background:'#151816',foreground:'#d5ddcc',cursor:'#c4d3ab',selectionBackground:'#424e36'};}
-function size(){if(!running || mode!=='terminal' || layout.agentCollapsed)return;fit.fit();call('terminal-size',{cols:terminal.cols,rows:terminal.rows}).catch(()=>{});}
-async function applyLayout(next,persist=true){layout={...layout,...next};if(layout.centreCollapsed)layout.agentCollapsed=false;document.body.classList.toggle('agent-collapsed',layout.agentCollapsed);document.body.classList.toggle('centre-collapsed',layout.centreCollapsed);document.body.classList.add('nav-grey');deckMetrics();$('agent-rail').classList.toggle('hidden',!layout.agentCollapsed);$('claude-rail').classList.toggle('on',!layout.agentCollapsed);$('restore-centre').classList.toggle('hidden',!layout.centreCollapsed);placeViews();size();if(persist)await saveLayout();}
-let layoutSaveTimer=null;function saveLayout(){const open=workspaces.find(w=>w.id===workspaceId);if(open)open.tiles=tiles;clearTimeout(layoutSaveTimer);return new Promise(resolve=>{layoutSaveTimer=setTimeout(()=>resolve(Promise.all([call('appearance',{layout:{...layout,tiles}}),saveWorkspaces()]).catch(()=>{})),150);});}
-function saveWorkspaces(){return call('workspaces',{list:workspaces.map(w=>({id:w.id,name:w.name,icon:w.icon,colour:w.colour,opens:w.opens || [],tiles:w.id===workspaceId?tiles:w.tiles})),active:workspaceId}).catch(()=>{});}
-function applyMode(next){mode=next;for(const name of ['chat','terminal','files'])$('mode-'+name).setAttribute('aria-pressed',next===name);$('chat-view').classList.toggle('hidden',next!=='chat');$('files-view').classList.toggle('hidden',next!=='files');$('claude-access').classList.toggle('hidden',next==='files');$('agent-empty').classList.toggle('hidden',next!=='terminal' || running);$('terminal').classList.toggle('hidden',next!=='terminal' || !running);updateAgentStatus();size();}
-function updateAgentStatus(){const state=mode==='files'?(root?'Files · '+root.split('/').pop():'Files · no folder yet'):mode==='chat'?(chatState.busy?(chatState.pending.length?'Needs your approval':'Working…'):'Chat · Claude Code'):(running?'Terminal · running':'Terminal · ready');$('agent-state').textContent=state;$('rail-state').textContent=chatState.pending.length?'●':chatState.busy || running?'·':'';}
-// Pane switches cross-fade: the outgoing page fades, then the incoming one fades in. Web views are native layers, so the
-// tiles dip briefly while the new page is placed. Reduced-motion users get an instant switch.
-const PAGES=['overview','files-page','browser-page','brain-page','security-page','settings-page'];
-const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
-async function fadeOutPage(){if(reducedMotion.matches)return;const current=PAGES.map(id=>$(id)).find(el=>!el.classList.contains('hidden'));if(!current)return;current.classList.add('page-leaving');document.body.classList.add('switching');await new Promise(r=>setTimeout(r,120));current.classList.remove('page-leaving');}
-function fadeInPage(id){const el=$(id);if(reducedMotion.matches)return;el.classList.add('page-entering');requestAnimationFrame(()=>requestAnimationFrame(()=>{el.classList.remove('page-entering');setTimeout(()=>document.body.classList.remove('switching'),160);}));}
-async function show(next){if(next===page && !$(next).classList.contains('hidden'))return;if(next!=='browser-page')closePeek();if(page!==next && ['overview','browser-page','brain-page','security-page'].includes(next)){layout.page=next;saveLayout();}await fadeOutPage();page=next;if(layout.centreCollapsed)await applyLayout({centreCollapsed:false});PAGES.forEach(id=>$(id).classList.toggle('hidden',id!==next));fadeInPage(next);if(next==='overview')call('now-refresh').catch(()=>{});$('home').classList.toggle('selected',next==='overview');$('security-nav').classList.toggle('selected',next==='security-page');$('settings-nav').classList.toggle('selected',next==='settings-page');$('brain-nav').classList.toggle('selected',next==='brain-page');placeViews();updateZoomControl();deckSync();if(next==='settings-page')renderSettings();if(next==='security-page'){await renderSecurityStatus();await renderPasswords().catch(()=>{});await renderMediaGrants().catch(()=>{});}if(next!=='brain-page')brain.stop();}
-async function renderSecurityStatus(){if(securityLoading)return;securityLoading=true;try{const status=securityStatus=await call('security-status');$('security-signature').textContent=status.signature;$('security-gatekeeper').textContent=status.gatekeeper;$('security-updates').textContent=status.updates;$('security-engine').textContent='Electron '+status.electron+' · Chromium '+status.chromium;$('security-engine').title=status.engineSupport || '';$('security-engine-support').textContent=status.engineSupport || '';const p=status.profiles,c=status.claude,l=status.lock;$('security-profile-summary').textContent=`${status.encrypted?'Keychain-encrypted state':'Encryption unavailable'} · ${p.shared} Shared · ${p.personal} Personal · ${p.work} Work · ${p.isolated} Isolated · ${status.liveViews} web page${status.liveViews===1?'':'s'} in memory · Claude Chat: ${c.sandboxed?'OS sandbox active':'not sandboxed'}.`;$('lock-description').textContent=l.enabled?`${l.method==='passcode'?'Passcode':'Touch ID'} lock is enabled and activates after ${l.minutes} minutes of inactivity.`:l.touchID?'Local state is encrypted. Enable Touch ID to lock the visible workspace after inactivity.':'Touch ID is unavailable. Choose a passcode of at least six characters; local state remains Keychain-encrypted.';$('auto-lock-minutes').value=String(l.minutes);$('auto-lock-minutes').disabled=false;$('new-lock-passcode').classList.toggle('hidden',l.touchID || l.enabled);$('toggle-app-lock').disabled=false;$('toggle-app-lock').textContent=l.enabled?'Disable app lock':l.touchID?'Enable Touch ID lock':'Enable passcode lock';$('lock-now').disabled=!l.enabled;sleep=status.sleep || sleep;$('sleep-default').value=String(sleep.defaultMinutes);const custom=Object.keys(sleep.apps || {}).length;$('sleep-summary').textContent=custom?custom+' app'+(custom===1?' has':'s have')+' their own setting.':'';const target=$('clear-profile-target'),selected=target.value;target.replaceChildren(new Option('Shared login group','shared'),new Option('Personal login group','personal'),new Option('Work login group','work'));for(const item of sidebarItems.filter(isBrowserItem))target.add(new Option('Browser · '+item.name,'browser:'+encodeURIComponent(item.id)));for(const item of sidebarItems.filter(item=>item.url && (item.profile || 'isolated')==='isolated'))target.add(new Option('Isolated · '+item.name,'isolated:'+encodeURIComponent(item.id || item.url)));if([...target.options].some(option=>option.value===selected))target.value=selected;}finally{securityLoading=false;}}
-function setLocked(value,method){if(typeof value==='object'){method=value.method;value=value.locked;}document.body.classList.toggle('is-locked',value);$('lock-screen').classList.toggle('hidden',!value);if(value){const passcode=method==='passcode';$('unlock-passcode').classList.toggle('hidden',!passcode);$('lock-screen-copy').textContent=passcode?'Enter your Just Zen passcode to restore this workspace.':'Use Touch ID to restore your workspace.';$('unlock-app').textContent=passcode?'Unlock':'Unlock with Touch ID';(passcode?$('unlock-passcode'):$('unlock-app')).focus();closePopovers();}else $('unlock-passcode').value='';placeViews();}
-function showVersion(state){if(state?.version)$('app-version').textContent='JUST ZEN · '+state.version;}
-function hydrate(state){homeDir=state.home || homeDir;platform=state.platform || platform;document.body.classList.toggle('platform-win',state.platform==='win32');if(state.claudeSupported===false){$('agent-state').textContent='Not available on Windows yet';const card=$('chat-signin');if(card){card.replaceChildren(el('h3',null,'Claude is macOS-only for now'),el('p',null,'Claude runs inside a macOS sandbox, and Just Zen will not run it without one. Everything else works: your apps, splits, search, tasks and documents.'));}}showVersion(state);attempt(refreshClaudeAuth);serviceBadges.clear();for(const [key,count] of Object.entries(state.serviceBadges || {}))serviceBadges.set(key,count);setLocked(false);setRoot(state.root);renderConnectedFolders(state.connectedFolders || []);setClaudeAccess({root:state.claudeRoot,policy:state.claudePolicy,workspaces:state.claudeWorkspaces});tabs=state.tabs || {};sleep=state.sleep || sleep;asleep.clear();for(const key of state.asleep || [])asleep.add(key);mutes=state.mutes || {};zoomByApp=state.zoom || {};$('peek-toggle').checked=state.peekLinks!==false;nowFeed=state.now || [];presets=state.presets || [];appUses=state.appUses || {};sidecar={key:typeof state.sidecar?.key==='string'?state.sidecar.key:'',open:state.sidecar?.open===true};renderNow();recent=state.recent || [];renderRecent();chimeOn=Boolean(state.layout?.chime);$('chime-toggle').checked=chimeOn;if(!state.tourDone)setTimeout(()=>attempt(startTour),800);setWorkspaces(state.workspaces,state.layout?.tiles);services(state.services,state.serviceFolders,state.sidebarOrder);todos=state.todos;taskFolders=state.taskFolders || [];whiteboard.setBoard(state.whiteboard);renderTodos();applyTheme(state.theme);renderChat(state.chat);applyMode(state.mode);renderTiles();renderSidecar();attempt(loadNative);const startPage=state.layout?.page;setTimeout(()=>attempt(async()=>{const target=startPage && !['overview','browser-page'].includes(startPage) && $(startPage)?startPage:(root?'files-page':'settings-page');await show(target);}),50);// The app opens with the Claude pane folded to its rail (Tasks and Documents start closed too); it unfolds when something is sent to it.
- return applyLayout({...state.layout,agentCollapsed:true,centreCollapsed:false,navCollapsed:layout.navCollapsed,navColumns:state.layout?.navColumns===2?2:1,navGrey:state.layout?.navGrey!==false,navDock:state.layout?.navDock!==false},false);}
 
-function setRoot(value){root=value;$('folder-name').textContent=value?value.split('/').pop():'Make yourself at home';$('folder-path').textContent=pretty(value) || 'Connect a vault or project to begin.';$('choose-folder').textContent='Add folder';}
-function setClaudeAccess({root:nextRoot,policy=claudePolicy,workspaces=claudeWorkspaces}){claudeRoot=nextRoot || null;claudePolicy=policy;claudeWorkspaces=workspaces || [];$('claude-workspace').replaceChildren(new Option('No folder connected',''));for(const value of claudeWorkspaces)$('claude-workspace').add(new Option(value.split('/').pop(),value));$('claude-workspace').value=claudeRoot || '';$('claude-workspace').title=pretty(claudeRoot) || '';$('claude-policy').value=claudePolicy;$('claude-policy').disabled=!claudeRoot;$('disconnect-claude').disabled=!claudeRoot;$('chat-folder').textContent=claudeRoot?claudeRoot.split('/').pop():'Choose a Claude workspace to begin';$('chat-folder').title=pretty(claudeRoot) || '';const notes={full:'Full access to the selected folder. Shell commands still require explicit review.',notes:'Markdown changes are allowed. Other writes and commands require explicit approval.',readOnly:'Read tools only. File changes and commands are blocked in Chat.'};$('claude-access-note').textContent=claudeRoot?pretty(claudeRoot)+' · '+notes[claudePolicy]:'Claude is disconnected from local files.';document.body.classList.toggle('claude-disconnected',!claudeRoot);}
-async function chooseClaude(){const state=await call('choose-claude-folder');if(state){setClaudeAccess(state);notice('Claude can now access '+pretty(state.root));return true;}return false;}
-async function choose(){if(!discard())return;const value=await call('choose-folder');if(value){setRoot(value);const state=await call('state');renderConnectedFolders(state.connectedFolders || []);setClaudeAccess({root:state.claudeRoot,policy:state.claudePolicy,workspaces:state.claudeWorkspaces});currentFile=null;original='';$('editor').value='';$('editor').disabled=true;$('save').disabled=true;$('note-tabs').classList.add('hidden');$('markdown-preview').classList.add('hidden');$('editor').classList.remove('hidden');$('filename').textContent='Select a note or source file';directory='';applyMode('files');await list('');notice('Connected to '+pretty(value));}}
-async function openFile(relative){if(!discard())return;const content=await call('read',relative);if(page!=='files-page')await show('files-page');currentFile=relative;original=content.text;$('editor').value=original;$('editor').disabled=false;$('save').disabled=true;$('filename').textContent=relative;const md=/\.(md|markdown)$/i.test(relative);$('note-tabs').classList.toggle('hidden',!md);setNoteMode(md?'preview':'edit');}
-async function list(relative){if(!root)return;directory=relative;const entries=await call('files',relative);$('file-list').replaceChildren();if(relative){const b=document.createElement('button');b.className='file-entry';b.textContent='← Parent folder';b.onclick=()=>attempt(()=>list(relative.split('/').slice(0,-1).join('/')));$('file-list').append(b);}for(const item of entries){const b=document.createElement('button');b.className='file-entry';b.textContent=(item.folder?'▸ ':'· ')+item.name;b.title=item.path;b.onclick=()=>attempt(()=>item.folder?list(item.path):openFile(item.path));$('file-list').append(b);}}
-function setNoteMode(value){noteMode=value;$('editor').classList.toggle('hidden',value==='preview');$('markdown-preview').classList.toggle('hidden',value!=='preview');$('note-preview').setAttribute('aria-pressed',value==='preview');$('note-edit').setAttribute('aria-pressed',value==='edit');if(value==='preview'){
-  let text=$('editor').value;const frontmatter=text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);if(frontmatter)text=text.slice(frontmatter[0].length);
-  text=text.replace(/\[\[([^\]\n]+)\]\]/g,(_m,raw)=>{const [target,label]=raw.split('|');return '['+(label || target).replace(/[\[\]<>]/g,'')+'](#vault-note='+encodeURIComponent(target)+')';});
-  $('markdown-preview').innerHTML=markdown(text);
-  if(frontmatter){const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent='Note properties';pre.textContent=frontmatter[1];details.append(summary,pre);$('markdown-preview').prepend(details);}
-}}
-async function save(){if(!currentFile)return;const text=$('editor').value;await call('save',{relative:currentFile,text,original});original=text;$('save').disabled=true;notice('Saved '+currentFile);}
-async function start(kind){if(kind!=='login' && !claudeRoot && !await chooseClaude())return;await call('start-terminal',kind);running=true;loginInProgress=kind==='login';await applyLayout({agentCollapsed:false});applyMode('terminal');requestAnimationFrame(size);terminal.focus();if(loginInProgress)notice('Signing in: finish in the browser window that opens, then return to Chat.');}
-let loginInProgress=false;
-async function refreshClaudeAuth(){try{const status=await call('claude-auth-status');$('chat-signin').classList.toggle('hidden',status.loggedIn);$('claude-login').classList.toggle('hidden',status.loggedIn);$('claude-logout').classList.toggle('hidden',!status.loggedIn);}catch{}}
-$('claude-logout').onclick=()=>attempt(async()=>{if(!confirm('Sign out of Claude in Just Zen? Saved Just Zen conversations are cleared; Claude Code keeps its own history.'))return;await call('claude-logout');await refreshClaudeAuth();notice('Signed out of Claude.');});
-$('chat-signin-button').onclick=()=>attempt(()=>start('login'));
 
-// ---- Tiles, tabs and the Browser ----
-// The centre is a row of columns; each column holds one pane or two stacked. Slots are numbered column by column, top to bottom.
-const MAX_PANES=8;
-const SHAPES={'1':{cols:[{rows:1}]},'2h':{cols:[{rows:1},{rows:1}]},'2v':{cols:[{rows:2}]},'3':{cols:[{rows:1},{rows:1},{rows:1}],widths:[.24,.24,.52]},'4':{cols:[{rows:2},{rows:2}]}};
-function slotCount(){return tiles.cols.reduce((n,c)=>n+c.rows,0);}
-function slotPos(i){let at=0;for(let c=0;c<tiles.cols.length;c++){if(i<at+tiles.cols[c].rows)return {col:c,row:i-at};at+=tiles.cols[c].rows;}return {col:tiles.cols.length-1,row:0};}
-function slotIndex(col,row=0){let at=0;for(let c=0;c<col;c++)at+=tiles.cols[c].rows;return at+row;}
-function tileEl(i){return $('tiles').querySelector('.tile[data-slot="'+i+'"]');}
-function evenWidths(n){return Array.from({length:n},()=>1/n);}
-function normaliseTiles(raw){
- const src=raw && typeof raw==='object'?raw:{};let cols=null,widths=null;
- if(Array.isArray(src.cols) && src.cols.length){cols=src.cols.slice(0,MAX_PANES).map(c=>({rows:c && c.rows===2?2:1,split:Number.isFinite(Number(c?.split))?Math.max(.1,Math.min(.9,Number(c.split))):.5}));while(cols.reduce((n,c)=>n+c.rows,0)>MAX_PANES)cols.pop();widths=Array.isArray(src.widths) && src.widths.length===cols.length?src.widths.map(Number):null;}
- else{const shape=SHAPES[src.mode] || SHAPES['1'];cols=shape.cols.map(c=>({rows:c.rows,split:.5}));widths=shape.widths?shape.widths.slice():null;const r=src.ratios && typeof src.ratios==='object'?src.ratios:{};const two=Number.isFinite(Number(src.ratio))?Number(src.ratio):.5;
-  if(src.mode==='2h')widths=[r['2h']?.[0] ?? two,1-(r['2h']?.[0] ?? two)];else if(src.mode==='2v')cols[0].split=r['2v']?.[0] ?? two;else if(src.mode==='3' && r['3']?.length===2)widths=[r['3'][0],r['3'][1]-r['3'][0],1-r['3'][1]];else if(src.mode==='4'){if(r['4']?.length===2){widths=[r['4'][0],1-r['4'][0]];cols[0].split=cols[1].split=r['4'][1];}}}
- if(!widths || widths.some(w=>!Number.isFinite(w) || w<=0))widths=evenWidths(cols.length);const sum=widths.reduce((a,b)=>a+b,0);widths=widths.map(w=>w/sum);
- const n=cols.reduce((a,c)=>a+c.rows,0);const order=!Array.isArray(src.cols) && src.mode==='4'?[0,2,1,3]:null;const slots=Array.from({length:n},(_,i)=>{const s=Array.isArray(src.slots)?src.slots[order?order[i]:i]:null;if(!s || typeof s!=='object')return null;if(s.kind==='document')return {kind:'document'};return typeof s.serviceKey==='string' && typeof s.tabId==='string'?{serviceKey:s.serviceKey,tabId:s.tabId}:null;});
- return {cols,widths,slots,focus:Number.isInteger(src.focus)?Math.max(0,Math.min(n-1,src.focus)):0};
-}
-function modeOf(){const key=JSON.stringify(tiles.cols.map(c=>c.rows));for(const [mode,shape] of Object.entries(SHAPES))if(JSON.stringify(shape.cols.map(c=>c.rows))===key)return mode;return 'custom';}
-function shapeTiles(mode){const shape=SHAPES[mode];if(!shape)return;const cols=shape.cols.map((c,i)=>({rows:c.rows,split:tiles.cols[i]?.split ?? .5}));const n=cols.reduce((a,c)=>a+c.rows,0);const keep=tiles.slots.slice(0,slotCount()).filter(Boolean);tiles.cols=cols;tiles.widths=shape.widths?shape.widths.slice():evenWidths(cols.length);tiles.slots=Array.from({length:n},(_,i)=>keep[i] || null);tiles.focus=Math.min(tiles.focus,n-1);}
-function ensureTwo(){if(slotCount()===1)shapeTiles('2h');}
-// Structure edits: a new column beside the focused one, a column split into top and bottom, or a pane removed.
-function addColumn(afterCol=slotPos(tiles.focus).col){if(slotCount()>=MAX_PANES){notice('That is the most panes Just Zen will show ('+MAX_PANES+').');return -1;}const n=tiles.cols.length;tiles.cols.splice(afterCol+1,0,{rows:1,split:.5});tiles.widths=[...tiles.widths.slice(0,afterCol+1).map(w=>w*n/(n+1)),1/(n+1),...tiles.widths.slice(afterCol+1).map(w=>w*n/(n+1))];const at=slotIndex(afterCol+1,0);tiles.slots.splice(at,0,null);tiles.focus=at;return at;}
-function splitColumn(col=slotPos(tiles.focus).col){const c=tiles.cols[col];if(!c)return -1;if(c.rows===2){notice('This column is already split. Close its lower pane to unsplit.');return -1;}if(slotCount()>=MAX_PANES){notice('That is the most panes Just Zen will show ('+MAX_PANES+').');return -1;}c.rows=2;c.split=.5;const at=slotIndex(col,0)+1;tiles.slots.splice(at,0,null);tiles.focus=at;return at;}
-// ---- The sidebar app: one app you keep to hand in every workspace, sliding over the panes ----
-let sidecar={key:'',open:false};
-function sidecarItem(){return sidecar.key?serviceOf(sidecar.key):null;}
-function sidecarOpen(){return Boolean(sidecar.open && sidecarItem() && page==='browser-page' && !document.body.classList.contains('is-locked'));}
-function sidecarBox(){if(!sidecarOpen())return null;const r=$('sidecar').getBoundingClientRect();return r.width>10?r:null;}
-function sidecarPlacement(){
- const item=sidecarItem();const box=sidecarBox();if(!item || !box)return null;
- const group=tabs[sidecar.key];if(!group)return null;const tab=group.items.find(t=>t.id===group.active) || group.items[0];if(!tab)return null;
- const surface=$('sidecar').querySelector('.sidecar-surface');const r=surface?.getBoundingClientRect();if(!r || r.width<10 || r.height<10)return null;
- return {serviceKey:sidecar.key,tabId:tab.id,x:r.x,y:r.y,width:r.width,height:r.height,radius:0,sidecar:true};
-}
-function renderSidecar(){
- const item=sidecarItem();const rail=$('sidecar-rail'),panel=$('sidecar');
- rail.classList.toggle('on',sidecarOpen());
- const label=rail.querySelector('b');if(label)label.textContent=item?item.name.slice(0,12):'Sidebar';
- const art=rail.querySelector('.sidecar-art');if(art){art.replaceChildren();art.append(item?iconFor(item):el('span',null,'▤'));}
- rail.title=item?item.name+' · always one click away (⌘⇧E)':'Choose an app to keep in the sidebar (⌘⇧E)';
- panel.classList.toggle('hidden',!sidecarOpen());
- document.body.classList.toggle('sidecar-open',sidecarOpen());
- $('sidecar-name').textContent=item?item.name:'';
- placeViews();requestAnimationFrame(()=>setTimeout(placeViews,220));
-}
-function saveSidecar(){return call('appearance',{sidecar:{key:sidecar.key,open:sidecar.open}}).catch(()=>{});}
-async function toggleSidecar(){
- if(!sidecarItem()){searchMode='sidecar';openAppSearch(0);return;}
- sidecar.open=!sidecar.open;if(sidecar.open && page!=='browser-page')await show('browser-page');
- renderSidecar();saveSidecar();
-}
-async function setSidecarApp(item){
- const key=item.id || item.url;if(!tabs[key])tabs=await call('tabs');
- // The sidebar app is the same app as everywhere else; it simply keeps a place of its own.
- sidecar={key,open:true};if(page!=='browser-page')await show('browser-page');
- renderSidecar();await saveSidecar();notice(item.name+' stays in the sidebar, in every workspace.');
-}
-function clearSidecar(){sidecar={key:'',open:false};renderSidecar();saveSidecar();}
-// ---- Workspaces: each one remembers its own split and which app sits in each pane ----
-function setWorkspaces(payload,fallbackTiles){
- const list=Array.isArray(payload?.list) && payload.list.length?payload.list:[{id:'w1',name:'Workspace 1',tiles:fallbackTiles}];
- workspaces=list.map((w,i)=>({id:w.id || 'w'+(i+1),name:w.name || 'Workspace '+(i+1),icon:w.icon || '',colour:w.colour || 'slate',opens:w.opens || [],tiles:w.tiles}));
- workspaceId=workspaces.some(w=>w.id===payload?.active)?payload.active:workspaces[0].id;
- tiles=normaliseTiles(workspaces.find(w=>w.id===workspaceId).tiles || fallbackTiles);
- renderWorkspaces();
-}
-// A small set of flat, single-weight icons for workspace tabs (drawn, not emoji, so they sit quietly next to the name).
-const WS_ICONS={
- dot:'',
- work:'M4 7h12v9H4zM8 7V5h4v2',
- home:'M4 9l6-5 6 5v7H4z',
- chat:'M4 5h12v8H8l-4 3z',
- mail:'M3 5h14v10H3zM3 6l7 5 7-5',
- calendar:'M4 5h12v11H4zM4 8h12M8 3v3M12 3v3',
- doc:'M6 3h6l3 3v11H6zM12 3v3h3',
- code:'M8 7l-4 3 4 3M12 7l4 3-4 3',
- chart:'M4 16V9M8.5 16V5M13 16v-5M17 16V8',
- idea:'M10 3a4 4 0 0 0-2.5 7.2V13h5v-2.8A4 4 0 0 0 10 3zM8.5 16h3',
- star:'M10 3.5l2 4.3 4.5.5-3.4 3.1 1 4.5-4.1-2.4-4.1 2.4 1-4.5L3.5 8.3l4.5-.5z',
- heart:'M10 16S3.8 12.2 3.8 8.2A3.2 3.2 0 0 1 10 6.6a3.2 3.2 0 0 1 6.2 1.6c0 4-6.2 7.8-6.2 7.8z',
- rocket:'M10 3c3 2 4 5 4 8l-2 2H8l-2-2c0-3 1-6 4-8zM8 15l-1 2M12 15l1 2',
- leaf:'M5 15C5 9 9 5 16 4c0 7-4 11-10 11zM5 15l4-4',
- coffee:'M4 6h10v5a4 4 0 0 1-8 0zM14 7h2a2 2 0 0 1 0 4h-2M4 17h12',
- money:'M10 4v12M7 7h4.5a2 2 0 0 1 0 4h-3a2 2 0 0 0 0 4H13',
- people:'M7.5 9a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4zM3 16c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4M14 6.2a2 2 0 1 1 0 4M14.5 12.4c1.6.4 2.5 1.7 2.5 3.6'
-};
-function wsIconGlyph(name){
- const path=WS_ICONS[name];if(!path)return null;
- const ns='http://www.w3.org/2000/svg';const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 20 20');svg.setAttribute('aria-hidden','true');svg.classList.add('ws-glyph');
- const p=document.createElementNS(ns,'path');p.setAttribute('d',path);svg.append(p);return svg;
-}
-const WS_COLOURS={slate:'#8a97a4',blue:'#4b8ff0',green:'#57b768',amber:'#e0a33c',rose:'#e26b8c',violet:'#9a7ae0',teal:'#3fb6ad'};
-let wsDrag=null;
-function renderWorkspaces(){
- const host=$('workspace-switch');if(!host)return;host.replaceChildren();
- host.classList.toggle('single',workspaces.length<2);
- for(const w of workspaces){
-  const tab=el('button','ws-tab');tab.type='button';tab.style.setProperty('--ws-colour',WS_COLOURS[w.colour] || WS_COLOURS.slate);
-  const glyph=wsIconGlyph(w.icon);tab.append(glyph?Object.assign(el('span','ws-icon'),{}):el('span','ws-dot'),el('span','ws-label',w.name));if(glyph)tab.querySelector('.ws-icon').append(glyph);
-  tab.title=w.name+' · right-click to rename, recolour or close';tab.setAttribute('aria-pressed',String(w.id===workspaceId));
-  tab.onclick=()=>attempt(()=>w.id===workspaceId?editWorkspace(w.id):switchWorkspace(w.id));
-  tab.oncontextmenu=e=>{e.preventDefault();workspaceMenu(w.id,e.clientX,e.clientY);};
-  // Tabs can be dragged into the order you want them; the drop lands where the pointer is.
-  tab.draggable=true;tab.dataset.ws=w.id;
-  tab.ondragstart=e=>{wsDrag=w.id;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',w.name);}catch{}tab.classList.add('dragging');};
-  tab.ondragend=()=>{wsDrag=null;tab.classList.remove('dragging');for(const t of host.children)t.classList.remove('drop-before','drop-after');};
-  tab.ondragover=e=>{if(!wsDrag || wsDrag===w.id)return;e.preventDefault();e.dataTransfer.dropEffect='move';const r=tab.getBoundingClientRect();const after=e.clientX>r.left+r.width/2;tab.classList.toggle('drop-before',!after);tab.classList.toggle('drop-after',after);};
-  tab.ondragleave=()=>{tab.classList.remove('drop-before','drop-after');};
-  tab.ondrop=e=>{e.preventDefault();const r=tab.getBoundingClientRect();const after=e.clientX>r.left+r.width/2;attempt(()=>moveWorkspace(wsDrag,w.id,after));wsDrag=null;};
-  host.append(tab);
- }
- const add=el('button','ws-add','＋');add.type='button';add.title='New workspace (⌘⇧W): the same apps, arranged differently';add.setAttribute('aria-label','New workspace');add.onclick=()=>attempt(addWorkspace);
- host.append(add);
-}
-// One small dialog does name, icon and colour; the tab shows the icon when there is one and a coloured dot when there is not.
-let wsEditing=null,wsColour='slate',wsIcon='dot';
-function editWorkspace(id){
- const w=workspaces.find(x=>x.id===id);if(!w)return;
- wsEditing=id;wsColour=w.colour || 'slate';
- $('ws-name').value=w.name;wsIcon=WS_ICONS[w.icon]!==undefined?w.icon:'dot';
- const icons=$('ws-icons');icons.replaceChildren();
- for(const name of Object.keys(WS_ICONS)){const b=el('button','ws-icon-choice');b.type='button';b.setAttribute('role','radio');b.setAttribute('aria-label',name);b.title=name;b.setAttribute('aria-checked',String(name===wsIcon));const g=wsIconGlyph(name);b.append(g || el('span','ws-dot'));b.onclick=()=>{wsIcon=name;for(const other of icons.children)other.setAttribute('aria-checked',String(other===b));};icons.append(b);}
- const host=$('ws-colours');host.replaceChildren();
- for(const [name,hex] of Object.entries(WS_COLOURS)){const b=el('button');b.type='button';b.style.setProperty('--swatch',hex);b.setAttribute('role','radio');b.title=name;b.setAttribute('aria-checked',String(name===wsColour));b.setAttribute('aria-label',name);b.onclick=()=>{wsColour=name;for(const other of host.children)other.setAttribute('aria-checked',String(other===b));};host.append(b);}
- renderWorkspaceOpens(w);
- suspendViews();$('ws-dialog').showModal();$('ws-name').focus();$('ws-name').select();
-}
-async function moveWorkspace(id,beforeId,after=false){
- if(!id || id===beforeId)return;
- const from=workspaces.findIndex(w=>w.id===id);if(from<0)return;
- const [moved]=workspaces.splice(from,1);
- let to=workspaces.findIndex(w=>w.id===beforeId);if(to<0)to=workspaces.length-1;
- workspaces.splice(to+(after?1:0),0,moved);
- renderWorkspaces();await saveWorkspaces();
-}
-async function nudgeWorkspace(id,direction){
- const at=workspaces.findIndex(w=>w.id===id);const to=at+direction;
- if(at<0 || to<0 || to>=workspaces.length)return;
- const [moved]=workspaces.splice(at,1);workspaces.splice(to,0,moved);
- renderWorkspaces();await saveWorkspaces();
-}
-async function switchWorkspace(id){
- const next=workspaces.find(w=>w.id===id);if(!next || id===workspaceId)return;
- const open=workspaces.find(w=>w.id===workspaceId);if(open)open.tiles=tiles;
- workspaceId=id;tiles=normaliseTiles(next.tiles);
- if(page!=='browser-page')await show('browser-page');
- renderWorkspaces();renderTiles();await saveWorkspaces();notice(next.name);
- const opened=await call('workspace-open',{id}).catch(()=>null);
- if(opened?.opened)notice(next.name+': opened '+opened.opened+' app'+(opened.opened===1?'':'s')+' for you.');
- if(opened?.problems?.length)notice('Could not open '+opened.problems.join(', '));
-}
-async function addWorkspace(){
- if(workspaces.length>=9){notice('Nine workspaces is the limit. Close one first.');return;}
- const open=workspaces.find(w=>w.id===workspaceId);if(open)open.tiles=tiles;
- const id='w'+Date.now().toString(36);workspaces.push({id,name:'Space '+(workspaces.length+1),icon:Object.keys(WS_ICONS)[(workspaces.length+1)%Object.keys(WS_ICONS).length],colour:Object.keys(WS_COLOURS)[workspaces.length%7],tiles:{cols:[{rows:1,split:.5}],widths:[1],slots:[null],focus:0}});
- workspaceId=id;tiles=normaliseTiles(workspaces[workspaces.length-1].tiles);
- if(page!=='browser-page')await show('browser-page');
- renderWorkspaces();renderTiles();await saveWorkspaces();openAppSearch(0);
-}
-function renameWorkspace(id){editWorkspace(id);}
-async function closeWorkspace(id){
- if(workspaces.length<2){notice('This is your only workspace.');return;}
- const at=workspaces.findIndex(w=>w.id===id);if(at<0)return;
- const gone=workspaces.splice(at,1)[0];
- if(workspaceId===id){const next=workspaces[Math.min(at,workspaces.length-1)];workspaceId=next.id;tiles=normaliseTiles(next.tiles);renderTiles();}
- renderWorkspaces();await saveWorkspaces();
- undoable('Closed '+gone.name,async()=>{if(workspaces.length>=9)return;workspaces.splice(Math.min(at,workspaces.length),0,gone);workspaceId=gone.id;tiles=normaliseTiles(gone.tiles);renderWorkspaces();renderTiles();await saveWorkspaces();});
-}
-function workspaceMenu(id,x,y){
- const w=workspaces.find(x=>x.id===id);if(!w)return;
- showMenu([{label:'Switch to '+w.name,run:()=>switchWorkspace(id)},{label:'Name, icon and colour…',run:()=>editWorkspace(id)},...(workspaces.length>1?[{label:'Move left',run:()=>nudgeWorkspace(id,-1)},{label:'Move right',run:()=>nudgeWorkspace(id,1)}]:[]),{label:'Duplicate',run:()=>attempt(async()=>{if(workspaces.length>=9){notice('Nine workspaces is the limit.');return;}const open=workspaces.find(x=>x.id===workspaceId);if(open)open.tiles=tiles;const copy={id:'w'+Date.now().toString(36),name:w.name+' copy',icon:w.icon || '',colour:w.colour || 'slate',tiles:JSON.parse(JSON.stringify(w.id===workspaceId?tiles:w.tiles))};workspaces.push(copy);workspaceId=copy.id;tiles=normaliseTiles(copy.tiles);renderWorkspaces();renderTiles();await saveWorkspaces();})},'-',{label:'Close '+w.name,run:()=>closeWorkspace(id)}],x,y);
-}
-function stepWorkspace(direction){if(workspaces.length<2)return;const at=workspaces.findIndex(w=>w.id===workspaceId);return switchWorkspace(workspaces[(at+direction+workspaces.length)%workspaces.length].id);}
-function removePane(i){const n=slotCount();if(i<0 || i>=n)return;const {col}=slotPos(i);if(n===1){tiles.slots[0]=null;return;}if(tiles.cols[col].rows===2){tiles.cols[col].rows=1;tiles.slots.splice(i,1);}else{tiles.cols.splice(col,1);const w=tiles.widths.splice(col,1)[0];tiles.widths=tiles.widths.map(x=>x/(1-w));tiles.slots.splice(i,1);}tiles.focus=Math.min(i,slotCount()-1);}
-function liveKey(serviceKey,tabId){return serviceKey+'\n'+tabId;}
-function serviceOf(key){return sidebarItems.find(item=>openable(item) && (item.id || item.url)===key) || null;}
-function defaultBrowser(){return sidebarItems.find(item=>isBrowserItem(item) && item.id==='browser') || sidebarItems.find(isBrowserItem) || null;}
-function isSlack(item){try{const host=new URL(item.url).hostname;return host==='slack.com' || host.endsWith('.slack.com');}catch{return false;}}
-function tabOf(slot){if(!slot || slot.kind==='document')return null;const group=tabs[slot.serviceKey];if(!group)return null;return group.items.find(t=>t.id===slot.tabId) || null;}
-function hostOf(url){try{return new URL(url).hostname.replace(/^www\./,'');}catch{return '';}}
-function tabTitle(serviceKey,tab){const live=tabLive.get(liveKey(serviceKey,tab.id));const url=live?.url || tab.current || tab.url;return live?.title || tab.title || hostOf(url) || 'New tab';}
-function normaliseSlots(){const n=slotCount();tiles.slots.length=n;for(let i=0;i<n;i++){const slot=tiles.slots[i] || null;tiles.slots[i]=slot;if(!slot || slot.kind==='document')continue;const group=tabs[slot.serviceKey];if(!group || !serviceOf(slot.serviceKey)){tiles.slots[i]=null;continue;}if(!group.items.some(t=>t.id===slot.tabId))tiles.slots[i]={serviceKey:slot.serviceKey,tabId:group.active};}for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)if(tiles.slots[i] && tiles.slots[j] && ((tiles.slots[i].kind==='document' && tiles.slots[j].kind==='document') || (tiles.slots[i].serviceKey && tiles.slots[i].serviceKey===tiles.slots[j].serviceKey)))tiles.slots[j]=null;tiles.focus=Math.max(0,Math.min(tiles.focus,n-1));}
-let placeScheduled=false;
-function placeViews(){if(placeScheduled)return;placeScheduled=true;requestAnimationFrame(()=>{placeScheduled=false;placeNow().catch(()=>{});});}
- 
-async function placeNow(){peekBounds();healSuspension();
- const list=[];let docBox=null;
- if(page==='browser-page' && !layout.centreCollapsed && !viewsSuspended && !document.querySelector('dialog[open]') && !document.body.classList.contains('is-locked')){
-  for(let i=0;i<slotCount();i++){const slot=tiles.slots[i];if(!slot)continue;if(slot.kind==='document'){const surface=tileEl(i)?.querySelector('.tile-surface');const r=surface?.getBoundingClientRect();if(r && r.width>10 && r.height>10){docBox={x:r.x,y:r.y,width:r.width,height:r.height};list.push({document:true,slot:i,x:r.x,y:r.y,width:r.width,height:r.height});}continue;}const tab=tabOf(slot);if(!tab || !(tab.current || tab.url || tabLive.has(liveKey(slot.serviceKey,slot.tabId))))continue;const surface=tileEl(i)?.querySelector('.tile-surface');if(!surface)continue;const r=surface.getBoundingClientRect();if(r.width<10 || r.height<10)continue;let width=r.width;if(peekOpenState && !$('peek').classList.contains('hidden')){const d=$('peek').getBoundingClientRect();if(d.width && r.x+width>d.left)width=Math.max(0,d.left-r.x);}const side=sidecarBox();if(side && r.x+width>side.x)width=Math.max(0,side.x-r.x);const covered=width<40;tileEl(i)?.classList.toggle('covered',covered);if(covered)continue;list.push({serviceKey:slot.serviceKey,tabId:slot.tabId,x:r.x,y:r.y,width,height:r.height,radius:0,slot:i});}
-  const side=sidecarPlacement();if(side)list.push(side);
- }
- call('document-bounds',docBox || {visible:false}).catch(()=>{});
- const infos=await call('place-views',list);
- for(const info of infos)tabLive.set(liveKey(info.serviceKey,info.tabId),info);
- refreshTileBars();
-}
+
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
-function renderTiles(){
- if(paneChoice)cancelPaneChoice();
- normaliseSlots();
- const host=$('tiles');const shape=modeOf();host.dataset.mode=shape;host.dataset.panes=String(slotCount());host.replaceChildren();
- for(const b of document.querySelectorAll('#layout-switch button[data-tiles]'))b.setAttribute('aria-pressed',String(b.dataset.tiles===shape));
- $('dock-layouts').title='Panes: '+(LAYOUT_NAMES[shape] || slotCount()+' panes')+' · click for splits';
- const n=slotCount();const colEls=tiles.cols.map((c,ci)=>{const colEl=el('div','tile-col');colEl.dataset.col=String(ci);colEl.style.flexGrow=String(tiles.widths[ci]*1000);host.append(colEl);return colEl;});
- for(let i=0;i<n;i++){
-  const {col,row}=slotPos(i);const colEl=colEls[col];const tile=el('div','tile');tile.dataset.slot=String(i);if(tiles.cols[col].rows===2)tile.style.flexGrow=String((row===0?tiles.cols[col].split:1-tiles.cols[col].split)*1000);
-  if(n>1 && i===tiles.focus)tile.classList.add('focused');
-  const slot=tiles.slots[i],item=slot?serviceOf(slot.serviceKey):null,group=slot?tabs[slot.serviceKey]:null;
-  const bar=el('div','tile-bar'),surface=el('div','tile-surface'),progress=el('div','tile-progress');surface.append(progress);const ghost=el('button','pane-search');ghost.type='button';ghost.title='Find an app for this pane';ghost.append(searchGlyph(),el('span',null,'Find an app'));ghost.onclick=()=>{tiles.focus=i;openAppSearch(i);};surface.append(ghost);
-  tile.onmouseenter=()=>call('badge-hover',{slot:i}).catch(()=>{});tile.onmouseleave=()=>call('badge-hover',{slot:-1}).catch(()=>{});
-  tile.onmousedown=()=>{if(tiles.focus!==i && n>1){lastFocus=tiles.focus;tiles.focus=i;for(const t of host.querySelectorAll('.tile'))t.classList.toggle('focused',t===tile);saveLayout();updateZoomControl();}};
-  if(slot && slot.kind==='document'){tile.classList.add('document');bar.classList.add('hidden');tile.append(bar,surface);colEl.append(tile);continue;}
-  if(!slot || !item || !group){
-   bar.classList.add('hidden');
-   const empty=el('div','tile-empty');empty.append(el('span','tile-empty-mark','⊞'),el('p',null,n>1?'Choose an app for this pane.':'Choose an app for this window.'));
-   const find=el('button','tile-find');find.type='button';find.append(searchGlyph(),document.createTextNode('Find an app'));find.onclick=()=>{tiles.focus=i;openAppSearch(i);};empty.append(find);surface.append(empty);
-   tile.append(bar,surface);colEl.append(tile);continue;
-  }
-  const browser=isBrowserItem(item);
-  if(browser){const urlbar=el('div','tile-urlbar');for(const [action,glyph,title] of [['back','‹','Back'],['forward','›','Forward'],['reload','↻','Reload']]){const nb=el('button',null,glyph);nb.type='button';nb.dataset.nav=action;nb.title=title;nb.onclick=()=>attempt(async()=>{const info=await call('tab-action',{serviceKey:slot.serviceKey,tabId:slot.tabId,action});if(info)tabLive.set(liveKey(info.serviceKey,info.tabId),info);refreshTileBars();});urlbar.append(nb);}
-   const form=el('form','tile-url');const address=document.createElement('input');address.className='tile-address';address.type='text';address.autocomplete='off';address.spellcheck=false;address.placeholder='Enter a website address';address.setAttribute('aria-label','Address');const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId)),tab=tabOf(slot);address.value=live?.url || tab?.current || tab?.url || '';address.onfocus=()=>address.select();
-   form.append(address);form.onsubmit=e=>{e.preventDefault();const value=address.value.trim();if(!value)return;attempt(async()=>{const target=/^[a-z][a-z0-9+.-]*:/i.test(value)?value:/^[^\s]+\.[^\s]+$/.test(value)?'https://'+value:'https://duckduckgo.com/?q='+encodeURIComponent(value);tabs[slot.serviceKey]=await call('navigate-tab',{serviceKey:slot.serviceKey,tabId:slot.tabId,url:target});renderTiles();});};urlbar.append(form);
-   tile.__urlbar=urlbar;
-   // A browser tab with nothing loaded yet gets one big search box in the middle instead of a thin bar at the bottom.
-   const liveNow=tabLive.get(liveKey(slot.serviceKey,slot.tabId)),tabNow=tabOf(slot);
-   if(!(liveNow?.url || tabNow?.current || tabNow?.url)){
-    tile.classList.add('blank');
-    const start=el('div','tile-start');
-    const startForm=el('form','tile-start-form');
-    const big=document.createElement('input');big.className='tile-start-input';big.type='text';big.autocomplete='off';big.spellcheck=false;big.placeholder='Search the web, or type an address';big.setAttribute('aria-label','Search the web or type an address');
-    const go=el('button','tile-start-go');go.type='submit';go.append(searchGlyph());go.title='Go';
-    startForm.append(searchGlyph(),big,go);
-    startForm.onsubmit=e=>{e.preventDefault();address.value=big.value;form.requestSubmit();};
-    start.append(startForm,el('p','tile-start-hint','Press Enter to search, or paste an address.'));
-    surface.append(start);
-    requestAnimationFrame(()=>{if(tiles.focus===i)big.focus();});
-   }}
-  // The tab strip is always visible: it is where new tabs and extra Slack workspaces are added.
-  bar.classList.remove('hidden');
-  if(browser){const label=el('button','tile-app');const tileIcon=el('span','tile-emoji');tileIcon.append(iconNode(item.icon || '🌐'));label.append(tileIcon,el('span',null,item.name));label.title=item.name;label.onclick=()=>{tiles.focus=i;};bar.append(label);}
-  if(!browser){const label=el('button','tile-app');const img=el('img','site-favicon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback',item.name.slice(0,1).toUpperCase());label.append(img,fallback,el('span',null,item.name));label.title=item.name;label.onclick=()=>{tiles.focus=i;};call('favicon',slot.serviceKey).then(icon=>paintIcon(img,icon)).catch(()=>{});bar.append(label);}
-  const strip=el('div','tile-tabs');
-  for(const tab of group.items){
-   const b=el('button','tile-tab');b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',String(tab.id===slot.tabId));b.dataset.tab=tab.id;b.title=tabLive.get(liveKey(slot.serviceKey,tab.id))?.url || tab.current || tab.url || 'New tab';
-   const text=el('span',null,tabTitle(slot.serviceKey,tab));const close=el('b','tile-tab-close','×');close.title='Close tab';
-   close.onclick=e=>{e.stopPropagation();attempt(()=>closeTab(slot.serviceKey,tab.id));};
-   b.onclick=()=>{if(tab.id!==slot.tabId)attempt(()=>activateTab(i,slot.serviceKey,tab.id));};
-   b.onauxclick=e=>{if(e.button===1)attempt(()=>closeTab(slot.serviceKey,tab.id));};
-   b.append(text,close);strip.append(b);
-  }
-  bar.append(strip);
-  const refresh=el('button','tile-refresh','↻');refresh.type='button';refresh.title='Reload this tab (⌘R)';refresh.onclick=()=>attempt(async()=>{const info=await call('tab-action',{serviceKey:slot.serviceKey,tabId:slot.tabId,action:'reload'});if(info)tabLive.set(liveKey(info.serviceKey,info.tabId),info);refreshTileBars();});if(!browser)bar.append(refresh);
-  const plus=el('button','tile-new','+');plus.type='button';plus.title=isSlack(item)?'Add another Slack workspace':'New tab (⌘T)';plus.onclick=()=>attempt(()=>newTab(slot.serviceKey));bar.append(plus);
-  if(browser){
-   const form=el('form','tile-url');
-   for(const [action,glyph,title] of [['back','‹','Back'],['forward','›','Forward'],['reload','↻','Reload']]){const b=el('button',null,glyph);b.type='button';b.dataset.nav=action;b.title=title;b.onclick=()=>attempt(async()=>{const info=await call('tab-action',{serviceKey:slot.serviceKey,tabId:slot.tabId,action});if(info)tabLive.set(liveKey(info.serviceKey,info.tabId),info);refreshTileBars();});form.append(b);}
-   const address=document.createElement('input');address.className='tile-address';address.type='text';address.autocomplete='off';address.spellcheck=false;address.placeholder='Enter a website address';address.setAttribute('aria-label','Address');
-   const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId)),tab=tabOf(slot);address.value=live?.url || tab?.current || tab?.url || '';
-   address.onfocus=()=>address.select();
-   form.append(address);form.onsubmit=e=>{e.preventDefault();const value=address.value.trim();if(!value)return;attempt(async()=>{const target=/^[a-z][a-z0-9+.-]*:/i.test(value)?value:/^[^\s]+\.[^\s]+$/.test(value)?'https://'+value:'https://duckduckgo.com/?q='+encodeURIComponent(value);tabs[slot.serviceKey]=await call('navigate-tab',{serviceKey:slot.serviceKey,tabId:slot.tabId,url:target});renderTiles();});};
-   bar.append(form);
-  }
-  if(n>1){const clear=el('button','tile-clear','×');clear.type='button';clear.title='Empty this tile';clear.onclick=()=>{tiles.slots[i]=null;renderTiles();saveLayout();};bar.append(clear);}
-  const tab=tabOf(slot);
-  if(!tab || !(tab.current || tab.url)){const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));if(live){const empty=el('div','tile-empty');empty.append(el('span','tile-empty-mark','…'),el('p',null,'Opening…'));surface.append(empty);}}
-  else if(asleep.has(slot.serviceKey)){const empty=el('div','tile-empty tile-waking');const img=el('img','site-favicon wake-icon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback wake-icon',item.name.slice(0,1).toUpperCase());empty.append(img,fallback,el('strong',null,tab.title || item.name),el('p',null,'Waking '+item.name+' up…'));if(!isBrowserItem(item))call('favicon',slot.serviceKey).then(icon=>paintIcon(img,icon)).catch(()=>{});surface.append(empty);}
-  if(!tile.__urlbar && (group.items.length>1 || isSlack(item))){const tabbar=el('div','tile-urlbar tile-tabbar');const strip=bar.querySelector('.tile-tabs'),plus=bar.querySelector('.tile-new');if(strip)tabbar.append(strip);if(plus)tabbar.append(plus);tile.__urlbar=tabbar;}
-  tile.append(bar,surface);if(tile.__urlbar){const strip=bar.querySelector('.tile-tabs'),plus=bar.querySelector('.tile-new'),form=tile.__urlbar.querySelector('.tile-url');if(strip && form)tile.__urlbar.insertBefore(strip,form);if(plus && form)tile.__urlbar.append(plus);tile.append(tile.__urlbar);}colEl.append(tile);
- }
- applySplit();placeViews();updateZoomControl();deckSync();
-}
-// Every boundary is draggable: a vertical divider between neighbouring columns, a horizontal one inside a split column.
-// Dividers are positioned from the real pane rectangles, so they sit in the gap whatever the widths are.
-const dividerPool=[];
-function ensureDividers(n){const pageEl=$('browser-page');while(dividerPool.length<n){const d=el('div','tile-divider hidden');d.title='Drag to resize · double-click to even out';d.onpointerdown=e=>startDividerDrag(e,d);d.ondblclick=()=>{if(d.__kind==='col')tiles.widths=evenWidths(tiles.cols.length);else if(tiles.cols[d.__at])tiles.cols[d.__at].split=.5;renderTiles();saveLayout();};pageEl.append(d);dividerPool.push(d);}for(let i=n;i<dividerPool.length;i++)dividerPool[i].classList.add('hidden');}
-function applySplit(){const host=$('tiles');const page=$('browser-page').getBoundingClientRect();const jobs=[];
- const colEls=[...host.querySelectorAll('.tile-col')];
- for(let c=0;c<colEls.length-1;c++){const l=colEls[c].getBoundingClientRect(),r=colEls[c+1].getBoundingClientRect();jobs.push({kind:'col',at:c,x:(l.right+r.left)/2-page.left-5,y:l.top-page.top,w:10,h:l.height});}
- for(let c=0;c<colEls.length;c++){const rows=colEls[c].querySelectorAll('.tile');if(rows.length<2)continue;const t=rows[0].getBoundingClientRect(),u=rows[1].getBoundingClientRect();jobs.push({kind:'row',at:c,x:t.left-page.left,y:(t.bottom+u.top)/2-page.top-5,w:t.width,h:10});}
- ensureDividers(jobs.length);
- jobs.forEach((j,i)=>{const d=dividerPool[i];d.__kind=j.kind;d.__at=j.at;d.classList.remove('hidden');d.classList.toggle('vertical',j.kind==='row');d.style.left=j.x+'px';d.style.top=j.y+'px';d.style.width=j.w+'px';d.style.height=j.h+'px';});}
-function startDividerDrag(e,d){e.preventDefault();const host=$('tiles'),rect=host.getBoundingClientRect(),kind=d.__kind,at=d.__at;document.body.classList.add('resizing-split');suspendViews();
- const colRect=kind==='row'?host.querySelectorAll('.tile-col')[at]?.getBoundingClientRect():null;
- const move=ev=>{if(kind==='col'){const left=tiles.widths.slice(0,at).reduce((a,b)=>a+b,0),pair=tiles.widths[at]+tiles.widths[at+1];let pos=(ev.clientX-rect.left)/rect.width;pos=Math.max(left+.08,Math.min(left+pair-.08,pos));tiles.widths[at]=pos-left;tiles.widths[at+1]=pair-tiles.widths[at];for(const [i,colEl] of [...host.querySelectorAll('.tile-col')].entries())colEl.style.flexGrow=String(tiles.widths[i]*1000);}
-  else if(colRect){const c=tiles.cols[at];if(!c)return;c.split=Math.max(.1,Math.min(.9,(ev.clientY-colRect.top)/colRect.height));const rows=host.querySelectorAll('.tile-col')[at].querySelectorAll('.tile');if(rows[0])rows[0].style.flexGrow=String(c.split*1000);if(rows[1])rows[1].style.flexGrow=String((1-c.split)*1000);}
-  applySplit();};
- const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);document.body.classList.remove('resizing-split');resumeViews();saveLayout();};
- document.addEventListener('pointermove',move);document.addEventListener('pointerup',up,{once:true});}
-new ResizeObserver(()=>applySplit()).observe($('tiles'));
-function refreshTileBars(){
- const host=$('tiles');
- for(let i=0;i<slotCount();i++){const tile=tileEl(i),slot=tiles.slots[i];if(!tile || !slot)continue;const group=tabs[slot.serviceKey];if(!group)continue;
-  for(const b of tile.querySelectorAll('.tile-tab')){const tab=group.items.find(t=>t.id===b.dataset.tab);if(!tab)continue;const live=tabLive.get(liveKey(slot.serviceKey,tab.id));b.firstChild.textContent=tabTitle(slot.serviceKey,tab);b.title=live?.url || tab.current || tab.url || 'New tab';b.classList.toggle('loading',Boolean(live?.loading));}
-  const address=tile.querySelector('.tile-urlbar .tile-address');const live=tabLive.get(liveKey(slot.serviceKey,slot.tabId));tile.classList.toggle('loading',Boolean(live?.loading));
-  if(address && document.activeElement!==address && live?.url)address.value=live.url;
-  const back=tile.querySelector('.tile-urlbar [data-nav=back]'),forward=tile.querySelector('.tile-urlbar [data-nav=forward]');if(back)back.disabled=!live?.canGoBack;if(forward)forward.disabled=!live?.canGoForward;
-  if(live?.url && tile.querySelector('.tile-empty') && !asleep.has(slot.serviceKey))tile.querySelector('.tile-empty').remove();
- }
-}
-// In a split layout, opening an app that is not already on screen and has no empty tile asks which pane it should take:
-// each tile bar shows a "Put it here" chip until one is picked (Escape cancels).
-function cancelPaneChoice(){if(!paneChoice)return;const {resolve}=paneChoice;paneChoice=null;document.body.classList.remove('choosing-pane');for(const chip of document.querySelectorAll('.tile-choose'))chip.remove();resolve(null);}
-function choosePane(item){return new Promise(resolve=>{cancelPaneChoice();paneChoice={resolve};document.body.classList.add('choosing-pane');const n=slotCount();for(let i=0;i<n;i++){const tile=tileEl(i);if(!tile)continue;const chip=el('button','tile-choose');chip.type='button';chip.textContent='Put '+item.name+' here';chip.onclick=e=>{e.stopPropagation();const {resolve}=paneChoice;paneChoice=null;document.body.classList.remove('choosing-pane');for(const c of document.querySelectorAll('.tile-choose'))c.remove();resolve(i);};(tile.querySelector('.tile-bar') || tile).append(chip);if(!tile.querySelector('.tile-bar') || tile.querySelector('.tile-bar').classList.contains('hidden'))tile.querySelector('.tile-surface')?.append(chip);}notice('Choose the pane for '+item.name+'. Press Escape to cancel.',{duration:6000});});}
-document.addEventListener('keydown',e=>{if(e.key==='Escape' && paneChoice)cancelPaneChoice();});
-async function openInTile(serviceKey,tabId,forceIndex=null){cancelPaneChoice();if(page==='browser-page' && !reducedMotion.matches){document.body.classList.add('switching');setTimeout(()=>document.body.classList.remove('switching'),220);}
- if(!tabs[serviceKey])tabs=await call('tabs');
- const group=tabs[serviceKey];if(!group)throw Error('App not found');
- tabId=group.items.some(t=>t.id===tabId)?tabId:group.active;
- const n=slotCount();let index=Number.isInteger(forceIndex) && forceIndex>=0 && forceIndex<n?forceIndex:tiles.slots.findIndex((s,i)=>i<n && s && s.serviceKey===serviceKey);
- if(index<0)index=tiles.slots.findIndex((s,i)=>i<n && !s);
- if(index<0 && n===1 && tiles.slots[0] && inCall(tiles.slots[0]) && tiles.slots[0].serviceKey!==serviceKey){await setTilesMode('2h');index=1;notice('Kept your call in the left pane.');}
- if(index<0)index=Math.min(tiles.focus,n-1);
- tiles.slots[index]={serviceKey,tabId};tiles.focus=index;
- if(group.active!==tabId){group.active=tabId;call('activate-tab',{serviceKey,tabId}).catch(()=>{});}
- closePopovers();await show('browser-page');renderTiles();saveLayout();
- if(isBrowserItem(serviceOf(serviceKey))){const tab=group.items.find(t=>t.id===tabId);if(tab && !(tab.current || tab.url))focusAddress(index);}
-}
-function focusAddress(index=tiles.focus){requestAnimationFrame(()=>{const address=tileEl(index)?.querySelector('.tile-urlbar .tile-address');if(address){address.focus();address.select();}});}
-// Links from notes and chat open in the default browser app; one is created if every browser has been removed.
-async function openBrowser(url){let item=defaultBrowser();if(!item){const added=await call('add-browser',{name:'Browser',icon:'🌐'});services(added.services);item=serviceOf(added.key);}const key=item.id;if(url){const opened=await call('open-tab',{serviceKey:key,url});tabs[key]=opened.tabs;await openInTile(key,opened.tabId);}else await openInTile(key);}
-async function activateTab(index,serviceKey,tabId){tabs[serviceKey]=await call('activate-tab',{serviceKey,tabId});tiles.slots[index]={serviceKey,tabId};renderTiles();saveLayout();}
-async function newTab(serviceKey){const item=serviceOf(serviceKey);if(!item)return;const url=isSlack(item)?'https://slack.com/signin':'';const opened=await call('open-tab',{serviceKey,url});tabs[serviceKey]=opened.tabs;await openInTile(serviceKey,opened.tabId);if(isSlack(item))notice('Sign in to the other workspace here; it opens in its own tab beside this one.');}
-async function closeTab(serviceKey,tabId){tabs[serviceKey]=await call('close-tab',{serviceKey,tabId});tabLive.delete(liveKey(serviceKey,tabId));renderTiles();saveLayout();}
-function updateZoomControl(){const slot=page==='browser-page'?focusedSlot():null;$('zoom-switch').classList.add('hidden');if(slot)$('zoom-label').textContent=Math.round((zoomByApp[slot.serviceKey] || 1)*100)+'%';}
-async function zoomApp(step){const slot=page==='browser-page'?focusedSlot():null;if(!slot)return;const factor=await call('set-zoom',step===0?{key:slot.serviceKey,reset:true}:{key:slot.serviceKey,step});if(factor===1)delete zoomByApp[slot.serviceKey];else zoomByApp[slot.serviceKey]=factor;updateZoomControl();const item=serviceOf(slot.serviceKey);notice((item?.name || 'App')+' at '+Math.round(factor*100)+'%');}
-for(const b of document.querySelectorAll('#zoom-switch button'))b.onclick=()=>attempt(()=>zoomApp(Number(b.dataset.zoom)));
-function focusedSlot(){const n=slotCount();return tiles.slots[Math.min(tiles.focus,n-1)] || tiles.slots.slice(0,n).find(Boolean) || null;}
-async function setTilesMode(nextMode){if(!SHAPES[nextMode])return;shapeTiles(nextMode);if(page!=='browser-page')await show('browser-page');renderTiles();saveLayout();}
-async function addPane(){const at=addColumn();if(at<0)return;if(page!=='browser-page')await show('browser-page');renderTiles();saveLayout();openAppSearch(at);}
-async function splitPane(index=tiles.focus){const at=splitColumn(slotPos(index).col);if(at<0)return;if(page!=='browser-page')await show('browser-page');renderTiles();saveLayout();openAppSearch(at);}
-function suspendViews(){viewsSuspended++;placeViews();}
-function resumeViews(){viewsSuspended=Math.max(0,viewsSuspended-1);placeViews();}
-// Some Chromium builds fire toggle rather than close for dialogs; listen to both and resume exactly once per opening.
-function onDialogClosed(dialog,fn){let armed=false;dialog.addEventListener('toggle',e=>{if(e.newState==='open')armed=true;else if(armed){armed=false;fn();}});dialog.addEventListener('close',()=>{if(armed){armed=false;fn();}});}
-// Nothing legitimately keeps views hidden once every dialog is closed; heal a stuck counter rather than show blank panes.
-function healSuspension(){if(viewsSuspended>0 && !popoverSuspended && !document.querySelector('dialog[open]') && $('tour').classList.contains('hidden') && !document.body.classList.contains('resizing-split'))viewsSuspended=0;}
-// Read-only peek for diagnostics (nothing here can be changed from outside).
-window.__zen=Object.freeze({get suspended(){return viewsSuspended;},get page(){return page;},get focus(){return tiles.focus;}});
-for(const b of document.querySelectorAll('#layout-switch button[data-tiles]'))b.onclick=()=>attempt(()=>setTilesMode(b.dataset.tiles));
-$('add-pane').onclick=()=>attempt(addPane);
-const LAYOUT_NAMES={'1':'One app','2h':'Two side by side','2v':'Two stacked','3':'Two narrow and one wide','4':'Four in a grid'};
-$('dock-layouts').hidden=true;
-$('dock-layouts').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();const shape=modeOf();
- showMenu([...Object.entries(LAYOUT_NAMES).map(([mode,label])=>({label,checked:shape===mode,run:()=>setTilesMode(mode)})),'-',
-  {label:'Add a pane',hint:'⌘⇧N',run:addPane},{label:'Split this pane top and bottom',hint:'⌘⇧B',run:()=>splitPane()},{label:'Close this pane',run:()=>closePane(Math.min(tiles.focus,slotCount()-1))},'-',
-  {label:'Swap panes',hint:'⌘⇧S',run:swapPanes},{label:'Make this the wide one',hint:'⌘⇧=',run:widenPane}],r.right+6,r.top);};
-$('dock-layouts').oncontextmenu=e=>{e.preventDefault();$('dock-layouts').click();};
-$('layout-switch').addEventListener('contextmenu',e=>{e.preventDefault();showMenu([{label:'Save current layout…',run:openPresetDialog},...(presets.length?['-',...presets.map(p=>({label:'Switch to '+p.name,run:()=>applyPreset(p)}))]:[])],e.clientX,e.clientY);});
-function openPresetDialog(){suspendViews();$('preset-dialog').showModal();$('preset-name').value='';$('preset-name').focus();}
-$('preset-cancel').onclick=()=>$('preset-dialog').close();onDialogClosed($('preset-dialog'),resumeViews);
-$('ws-cancel').onclick=()=>$('ws-dialog').close();onDialogClosed($('ws-dialog'),resumeViews);
-$('ws-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const w=workspaces.find(x=>x.id===wsEditing);$('ws-dialog').close();if(!w)return;w.name=$('ws-name').value.trim().slice(0,32) || w.name;w.icon=wsIcon==='dot'?'':wsIcon;w.colour=wsColour;renderWorkspaces();await saveWorkspaces();});};
-$('preset-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{presets=await call('save-preset',{name:$('preset-name').value,tiles});$('preset-dialog').close();notice('Layout saved. Switch to it from ⌘K.');});};
-async function applyPreset(p){tiles=normaliseTiles(p.tiles);if(page!=='browser-page')await show('browser-page');renderTiles();saveLayout();notice('Layout: '+p.name);}
-window.hearth.on('tab-update',info=>{const fresh=!tabLive.has(liveKey(info.serviceKey,info.tabId));tabLive.set(liveKey(info.serviceKey,info.tabId),info);if(fresh)placeViews();const group=tabs[info.serviceKey];const tab=group?.items.find(t=>t.id===info.tabId);if(tab){if(info.url)tab.current=info.url;if(info.title)tab.title=info.title;}refreshTileBars();});
-window.hearth.on('tabs-changed',({serviceKey,tabs:group})=>{if(serviceKey===sidecar.key)setTimeout(()=>placeViews(),0);tabs[serviceKey]=group;for(const key of [...tabLive.keys()])if(key.startsWith(serviceKey+'\n') && !group.items.some(t=>key===liveKey(serviceKey,t.id)))tabLive.delete(key);if(page==='browser-page')renderTiles();});
-// Quick look drawer
-let peekOpenState=false;
-function peekBounds(){const s=$('peek-surface'),r=s.getBoundingClientRect();call('peek-bounds',{x:r.x,y:r.y,width:r.width,height:r.height,visible:peekOpenState && !$('peek').classList.contains('hidden') && !viewsSuspended && page==='browser-page'}).catch(()=>{});}
-let peekHideTimer=null;
-function closePeek(){if(!peekOpenState)return;peekOpenState=false;setTimeout(placeViews,60);$('peek').classList.remove('peek-in');clearTimeout(peekHideTimer);peekHideTimer=setTimeout(()=>{$('peek').classList.add('hidden');},180);call('peek-close').catch(()=>{});}
-window.hearth.on('peek-opened',({name,live})=>{clearTimeout(peekHideTimer);peekOpenState=true;$('peek-tab').textContent=live?'Open here':'Open as tab';$('peek-title').textContent=(live?'Peek · ':'Quick look · ')+name;$('peek-url').textContent='';$('peek').classList.remove('hidden');requestAnimationFrame(()=>requestAnimationFrame(()=>{$('peek').classList.add('peek-in');setTimeout(()=>{peekBounds();placeViews();},200);}));if(page!=='browser-page')attempt(()=>show('browser-page'));});
-window.hearth.on('peek-update',info=>{if(!peekOpenState)return;$('peek-title').textContent=info.title || 'Quick look';$('peek-url').textContent=info.url;$('peek-back').disabled=!info.canGoBack;$('peek').classList.toggle('loading',Boolean(info.loading));});
-window.hearth.on('peek-closed',()=>{if(!peekOpenState)return;peekOpenState=false;setTimeout(placeViews,60);$('peek').classList.remove('peek-in');clearTimeout(peekHideTimer);peekHideTimer=setTimeout(()=>$('peek').classList.add('hidden'),180);});
-$('peek-close').onclick=closePeek;$('peek-back').onclick=()=>call('peek-action',{action:'back'});$('peek-reload').onclick=()=>call('peek-action',{action:'reload'});
-$('peek-tab').onclick=()=>attempt(async()=>{const opened=await call('peek-action',{action:'tab'});if(opened){tabs[opened.serviceKey]=opened.tabs;await openInTile(opened.serviceKey,opened.tabId);}});
-$('peek-beside').onclick=()=>attempt(async()=>{const opened=await call('peek-action',{action:'beside'});if(!opened)return;tabs[opened.serviceKey]=opened.tabs;ensureTwo();const n=slotCount();const other=tiles.slots.findIndex((s,i)=>i<n && (!s || s.serviceKey!==opened.serviceKey));await openInTile(opened.serviceKey,opened.tabId,other>=0?other:1);});
-document.addEventListener('keydown',e=>{if(e.key==='Escape' && peekOpenState){e.preventDefault();closePeek();}});
-new ResizeObserver(peekBounds).observe($('peek-surface'));
-$('peek-toggle').onchange=()=>attempt(async()=>{await call('set-peek-links',$('peek-toggle').checked);notice($('peek-toggle').checked?'Links from apps open in the quick-look drawer.':'Links from apps open as new tabs.');});
-window.hearth.on('tab-opened',({serviceKey,tabId,tabs:group})=>{tabs[serviceKey]=group;const n=slotCount();const index=tiles.slots.findIndex((s,i)=>i<n && s && s.serviceKey===serviceKey);if(index>=0){tiles.slots[index]={serviceKey,tabId};renderTiles();saveLayout();}});
-window.hearth.on('tab-command',command=>attempt(async()=>{
- if(command==='new'){const slot=page==='browser-page'?focusedSlot():null;if(slot)await newTab(slot.serviceKey);else await openBrowser();return;}
- if(command==='address'){await openBrowser();focusAddress();return;}
- if(command.startsWith('zoom-')){if(page==='overview'){document.getElementById(command==='zoom-in'?'board-zoom-in':command==='zoom-out'?'board-zoom-out':'board-home-view').click();return;}await zoomApp(command==='zoom-in'?1:command==='zoom-out'?-1:0);return;}
- if(page!=='browser-page')return;const slot=focusedSlot();if(!slot)return;
- if(command==='close')await closeTab(slot.serviceKey,slot.tabId);
- else if(command==='reload')await call('tab-action',{serviceKey:slot.serviceKey,tabId:slot.tabId,action:'reload'});
-}));
-window.hearth.on('service-asleep',({key,asleep:value})=>{if(value)asleep.add(key);else asleep.delete(key);for(const row of document.querySelectorAll('.service-row'))if(row.dataset.key===key){row.classList.toggle('asleep',value);const zz=row.querySelector('.zz');if(zz)zz.hidden=!value;}if(!value)refreshTileBars();});
-new ResizeObserver(placeViews).observe($('tiles'));new ResizeObserver(placeViews).observe(document.body);
 
-// ---- Sidebar: apps, groups, popovers ----
-let sidebarItems=[],sidebarOrder=[],dragKey=null;const serviceBadges=new Map();
-function paintIcon(img,icon){if(icon){img.src=icon;img.hidden=false;img.nextElementSibling.hidden=true;}}
-function closePopovers(){$('ctx-menu').classList.add('hidden');$('ctx-menu').replaceChildren();$('recent-panel').classList.add('hidden');call('hide-group-popover').catch(()=>{});if(popoverSuspended){popoverSuspended=false;resumeViews();}}
-let popoverSuspended=false;
+function closePopovers(){$('ctx-menu').classList.add('hidden');$('ctx-menu').replaceChildren();}
+
 function showMenu(items,x,y){
  closePopovers();const menu=$('ctx-menu');const host=document.querySelector('dialog[open]') || document.body;if(menu.parentElement!==host)host.append(menu);
  for(const item of items){if(item==='-'){menu.append(document.createElement('hr'));continue;}const b=el('button',item.checked?'checked':'',item.label);b.type='button';if(item.hint)b.append(el('kbd','menu-hint',item.hint));b.onclick=()=>{if(item.keep){showMenu(item.run(),x,y);return;}closePopovers();attempt(()=>item.run());};menu.append(b);}
@@ -475,147 +46,97 @@ function showMenu(items,x,y){
  const w=menu.offsetWidth,h=menu.offsetHeight,aside=document.querySelector('body>aside').getBoundingClientRect();
  // Inside the sidebar the menu sits above everything; over the centre it would be hidden behind the web pages, so only then are they paused.
  const fits=x<aside.right && aside.width>=w+8;
- if(fits)menu.style.left=Math.max(4,Math.min(x,aside.right-w-4))+'px';else{menu.style.left=Math.max(4,Math.min(x,innerWidth-w-8))+'px';popoverSuspended=true;suspendViews();}
+ if(fits)menu.style.left=Math.max(4,Math.min(x,aside.right-w-4))+'px';else{menu.style.left=Math.max(4,Math.min(x,innerWidth-w-8))+'px';}
  menu.style.top=Math.max(4,Math.min(y,innerHeight-h-8))+'px';
 }
-document.addEventListener('mousedown',e=>{if(!e.target.closest('#ctx-menu') && !e.target.closest('#recent-panel') && !e.target.closest('#bell'))closePopovers();},{capture:true});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closePopovers();});
-const SLEEP_LABELS={0:'Never',5:'5 minutes',15:'15 minutes',30:'30 minutes',60:'1 hour',120:'2 hours'};
-function sleepMenu(key){const own=sleep.apps?.[key];const items=[{label:'Use the default ('+SLEEP_LABELS[sleep.defaultMinutes]+')',checked:own===undefined,run:()=>setSleep(key,null)}];for(const minutes of [0,5,15,30,60,120])items.push({label:minutes?'Sleep after '+SLEEP_LABELS[minutes]+' hidden':'Never sleep',checked:own===minutes,run:()=>setSleep(key,minutes)});return items;}
-async function setSleep(key,minutes){sleep=await call('set-sleep',{key,minutes});notice(minutes===null?'Using the default sleep setting.':minutes?'Sleeps after '+SLEEP_LABELS[minutes]+' hidden.':'Never put to sleep.');}
-function groupMenu(key){const item=sidebarItems.find(s=>(s.id || s.url)===key);const items=serviceFolders.map(folder=>({label:(iconLabel(folder.icon)?iconLabel(folder.icon)+' ':'')+folder.name,checked:item?.folderId===folder.id,run:async()=>{const state=await call('set-service-folder',{key,folderId:folder.id});services(state.services,state.folders);notice('Moved into '+folder.name+'.');}}));items.push({label:'No group',checked:!item?.folderId,run:async()=>{const state=await call('set-service-folder',{key,folderId:null});services(state.services,state.folders);}});items.push('-',{label:'New group…',run:()=>openPicker('group')});return items;}
-// ---- Recent notifications ----
-function renderRecent(){const unseen=recent.length;$('bell-count').textContent=unseen>99?'99+':String(unseen);$('bell-count').hidden=!unseen;const list=$('recent-list');list.replaceChildren();for(const entry of recent){const item=serviceOf(entry.key);const row=el('button','recent-row');const when=new Date(entry.at);row.append(el('strong',null,entry.name+(entry.title?' · '+entry.title:'')),el('span',null,entry.body?entry.body:(entry.added+' new · '+entry.count+' unread')),el('small',null,when.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})));row.onclick=()=>{closePopovers();if(!item)return;attempt(async()=>{if(entry.tabId && tabs[entry.key]?.items.some(t=>t.id===entry.tabId))await openInTile(entry.key,entry.tabId);else await openService(item);await call('recent-open',entry.id);});};list.append(row);}if(!recent.length)list.append(el('p','todo-empty','Nothing missed. Unread that arrives in a pane you are not looking at shows up here.'));}
-function toggleRecent(){const panel=$('recent-panel');if(!panel.classList.contains('hidden')){closePopovers();return;}closePopovers();renderRecent();panel.classList.remove('hidden');popoverSuspended=true;suspendViews();const r=$('bell').getBoundingClientRect();panel.style.left=Math.max(8,Math.min(r.left-160,innerWidth-panel.offsetWidth-8))+'px';}
-$('bell').onclick=toggleRecent;$('recent-clear').onclick=()=>attempt(async()=>{recent=await call('recent-clear');renderRecent();});
-let chimeOn=false,lastChime=0;
-function chime(){if(!chimeOn || Date.now()-lastChime<20_000)return;lastChime=Date.now();try{const ctx=new (window.AudioContext || window.webkitAudioContext)();const play=(freq,at,len)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(0,at);g.gain.linearRampToValueAtTime(.08,at+.02);g.gain.exponentialRampToValueAtTime(.0001,at+len);o.connect(g).connect(ctx.destination);o.start(at);o.stop(at+len);};const t=ctx.currentTime;play(659,t,.5);play(880,t+.18,.7);setTimeout(()=>ctx.close(),1500);}catch{}}
-window.hearth.on('download-done',({name,path})=>toast('Saved '+name+' to Downloads',{action:'Show in Finder',onAction:()=>call('reveal-download',path),duration:8000}));
-$('test-notification').onclick=()=>attempt(async()=>{await call('test-notification');notice('Test notification sent. If nothing appeared, allow Just Zen in System Settings → Notifications.');});
-async function renderMediaGrants(){const list=$('media-list');const items=await call('media-grants');list.replaceChildren();for(const g of items){const row=el('div','password-row');row.append(el('strong',null,g.name),el('span',null,g.origin.replace(/^https?:\/\//,'')+' · '+(g.allowed?'allowed':'blocked')));const del=el('button','remove-service','×');del.title='Forget, and ask again next time';del.onclick=()=>attempt(async()=>{await call('media-forget',g.key+' '+g.origin);await renderMediaGrants();});row.append(del);list.append(row);}if(!items.length)list.append(el('p','todo-empty','No app has asked for your camera or microphone yet.'));}
-window.hearth.on('password-offer',offer=>{toast((offer.update?'Update the saved password for ':'Save your password for ')+offer.host+(offer.username?' ('+offer.username+')':'')+'?',{action:offer.update?'Update':'Save',onAction:()=>call('password-decide',{id:offer.id,decision:'save'}).then(()=>notice('Password saved for '+offer.host+'.')),actions:[{label:'Never for this site',run:()=>call('password-decide',{id:offer.id,decision:'never'})}],duration:15000});});
-async function renderPasswords(){const list=$('password-list');const items=await call('passwords-list');list.replaceChildren();for(const e of items){const row=el('div','password-row');row.append(el('strong',null,e.origin.replace(/^https?:\/\//,'')),el('span',null,e.username || '(no username)'));const del=el('button','remove-service','×');del.title='Forget this login';del.onclick=()=>attempt(async()=>{await call('password-remove',{origin:e.origin,username:e.username});await renderPasswords();notice('Login forgotten.');});row.append(del);list.append(row);}if(!items.length)list.append(el('p','todo-empty','No saved passwords yet. Sign in to a website and choose Save when asked.'));}
-$('passwords-clear').onclick=()=>attempt(async()=>{if(!confirm('Forget every saved password? Websites will ask you to sign in again.'))return;await call('passwords-clear');await renderPasswords();notice('Saved passwords forgotten.');});
-window.hearth.on('recent-changed',list=>{const grew=(list || []).length>recent.length;recent=list || [];renderRecent();if(grew)chime();});
-$('chime-toggle').onchange=()=>attempt(async()=>{chimeOn=$('chime-toggle').checked;await call('appearance',{layout:{...layout,tiles,chime:chimeOn}});if(chimeOn){lastChime=0;chime();}notice(chimeOn?'Chime on for missed notifications.':'Chime off.');});
-// ---- Drop a link on the sidebar, or text on Tasks ----
-function droppedURL(dt){const uri=(dt.getData('text/uri-list') || '').split('\n').find(l=>l && !l.startsWith('#')) || '';const text=(dt.getData('text/plain') || '').trim();const candidate=(uri || text).trim();if(!candidate || /\s/.test(candidate))return null;try{const u=new URL(/^[a-z][a-z0-9+.-]*:/i.test(candidate)?candidate:'https://'+candidate);if(['http:','https:'].includes(u.protocol) && u.hostname.includes('.'))return u.href;}catch{}return null;}
-function externalDrag(e){return !dragKey && [...(e.dataTransfer?.types || [])].some(t=>t==='text/uri-list' || t==='text/plain');}
-for(const target of [$('add-app'),document.querySelector('body>aside')]){target.addEventListener('dragover',e=>{if(!externalDrag(e))return;e.preventDefault();$('add-app').classList.add('drop-target');});target.addEventListener('dragleave',()=>$('add-app').classList.remove('drop-target'));target.addEventListener('drop',e=>{if(!externalDrag(e))return;e.preventDefault();e.stopPropagation();$('add-app').classList.remove('drop-target');const url=droppedURL(e.dataTransfer);if(!url){notice('Drop a link here to add it as a website.');return;}attempt(async()=>{const name=new URL(url).hostname.replace(/^www\./,'');const items=await call('add-service',{name,url});services(items);const item=items.find(v=>v.url===url);if(item)await openInTile(item.id || item.url);notice(name+' added to the sidebar.');});});}
-// Dropping text or a link on an app icon pastes it into that app's composer (or opens the link in a browser app); on Home it becomes a whiteboard note; on the Claude rail it becomes context.
-function dropPayload(e){const uri=e.dataTransfer.getData('text/uri-list').split('\n').find(l=>l && !l.startsWith('#')) || '';const text=e.dataTransfer.getData('text/plain') || '';return {url:/^https?:/i.test(uri)?uri.trim():(/^https?:\/\/\S+$/i.test(text.trim())?text.trim():''),text};}
-function armDropTarget(el,handler){el.addEventListener('dragover',e=>{if(!externalDrag(e))return;e.preventDefault();e.dataTransfer.dropEffect='copy';el.classList.add('drop-target');});el.addEventListener('dragleave',()=>el.classList.remove('drop-target'));el.addEventListener('drop',e=>{if(!externalDrag(e))return;e.preventDefault();e.stopPropagation();el.classList.remove('drop-target');attempt(()=>handler(dropPayload(e)));});}
-async function dropOnApp(item,{url,text}){const key=item.id || item.url;if(isBrowserItem(item)){if(!url)throw Error('Drop a link on a browser to open it there.');const opened=await call('open-tab',{serviceKey:key,url});tabs[key]=opened.tabs;await openInTile(key,opened.tabId);return;}if(!text.trim())return;await openInTile(key);const placed=await call('deliver-text',{serviceKey:key,text:text.trim(),mode:'compose'});notice('Pasted into '+item.name+'. Check it, then send when you are ready.');}
-armDropTarget($('home'),async ({text})=>{if(!text.trim())return;await call('whiteboard-add-note',{text:text.trim().slice(0,4000)});notice('Added to the whiteboard.',{action:'Show me',onAction:()=>show('overview')});});
-for(const el_ of [$('agent-rail'),document.querySelector('#agent .agent-heading')])armDropTarget(el_,async ({text})=>{if(!text.trim())return;showClaudeContext({text:text.trim(),source:'a drop'});});
-for(const target of [$('tasks'),$('todo-list')]){target.addEventListener('dragover',e=>{if(!externalDrag(e))return;e.preventDefault();$('tasks').classList.add('drop-target');});target.addEventListener('dragleave',()=>$('tasks').classList.remove('drop-target'));target.addEventListener('drop',e=>{if(!externalDrag(e))return;e.preventDefault();e.stopPropagation();$('tasks').classList.remove('drop-target');const text=(e.dataTransfer.getData('text/plain') || '').replace(/\s+/g,' ').trim().slice(0,300);if(!text){notice('Drop some text here to make it a task.');return;}attempt(async()=>{todos=await call('add-todo',text);taskTab='todo';renderTodos();if(!document.body.classList.contains('tasks-open'))$('tasks-rail').click();notice('Added to your tasks.');});});}
-// ---- First-run tour ----
-const TOUR=[{target:'#tiles .tile[data-slot="0"] .pane-search',title:'Search, don\u2019t switch',text:'Every pane has a ⌕ in its corner. Click it, type a couple of letters and press Enter: the app snaps into that pane. New apps, websites and groups are added from the same place (＋ Add an app).',prepare:async()=>{if(slotCount()!==1)await setTilesMode('1');}},{target:'#layout-switch',title:'Split the screen',text:'One app, two side by side, stacked, three, or a grid, and ＋ adds another column whenever you need one. Any column can be split top and bottom. Each pane keeps its own app, tabs and login.',prepare:async()=>{await setTilesMode('2h');}},{target:'#tiles .tile[data-slot="1"] .pane-search',title:'Any app, in any pane',text:'Each pane has its own ⌕, so you choose what goes where. Search from the second pane and whatever you pick lands there.',prepare:async()=>{}},{target:'#choose-claude-folder',title:'Give Claude a folder',text:'Claude only sees the folder you choose here, and starts in Notes-only. Select text in any app and press ⌘⇧A to put it in front of Claude, or ⌘⇧T to make it a task.',prepare:async()=>{await applyLayout({agentCollapsed:false});applyMode('chat');}}];
-let tourIndex=-1;
-async function startTour(){if(document.body.classList.contains('is-locked'))return;await show('browser-page');tourIndex=0;$('tour').classList.remove('hidden');suspendViews();await showTourStep();}
-async function showTourStep(){const step=TOUR[tourIndex];await step.prepare();await new Promise(r=>requestAnimationFrame(r));const target=document.querySelector(step.target);const r=target?target.getBoundingClientRect():{x:innerWidth/2-20,y:innerHeight/2-20,width:40,height:40};const spot=$('tour-spot');Object.assign(spot.style,{left:(r.x-8)+'px',top:(r.y-8)+'px',width:(r.width+16)+'px',height:(r.height+16)+'px'});$('tour-step').textContent='Step '+(tourIndex+1)+' of '+TOUR.length;$('tour-title').textContent=step.title;$('tour-text').textContent=step.text;$('tour-next').textContent=tourIndex===TOUR.length-1?'Done':'Next';const card=$('tour-card');const cw=card.offsetWidth || 360,ch=card.offsetHeight || 180;let left=r.x+r.width+18,top=r.y-10;if(left+cw>innerWidth-12)left=r.x-cw-18;if(left<12){left=Math.max(12,Math.min(innerWidth-cw-12,r.x));top=r.y+r.height+18;}if(top+ch>innerHeight-12)top=Math.max(12,innerHeight-ch-12);card.style.left=left+'px';card.style.top=top+'px';}
-async function endTour(){$('tour').classList.add('hidden');tourIndex=-1;resumeViews();await call('tour-done').catch(()=>{});}
-$('tour-next').onclick=()=>attempt(async()=>{if(tourIndex>=TOUR.length-1){await endTour();notice('You are set. Right-click anything for more.');return;}tourIndex++;await showTourStep();});
-$('tour-skip').onclick=()=>attempt(endTour);
-function muteLabel(key){const until=mutes[key];if(until===-1)return 'Muted forever · change…';if(until)return 'Muted until '+new Date(until).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · change…';return 'Mute notifications…';}
-function muteMenu(item){const key=item.id || item.url;const set=hours=>async()=>{mutes=await call('set-mute',{key,hours});services(sidebarItems,serviceFolders);notice(hours===null?item.name+' unmuted.':hours==='forever'?item.name+' muted until you unmute it.':item.name+' muted for '+hours+' hour'+(hours===1?'':'s')+'.');};
- const items=[];if(mutes[key])items.push({label:'Unmute '+item.name,run:set(null)},'-');
- for(const hours of [1,2,4,8,24])items.push({label:hours+' hour'+(hours===1?'':'s'),run:set(hours)});
- items.push({label:'Custom number of hours…',run:()=>openMuteDialog(item)},{label:'Forever',run:set('forever')});return items;}
-function openMuteDialog(item){const key=item.id || item.url;$('mute-title').textContent='Mute '+item.name+' for how long?';const dialog=$('mute-dialog');suspendViews();dialog.showModal();$('mute-hours').focus();$('mute-hours').select();$('mute-form').onsubmit=e=>{e.preventDefault();const hours=Number($('mute-hours').value);dialog.close();attempt(async()=>{mutes=await call('set-mute',{key,hours});services(sidebarItems,serviceFolders);notice(item.name+' muted for '+hours+' hour'+(hours===1?'':'s')+'.');});};}
-$('mute-cancel').onclick=()=>$('mute-dialog').close();onDialogClosed($('mute-dialog'),resumeViews);
-window.hearth.on('mutes-changed',next=>{mutes=next || {};services(sidebarItems,serviceFolders);});
-async function removeApp(item){const key=item.id || item.url;const result=await call('remove-service',key);services(result.services);undoable('Removed '+item.name,async()=>{services(await call('restore-service',result.snapshot));notice(item.name+' is back.');});}
-function rowMenu(item,x,y){
- const key=item.id || item.url;
- const browser=isBrowserItem(item);
- showMenu([{label:'Open',run:()=>openService(item)},{label:isSlack(item)?'Add another Slack workspace':'Open in a new tab',run:()=>newTab(key)},{label:'Open beside the current app',run:async()=>{ensureTwo();await openInTile(key);}},...(slotCount()>1?[{label:'Open in pane…',keep:true,run:()=>Array.from({length:slotCount()},(_,i)=>{const s=tiles.slots[i];const current=s?serviceOf(s.serviceKey)?.name:null;return {label:'Pane '+(i+1)+(current?' · replaces '+current:' · empty'),run:()=>openInTile(key,undefined,i)};})}]:[]),'-',...(browser?[{label:'Edit name and icon…',run:()=>openBrowserEditor(item)},{label:muteLabel(key),keep:true,run:()=>muteMenu(item)},{label:'Clear this browser\'s cookies and logins',run:async()=>{if(!confirm('Clear cookies and website data for '+item.name+'? This signs its websites out.'))return;await call('clear-profile-data',{profile:'browser',key});tabs=await call('tabs');renderTiles();notice(item.name+' cleared.');}}]:[{label:muteLabel(key),keep:true,run:()=>muteMenu(item)},{label:'Sleep when hidden…',keep:true,run:()=>sleepMenu(key)}]),{label:item.pinned?'Unpin from the deck':'Pin to the deck',run:async()=>{services(await call('update-service',{key,pinned:!item.pinned}));notice(item.pinned?item.name+' unpinned. Find it under ⋯ or ⌘K.':item.name+' pinned to the deck.');}},'-',{label:'Remove '+item.name,run:()=>removeApp(item)}],x,y);
-}
-// Hovering an app on the dock for a moment peeks at it over the centre; move away or press Esc and it goes.
-function serviceRow(item){
- const key=item.id || item.url;const row=document.createElement('div');row.className='service-row';row.dataset.key=key;row.dataset.name=item.name;row.draggable=true;if(asleep.has(key))row.classList.add('asleep');
- row.ondragstart=e=>{dragKey=key;e.dataTransfer.setData('text/plain',key);e.dataTransfer.effectAllowed='move';row.classList.add('dragging');};
- row.ondragend=()=>{dragKey=null;document.querySelectorAll('.service-row,.service-group').forEach(r=>r.classList.remove('dragging','drop-target'));};
- row.ondragover=e=>{if(dragKey && dragKey!==key){e.preventDefault();row.classList.add('drop-target');}};row.ondragleave=()=>row.classList.remove('drop-target');
- row.ondrop=e=>{e.preventDefault();e.stopPropagation();row.classList.remove('drop-target');if(!dragKey || dragKey===key)return;attempt(()=>dropBefore(row));};
- row.oncontextmenu=e=>{e.preventDefault();rowMenu(item,e.clientX,e.clientY);};
- const grip=document.createElement('button');grip.className='reorder-handle';grip.textContent='⠿';grip.title='Drag to reorder. Use Option + ↑ or ↓ to move.';grip.setAttribute('aria-label','Reorder '+item.name);grip.onkeydown=e=>{if(!e.altKey || !['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();attempt(async()=>{await nudge(row,e.key==='ArrowUp'?-1:1);document.querySelector(`.service-row[data-key="${CSS.escape(key)}"] .reorder-handle`)?.focus();notice(item.name+' moved '+(e.key==='ArrowUp'?'up':'down'));});};
- const b=document.createElement('button');b.className='nav';armDropTarget(b,payload=>dropOnApp(item,payload));const img=document.createElement('img');img.className='site-favicon';img.alt='';img.hidden=true;img.dataset.site=item.url || '';const fallback=document.createElement('span');fallback.className=isBrowserItem(item)?'group-icon':'site-fallback';if(isBrowserItem(item))fallback.append(iconNode(item.icon || '🌐'));else fallback.textContent=item.name.slice(0,1).toUpperCase();const label=document.createElement('span');label.className='label';label.textContent=item.name;const zz=document.createElement('small');zz.className='zz';zz.textContent='zz';zz.title='Asleep to save memory';zz.hidden=!asleep.has(key);const muted=document.createElement('small');muted.className='muted-mark';muted.textContent='🔕';muted.title=mutes[key]===-1?'Muted until you unmute it':mutes[key]?'Muted until '+new Date(mutes[key]).toLocaleString([],{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'}):'';muted.hidden=!mutes[key];const badge=document.createElement('small');badge.className='service-badge';badge.dataset.badgeKey=key;const count=serviceBadges.get(key) || 0;badge.textContent=count>99?'99+':String(count || '');badge.hidden=!count;b.append(img,fallback,label,zz,muted,badge);b.title=item.name;b.setAttribute('role','tab');b.onclick=()=>attempt(()=>row.classList.contains('front')?show('overview'):openService(item));
- const profile=document.createElement('select');profile.className='service-profile';profile.title='Browser profile for '+item.name;profile.setAttribute('aria-label','Browser profile for '+item.name);for(const [value,label] of [['isolated','Isolated'],['shared','Shared'],['personal','Personal'],['work','Work']])profile.add(new Option(label,value));profile.value=item.profile || 'isolated';profile.onclick=e=>e.stopPropagation();profile.onchange=()=>attempt(async()=>{services(await call('set-service-profile',{key,profile:profile.value}));notice(item.name+' now uses the '+profile.options[profile.selectedIndex].text+' profile. Sign in within that profile if needed.');});
- const remove=document.createElement('button');remove.className='remove-service';remove.textContent='×';remove.title='Remove '+item.name;remove.setAttribute('aria-label','Remove '+item.name);remove.onclick=()=>attempt(()=>removeApp(item));row.append(grip,b);if(item.url)row.append(profile);if(isBrowserItem(item)){const edit=document.createElement('button');edit.className='remove-service edit-group';edit.textContent='✎';edit.title='Edit browser name and icon';edit.setAttribute('aria-label','Edit '+item.name);edit.onclick=e=>{e.stopPropagation();attempt(()=>openBrowserEditor(item));};row.append(edit);}row.append(remove);
- if(item.url)call('favicon',key).then(icon=>paintIcon(img,icon)).catch(()=>{});
- return row;
-}
-// A group is one card in the deck. Hovering or pressing it splays its members up out of the slot like a hand of cards.
-function groupCard(folder,members){
- const row=document.createElement('div');row.className='service-row group-card';row.dataset.folder=folder.id;row.dataset.name=folder.name;row.draggable=true;
- row.ondragstart=e=>{dragKey='group:'+folder.id;e.dataTransfer.setData('text/plain',dragKey);e.dataTransfer.effectAllowed='move';row.classList.add('dragging');};
- row.ondragend=()=>{dragKey=null;document.querySelectorAll('.service-row,.service-group').forEach(r=>r.classList.remove('dragging','drop-target'));};
- const b=document.createElement('button');b.className='nav';b.setAttribute('role','tab');b.title=folder.name+' · '+members.length+' app'+(members.length===1?'':'s');
- const icon=document.createElement('span');icon.className='group-icon';icon.append(iconNode(folder.icon || '◫'));const label=document.createElement('span');label.className='label';label.textContent=folder.name;const count=document.createElement('small');count.className='group-count';count.textContent=String(members.length);
- const unread=members.reduce((sum,item)=>sum+(serviceBadges.get(item.id || item.url) || 0),0);const badge=document.createElement('small');badge.className='service-badge group-badge';badge.textContent=unread>99?'99+':String(unread || '');badge.hidden=!unread;
- b.append(icon,label,count,badge);
- b.onclick=()=>attempt(()=>{if(members.length===1)return openService(members[0]);if(row.classList.contains('front'))return show('overview');row.classList.toggle('open');});
- b.oncontextmenu=e=>{e.preventDefault();groupRowMenu(folder,e.clientX,e.clientY);};
- row.onmouseenter=()=>{if(!row.classList.contains('front'))row.classList.add('open');};row.onmouseleave=()=>row.classList.remove('open');
- row.ondragover=e=>{if(dragKey){e.preventDefault();row.classList.add('drop-target');}};row.ondragleave=()=>row.classList.remove('drop-target');
- row.ondrop=e=>{e.preventDefault();e.stopPropagation();row.classList.remove('drop-target');if(!dragKey || dragKey==='group:'+folder.id)return;if(dragKey.startsWith('group:')){attempt(()=>dropBefore(row));return;}attempt(async()=>{const state=await call('set-service-folder',{key:dragKey,folderId:folder.id});services(state.services,state.folders);notice('Moved into '+folder.name+'.');});};
- const hand=document.createElement('div');hand.className='hand';
- members.forEach((member,i)=>{const card=serviceRow(member);card.classList.add('member');card.style.setProperty('--hand-i',String(i));card.style.setProperty('--hi',String(i+1));hand.append(card);
-  });
- row.append(b,hand);
- return row;
-}
-function refreshGroupBadges(){for(const card of document.querySelectorAll('.group-card')){const sum=[...card.querySelectorAll('.hand>.service-row')].reduce((n,m)=>n+(serviceBadges.get(m.dataset.key) || 0),0);const badge=card.querySelector('.group-badge');if(!badge)continue;badge.textContent=sum>99?'99+':String(sum || '');badge.hidden=!sum;}}
-async function openGroupPopover(folder,row){closePopovers();const rect=row.getBoundingClientRect(),aside=document.querySelector('body>aside').getBoundingClientRect();if(layout.navDock!==false)await call('show-group-popover',{folderId:folder.id,left:Math.max(8,rect.left-120),top:rect.top-10,above:true});else await call('show-group-popover',{folderId:folder.id,left:aside.right+6,top:rect.top});}
-function groupRowMenu(folder,x,y){showMenu([{label:'Open',run:()=>{const first=sidebarItems.find(i=>openable(i) && i.folderId===folder.id);return first?openService(first):null;}},{label:'Edit name, icon and apps…',run:()=>openGroupEditor(folder)},'-',{label:'Remove group',run:()=>removeGroup(folder)}],x,y);}
-// Electron has no window.prompt, so editing uses the group form in the picker dialog, prefilled.
-let editingGroup=null;
-async function openGroupEditor(folder){editingGroup=folder;await openPicker('group');}
-async function removeGroup(folder){const state=await call('remove-service-folder',folder.id);services(state.services,state.folders);closePopovers();undoable('Removed the group '+folder.name+' (its apps stay)',async()=>{const back=await call('restore-service-folder',state.snapshot);services(back.services,back.folders);notice(folder.name+' is back.');});}
-function entryOf(el){return el.dataset.folder?'group:'+el.dataset.folder:el.dataset.key;}
-function currentEntries(){return [...$('services').children].map(entryOf);}
-// Drop the dragged row (app or group) in front of the target row and save the whole sidebar order.
-async function dropBefore(targetRow){const entries=currentEntries().filter(e=>e!==dragKey);const at=entries.indexOf(entryOf(targetRow));entries.splice(at<0?entries.length:at,0,dragKey);const moved=dragKey;const state=await call('reorder-sidebar',entries);if(!moved.startsWith('group:')){const item=state.services.find(s=>(s.id || s.url)===moved);if(item?.folderId){const out=await call('set-service-folder',{key:moved,folderId:null});state.services=out.services;}}services(state.services,state.folders,state.order);notice('Sidebar order saved.');}
-async function nudge(row,direction){const entries=currentEntries();const i=entries.indexOf(entryOf(row)),next=i+direction;if(i<0 || next<0 || next>=entries.length)return;[entries[i],entries[next]]=[entries[next],entries[i]];const state=await call('reorder-sidebar',entries);services(state.services,state.folders,state.order);}
-function orderedEntries(items,folders,order){const out=[],seen=new Set();for(const entry of order || []){if(seen.has(entry))continue;if(entry.startsWith('group:')?folders.some(f=>f.id===entry.slice(6)):items.some(i=>openable(i) && (i.id || i.url)===entry)){out.push(entry);seen.add(entry);}}for(const f of folders)if(!seen.has('group:'+f.id))out.push('group:'+f.id);for(const i of items){const k=i.id || i.url;if(openable(i) && !seen.has(k))out.push(k);}return out;}
-function services(items,folders=serviceFolders,order=sidebarOrder){sidebarItems=items;serviceFolders=folders;sidebarOrder=order || [];$('services').replaceChildren();$('services').ondragover=e=>{if(dragKey)e.preventDefault();};$('services').ondrop=e=>{if(!dragKey || e.target.closest('.service-group') || e.target.closest('.service-row'))return;e.preventDefault();if(dragKey.startsWith('group:')){const entries=currentEntries().filter(x=>x!==dragKey);entries.push(dragKey);attempt(async()=>{const state=await call('reorder-sidebar',entries);services(state.services,state.folders,state.order);});return;}attempt(async()=>{const state=await call('set-service-folder',{key:dragKey,folderId:null});services(state.services,state.folders);notice('Moved out of the group.');});};
- const entries=orderedEntries(items,folders,sidebarOrder).filter(entry=>{if(entry.startsWith('group:'))return true;const item=items.find(i=>(i.id || i.url)===entry);return !(item.folderId && folders.some(folder=>folder.id===item.folderId));});
- const pinnedOf=entry=>entry.startsWith('group:')?items.some(i=>i.folderId===entry.slice(6) && i.pinned):Boolean(items.find(i=>(i.id || i.url)===entry)?.pinned);
- const explicit=entries.some(pinnedOf);const shown=(explicit?entries.filter(pinnedOf):entries).slice(0,DECK_CAP);deckOverflow=entries.filter(e=>!shown.includes(e));
- for(const entry of shown){if(entry.startsWith('group:')){const folder=folders.find(f=>f.id===entry.slice(6));$('services').append(groupCard(folder,items.filter(item=>openable(item) && item.folderId===folder.id)));}else{$('services').append(serviceRow(items.find(i=>(i.id || i.url)===entry)));}}
- for(const key of Object.keys(tabs))if(!items.some(item=>(item.id || item.url)===key))delete tabs[key];
- deckSync();
- if(page==='browser-page')renderTiles();
-}
-window.hearth.on('favicon',({url,icon})=>{for(const img of document.querySelectorAll('.site-favicon'))if(img.dataset.site===url)paintIcon(img,icon);});
-window.hearth.on('service-badge',({key,count})=>{if(count)serviceBadges.set(key,count);else serviceBadges.delete(key);refreshGroupBadges();const badge=document.querySelector(`[data-badge-key="${CSS.escape(key)}"]`);if(badge){badge.textContent=count>99?'99+':String(count || '');badge.hidden=!count;}const item=sidebarItems.find(s=>(s.id || s.url)===key);if(item?.folderId){const folder=serviceFolders.find(f=>f.id===item.folderId);const row=folder && document.querySelector(`.service-group[data-folder="${CSS.escape(folder.id)}"]`);if(row)row.replaceWith(groupRow(folder,sidebarItems.filter(s=>s.folderId===folder.id)));}});
-window.hearth.on('edit-group',id=>{const folder=serviceFolders.find(f=>f.id===id);if(folder)attempt(()=>openGroupEditor(folder));});
-window.hearth.on('sidebar-changed',({services:items,folders})=>services(items,folders));
-window.hearth.on('open-service',key=>{const item=sidebarItems.find(value=>(value.id || value.url)===key);if(item)attempt(()=>openService(item));});
 
-function greeting(){const h=new Date().getHours();const word=h<5?'Still up':h<12?'Good morning':h<17?'Good afternoon':h<22?'Good evening':'Late night';const open=todos.filter(t=>!t.done).length;const date=new Date().toLocaleDateString([],{weekday:'long',day:'numeric',month:'long'});const el=document.querySelector('.board-whisper');if(el)el.textContent=word+'. '+date+'. '+(open?open+' task'+(open===1?'':'s')+' waiting.':'Nothing waiting.');}
-setInterval(greeting,60_000);
-// Now stream: one card per app with something waiting, plus tasks. Items open the exact place; tasks tick inline.
-function renderNow(){
- const host=$('now-cards');host.replaceChildren();const open=todos.filter(t=>!t.done);
- const cards=nowFeed.filter(f=>!f.muted && (f.count || f.items.length));
- $('now').classList.toggle('hidden',!cards.length && !open.length);
- for(const f of cards){const card=el('div','now-card');const head=el('div','now-card-head');const img=el('img','site-favicon');img.alt='';img.hidden=true;const fb=el('span','site-fallback',f.name.slice(0,1).toUpperCase());head.append(img,fb,el('strong',null,f.name));if(f.count)head.append(el('small','now-count',String(f.count)));head.onclick=()=>attempt(()=>openInTile(f.key));card.append(head);const item=serviceOf(f.key);if(item && !isBrowserItem(item))call('favicon',f.key).then(icon=>paintIcon(img,icon)).catch(()=>{});
-  const list=el('div','now-list');for(const it of f.items.slice(0,5)){const row=el('button','now-item');row.type='button';row.append(el('span',null,it.title));if(it.sub)row.append(el('small',null,it.sub));row.onclick=()=>attempt(async()=>{if(it.url){const opened=await call('open-tab',{serviceKey:f.key,url:it.url});tabs[f.key]=opened.tabs;await openInTile(f.key,opened.tabId);}else await openInTile(f.key);});list.append(row);}
-  if(!f.items.length)list.append(el('p','now-empty',f.count+' unread. Open '+f.name+' to see.'));card.append(list);host.append(card);}
- if(open.length){const card=el('div','now-card now-tasks');const head=el('div','now-card-head');head.append(el('span','site-fallback','✓'),el('strong',null,'Tasks'),el('small','now-count',String(open.length)));head.onclick=()=>$('tasks-rail').click();card.append(head);const list=el('div','now-list');for(const t of open.slice(0,5)){const row=el('label','now-task');const box=document.createElement('input');box.type='checkbox';box.onchange=()=>attempt(()=>toggleTodo(t,box));row.append(box,el('span',null,t.text));const chip=fromChip(t.from);if(chip)row.append(chip);list.append(row);}card.append(list);host.append(card);}
+function askName(title,value=''){
+ return new Promise(resolve=>{
+  namePending=resolve;$('name-title').textContent=title;$('name-input').value=value;
+  $('name-dialog').showModal();$('name-input').focus();$('name-input').select();
+ });
 }
-window.hearth.on('now-changed',feed=>{nowFeed=feed || [];renderNow();});
-$('now-hide').onclick=()=>{$('now').classList.add('hidden');};
-$('now-refresh').onclick=()=>attempt(async()=>{$('now-refresh').classList.add('spinning');await call('now-refresh');setTimeout(()=>$('now-refresh').classList.remove('spinning'),900);});
-// Ticking a task off asks first: a slip of the mouse should not silently close something you still meant to do.
+
+function onDialogClosed(dialog,fn){let armed=false;dialog.addEventListener('toggle',e=>{if(e.newState==='open')armed=true;else if(armed){armed=false;fn();}});dialog.addEventListener('close',()=>{if(armed){armed=false;fn();}});}
+
+function applyTheme(value){theme=value;document.body.dataset.theme=value;$('theme-moon').hidden=value!=='light';$('theme-sun').hidden=value==='light';$('theme-toggle').title=value==='light'?'Switch to dark mode':'Switch to light mode';$('theme-toggle').setAttribute('aria-label',value==='light'?'Switch to dark mode':'Switch to light mode');terminal.options.theme=value==='light'?{background:'#fbfcfe',foreground:'#354258',cursor:'#5278c8',selectionBackground:'#e6eefc'}:{background:'#151816',foreground:'#d5ddcc',cursor:'#c4d3ab',selectionBackground:'#424e36'};}
+
+function size(){if(!running || mode!=='terminal' || layout.agentCollapsed)return;fit.fit();call('terminal-size',{cols:terminal.cols,rows:terminal.rows}).catch(()=>{});}
+
+function applyMode(next){mode=next==='terminal'?'terminal':'chat';for(const name of ['chat','terminal'])$('mode-'+name).setAttribute('aria-pressed',mode===name);$('chat-view').classList.toggle('hidden',mode!=='chat');$('agent-empty').classList.toggle('hidden',next!=='terminal' || running);$('terminal').classList.toggle('hidden',next!=='terminal' || !running);updateAgentStatus();size();}
+
+function updateAgentStatus(){const state=mode==='chat'?(chatState.busy?(chatState.pending.length?'Needs your approval':'Working…'):'Chat · Claude Code'):(running?'Terminal · running':'Terminal · ready');$('agent-state').textContent=state;$('rail-state').textContent=chatState.pending.length?'●':chatState.busy || running?'·':'';}
+
+
+
+function setLocked(value,method){if(typeof value==='object'){method=value.method;value=value.locked;}document.body.classList.toggle('is-locked',value);$('lock-screen').classList.toggle('hidden',!value);if(value){const passcode=method==='passcode';$('unlock-passcode').classList.toggle('hidden',!passcode);$('lock-screen-copy').textContent=passcode?'Enter your Just Zen passcode to restore this workspace.':'Use Touch ID to restore your workspace.';$('unlock-app').textContent=passcode?'Unlock':'Unlock with Touch ID';(passcode?$('unlock-passcode'):$('unlock-app')).focus();closePopovers();}else $('unlock-passcode').value='';}
+
+function showVersion(state){if(state?.version)$('app-version').textContent='JUST ZEN · '+state.version;}
+
+function setRoot(value){root=value;$('folder-name').textContent=value?value.split('/').pop():'Make yourself at home';$('folder-path').textContent=pretty(value) || 'Connect a vault or project to begin.';$('choose-folder').textContent='Add folder';}
+
+function setClaudeAccess({root:nextRoot,policy=claudePolicy,workspaces=claudeWorkspaces}){claudeRoot=nextRoot || null;claudePolicy=policy;claudeWorkspaces=workspaces || [];$('claude-workspace').replaceChildren(new Option('No folder connected',''));for(const value of claudeWorkspaces)$('claude-workspace').add(new Option(value.split('/').pop(),value));$('claude-workspace').value=claudeRoot || '';$('claude-workspace').title=pretty(claudeRoot) || '';$('claude-policy').value=claudePolicy;$('claude-policy').disabled=!claudeRoot;$('disconnect-claude').disabled=!claudeRoot;$('chat-folder').textContent=claudeRoot?claudeRoot.split('/').pop():'Choose a Claude workspace to begin';$('chat-folder').title=pretty(claudeRoot) || '';const notes={full:'Full access to the selected folder. Shell commands still require explicit review.',notes:'Markdown changes are allowed. Other writes and commands require explicit approval.',readOnly:'Read tools only. File changes and commands are blocked in Chat.'};$('claude-access-note').textContent=claudeRoot?pretty(claudeRoot)+' · '+notes[claudePolicy]:'Claude is disconnected from local files.';document.body.classList.toggle('claude-disconnected',!claudeRoot);}
+
+
+async function chooseClaude(){const state=await call('choose-claude-folder');if(state){setClaudeAccess(state);notice('Claude can now access '+pretty(state.root));return true;}return false;}
+
+
+
+
+
+
+async function start(kind){if(kind!=='login' && !claudeRoot && !await chooseClaude())return;await call('start-terminal',kind);running=true;loginInProgress=kind==='login';await applyLayout({agentCollapsed:false});applyMode('terminal');requestAnimationFrame(size);terminal.focus();if(loginInProgress)notice('Signing in: finish in the browser window that opens, then return to Chat.');}
+
+async function refreshClaudeAuth(){try{const status=await call('claude-auth-status');$('chat-signin').classList.toggle('hidden',status.loggedIn);$('claude-login').classList.toggle('hidden',status.loggedIn);$('claude-logout').classList.toggle('hidden',!status.loggedIn);}catch{}}
+
+
+const chatNodes=new Map(),permissionNodes=new Map();
+function replyLines(text){return String(text || '').split('\n').map(l=>l.replace(/^\s*(?:[-*•]|\d+[.)])\s+/,'').replace(/^\[[ xX]\]\s*/,'').replace(/\*\*/g,'').trim()).filter((l,i,a)=>l && /^\s*(?:[-*•]|\d+[.)]|\[[ xX]\])\s+/.test(String(text).split('\n')[i] || '')).slice(0,50);}
+
+function replyActions(message,state){
+ const bar=el('div','reply-actions');const lines=replyLines(message.text);const links=[...new Set((String(message.text || '').match(/https?:\/\/[^\s)<>"']+/g) || []).map(u=>u.replace(/[.,;:]+$/,'')))].slice(0,3);
+ const idx=state.messages.indexOf(message);let from=null;for(let i=idx-1;i>=0;i--){const mm=state.messages[i];if(mm.role==='user'){from=mm.from || null;break;}}
+ if(lines.length){const b=el('button',null,'Add '+lines.length+' as tasks');b.type='button';b.onclick=()=>attempt(async()=>{const result=await call('add-todos',{texts:lines,from});todos=result.todos;taskTab='todo';renderTodos();if(!document.body.classList.contains('tasks-open'))$('tasks-rail').click();notice(result.added+' task'+(result.added===1?'':'s')+' added.');});bar.append(b);}
+
+ return bar;
+}
+
+function draftBlocks(text){const out=[];const re=/```message:([^\n`]+)\n([\s\S]*?)```/g;let m;while((m=re.exec(String(text || ''))))out.push({app:m[1].trim(),text:m[2].trim()});return out;}
+
+function stripCode(text){return String(text || '').replace(/```[\s\S]*?```/g,s=>s.replace(/^```[^\n]*\n?/,'').replace(/```$/,'')).trim();}
+
+function surfaceSignIn(messages){const last=messages?.[messages.length-1];if(last && last.role==='error' && /sign in again/i.test(String(last.text || ''))){$('chat-signin').classList.remove('hidden');$('claude-login').classList.remove('hidden');}}
+
+function renderChat(state){chatState=state;surfaceSignIn(state.messages);const scroller=$('chat-messages');const nearBottom=scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<90;if(state.messages.length && scroller.querySelector('.chat-welcome'))scroller.replaceChildren();const ids=new Set(state.messages.map(m=>m.id));for(const [id,node] of chatNodes)if(!ids.has(id)){node.remove();chatNodes.delete(id);}
+  for(const message of state.messages){let node=chatNodes.get(message.id);if(!node){node=document.createElement(message.role==='tool'?'details':'div');node.className='chat-message '+message.role;chatNodes.set(message.id,node);scroller.append(node);}const signature=JSON.stringify(message);if(node.dataset.signature===signature)continue;node.dataset.signature=signature;
+    if(message.role==='tool'){const open=node.open;node.replaceChildren();const summary=document.createElement('summary');summary.textContent=message.tool+' · '+message.status;const pre=document.createElement('pre');pre.textContent=message.text+(message.output?'\n\n'+message.output:'');node.append(summary,pre);node.open=open;}
+    else if(message.role==='assistant'){node.classList.add('markdown-body');node.innerHTML=markdown(message.text || '…');if(!state.busy || message!==state.messages.at(-1))node.append(replyActions(message,state));}
+    else{node.textContent=message.text;const chip=fromChip(message.from);if(chip){node.append(document.createTextNode(' '));node.append(chip);}}
+  }
+  if(!state.messages.length && !scroller.querySelector('.chat-welcome'))scroller.append(chatWelcome.cloneNode(true));
+  const live=new Set((state.pending || []).map(p=>p.id));for(const [id,node] of permissionNodes)if(!live.has(id)){node.remove();permissionNodes.delete(id);}
+  for(const request of state.pending || []){if(permissionNodes.has(request.id))continue;const card=document.createElement('div');card.className='permission-card';const title=document.createElement('strong');title.textContent=request.title;card.append(title);if(request.description){const p=document.createElement('p');p.textContent=request.description;card.append(p);}const answers={};if(request.tool==='AskUserQuestion'){for(const q of request.input.questions || []){const label=document.createElement('label');label.textContent=q.question;const field=document.createElement('textarea');field.rows=2;field.placeholder=(q.options || []).map(o=>o.label).join(' / ');label.append(field);card.append(label);answers[q.question]=field;}}else{const detail=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent='Review action';pre.textContent=JSON.stringify(request.input,null,2);detail.append(summary,pre);detail.open=true;card.append(detail);}const actions=document.createElement('div');actions.className='dialog-actions';for(const allow of [false,true]){const b=document.createElement('button');b.className=allow?'primary':'secondary';b.textContent=allow?(request.tool==='AskUserQuestion'?'Send answer':'Allow once'):'Deny';b.onclick=()=>attempt(()=>call('chat-permission',{id:request.id,allow,answers:Object.fromEntries(Object.entries(answers).map(([q,f])=>[q,f.value]))}));actions.append(b);}card.append(actions);permissionNodes.set(request.id,card);$('chat-permissions').append(card);}
+  $('chat-send').disabled=state.busy;$('new-chat').disabled=state.busy;updateAgentStatus();if(nearBottom)scroller.scrollTop=scroller.scrollHeight;
+}
+
+function showClaudeContext(context){
+ claudeContext={text:String(context.text).slice(0,20000),source:context.source || 'your selection',from:context.from || null};
+ $('chat-context-title').textContent=(context.whole?'Text from ':'Selected text from ')+claudeContext.source+' · '+claudeContext.text.length.toLocaleString()+' characters';
+ $('chat-context-preview').textContent=claudeContext.text.slice(0,400);
+ $('chat-context').classList.remove('hidden');
+ attempt(async()=>{await applyLayout({agentCollapsed:false});applyMode('chat');});
+}
+
+async function sendClaudeContext(instruction){
+ if(!claudeContext)return;const {text,source}=claudeContext;
+ if(!claudeRoot && !await chooseClaude())return;
+ await call('chat-send',instruction+'\n\nThe text below came from '+source+'.\n\n"""\n'+text+'\n"""',{from:claudeContext.from});clearClaudeContext();
+}
+
+function clearClaudeContext(){claudeContext=null;$('chat-context').classList.add('hidden');if($('chat-about').value)$('chat-about').value='';}
+
 async function toggleTodo(todo,box){if(!todo.done){const ok=confirm('Mark "'+todo.text+'" as complete?');if(!ok){if(box)box.checked=false;return false;}}todos=await call('toggle-todo',todo.id);renderTodos();return true;}
-// Tasks live in lists the user makes; anything without one sits under "Everything else".
-let taskFolders=[],taskTarget=null,foldedLists=new Set();
-try{foldedLists=new Set(JSON.parse(localStorage.getItem('zen-folded-lists') || '[]'));}catch{}
-function rememberFolded(){try{localStorage.setItem('zen-folded-lists',JSON.stringify([...foldedLists]));}catch{}}
-function folderName(id){return taskFolders.find(f=>f.id===id)?.name || '';}
+
 function todoRow(todo){
  const row=el('label','todo-row');const box=document.createElement('input');box.type='checkbox';box.checked=todo.done;box.onchange=()=>attempt(()=>toggleTodo(todo,box));
  const text=el('span',null,todo.text);const chip=fromChip(todo.from);if(chip)text.append(document.createTextNode(' '),chip);
@@ -629,7 +150,7 @@ function todoRow(todo){
  row.ondragend=()=>{taskDrag=null;row.classList.remove('dragging');for(const h of document.querySelectorAll('.task-list-head'))h.classList.remove('drop');};
  return row;
 }
-let taskDrag=null;
+
 function taskMenu(todo,x,y){
  const others=taskFolders.filter(f=>f.id!==todo.folderId);
  showMenu([
@@ -639,95 +160,18 @@ function taskMenu(todo,x,y){
   {label:'New list with this task…',run:()=>attempt(async()=>{const id=await newTaskList();if(id)await moveTask(todo.id,id);})}
  ],x,y);
 }
+
 async function moveTask(id,folderId){todos=await call('move-task',{id,folderId});renderTodos();}
-// Screen sharing: the main process asks which screen or window to hand to the call.
-let sharePick=null,shareSources=[],shareKind='screen';
-function renderShare(){
- const grid=$('share-grid');grid.replaceChildren();
- $('share-screens').setAttribute('aria-pressed',String(shareKind==='screen'));
- $('share-windows').setAttribute('aria-pressed',String(shareKind==='window'));
- const list=shareSources.filter(s=>(shareKind==='screen')===Boolean(s.screen));
- if(!list.length){grid.append(el('p','share-empty',shareKind==='screen'?'No screens available.':'No open windows to share.'));return;}
- for(const source of list){
-  const tile=el('button','share-tile');tile.type='button';tile.setAttribute('role','option');
-  if(source.thumb){const img=document.createElement('img');img.src=source.thumb;img.alt='';tile.append(img);}else tile.append(el('div','share-thumb-empty'));
-  tile.append(el('b',null,source.name || (source.screen?'Screen':'Window')));
-  tile.title=source.name;
-  tile.onclick=()=>answerShare(source.id);
-  grid.append(tile);
- }
-}
-function answerShare(sourceId){
- const pick=sharePick;sharePick=null;
- if($('share-dialog').open)$('share-dialog').close();
- if(pick)call('screen-picked',{id:pick,sourceId}).catch(()=>{});
-}
-$('share-cancel').onclick=()=>answerShare(null);
-$('share-screens').onclick=()=>{shareKind='screen';renderShare();};
-$('share-windows').onclick=()=>{shareKind='window';renderShare();};
-onDialogClosed($('share-dialog'),()=>{resumeViews();answerShare(null);});
-window.hearth.on('screen-pick',({id,app,sources})=>attempt(async()=>{
- sharePick=id;shareSources=Array.isArray(sources)?sources:[];
- shareKind=shareSources.some(s=>s.screen)?'screen':'window';
- $('share-title').textContent='Share your screen with '+(app || 'this app');
- $('share-sub').textContent='Choose a screen or a window. Nothing is shared until you pick one.';
- renderShare();
- if(!$('share-dialog').open){suspendViews();$('share-dialog').showModal();}
-}));
-// Electron does not implement window.prompt, so short names are asked for in a dialog of our own.
-let namePending=null;
-function askName(title,value=''){
- return new Promise(resolve=>{
-  namePending=resolve;$('name-title').textContent=title;$('name-input').value=value;
-  suspendViews();$('name-dialog').showModal();$('name-input').focus();$('name-input').select();
- });
-}
-$('name-cancel').onclick=()=>$('name-dialog').close();
-$('name-form').onsubmit=e=>{e.preventDefault();const value=$('name-input').value.trim().slice(0,40);const done=namePending;namePending=null;$('name-dialog').close();if(done)done(value || null);};
-onDialogClosed($('name-dialog'),()=>{resumeViews();const done=namePending;namePending=null;if(done)done(null);});
+
 async function newTaskList(name){
  const clean=name===undefined?await askName('Name this list','Client work'):name;
  if(!clean)return null;
  const result=await call('create-task-folder',{name:clean});
  taskFolders=result.folders;taskTarget=result.id;renderTodos();return result.id;
 }
+
 function caretGlyph(){const ns='http://www.w3.org/2000/svg';const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 20 20');svg.setAttribute('aria-hidden','true');svg.classList.add('caret');const p=document.createElementNS(ns,'path');p.setAttribute('d','M7 5l6 5-6 5');svg.append(p);return svg;}
-function renderWorkspaceOpens(workspace){
- const host=$('ws-opens');host.replaceChildren();
- const opens=workspace.opens || [];
- if(!opens.length)host.append(el('small','ws-open-empty','Nothing yet. Add Excel, a document or a link and it opens when you switch here.'));
- for(const item of opens){
-  const row=el('div','ws-open');
-  row.append(el('span',null,item.kind==='app'?'▣':item.kind==='file'?'▤':'↗'),el('b',null,item.label || item.target),el('small',null,item.detail || ''));
-  const remove=el('button',null,'×');remove.type='button';remove.title='Take this off';
-  remove.onclick=()=>attempt(async()=>{const state=await call('workspace-remove-open',{id:workspace.id,target:item.target});setWorkspaces(state);const fresh=workspaces.find(w=>w.id===workspace.id);if(fresh)renderWorkspaceOpens(fresh);});
-  row.append(remove);host.append(row);
- }
-}
-let wsOpenTimer=null;
-$('ws-open-q').oninput=()=>{
- clearTimeout(wsOpenTimer);
- const query=$('ws-open-q').value.trim();
- const results=$('ws-open-results');
- if(query.length<2){results.hidden=true;results.replaceChildren();return;}
- wsOpenTimer=setTimeout(()=>attempt(async()=>{
-  const items=await call('flick-list',{query});
-  results.replaceChildren();
-  if(!items.length){results.hidden=true;return;}
-  for(const item of items){
-   const b=el('button');b.type='button';
-   if(item.icon){const img=document.createElement('img');img.src=item.icon;img.alt='';b.append(img);}else b.append(el('span',null,item.kind==='app'?'▣':'▤'));
-   b.append(el('b',null,item.label),el('small',null,item.detail || ''));
-   b.onclick=()=>attempt(async()=>{
-    const state=await call('workspace-add-open',{id:wsEditing,flickId:item.id});
-    setWorkspaces(state);$('ws-open-q').value='';results.hidden=true;results.replaceChildren();
-    const fresh=workspaces.find(w=>w.id===wsEditing);if(fresh)renderWorkspaceOpens(fresh);
-   });
-   results.append(b);
-  }
-  results.hidden=false;
- }),220);
-};
+
 function listHead(folder,count){
  const id=folder?folder.id:'';const head=el('div','task-list-head');head.dataset.list=id;
  const folded=foldedLists.has(id);
@@ -759,8 +203,17 @@ function listHead(folder,count){
  head.ondrop=e=>{e.preventDefault();head.classList.remove('drop');const id=taskDrag;taskDrag=null;if(id)attempt(()=>moveTask(id,folder?folder.id:null));};
  return head;
 }
+
+// Where a task came from: a note, or the window itself.
+function fromChip(from){
+ if(!from || from.kind!=='note')return null;
+ const chip=el('button','from-chip','↩ '+String(from.path || '').split('/').pop());
+ chip.type='button';chip.title='Open the note this came from';
+ chip.onclick=e=>{e.preventDefault();e.stopPropagation();attempt(()=>openFile(from.path));};
+ return chip;
+}
 function renderTodos(){
- greeting();renderNow();
+ 
  const done=taskTab==='done';
  $('todo-tab').setAttribute('aria-pressed',!done);$('done-tab').setAttribute('aria-pressed',done);$('todo-form').classList.toggle('hidden',done);
  const host=$('todo-list');host.replaceChildren();
@@ -783,410 +236,59 @@ function renderTodos(){
  if(!list.length && !taskFolders.length)host.append(el('p','todo-empty',done?'Completed tasks will appear here.':'Nothing waiting. A clear list is a good list.'));
 }
 
-async function openService(item){if(item.kind==='claude'){await applyLayout({agentCollapsed:false});if(mode==='terminal'){if(!running)await start('claude');terminal.focus();}else $('chat-input').focus();return;}if(item.kind==='vault'){if(!root){await choose();return;}await openFiles();return;}await openInTile(item.id || item.url);}
-const GROUP_ICONS=["💼","🏢","📈","📊","💰","🧾","🏦","🛒","🛍️","📦","🚚","🧑‍💻","💻","🔧","🛠️","⚙️","🧪","🔬","🧠","💡","🎯","🚀","📣","📰","✉️","💬","📞","🗓️","🗂️","📚","📝","✏️","🎨","🖌️","📷","🎬","🎵","🎧","🎮","🏡","🏠","🔑","🚗","✈️","🌍","🗺️","🧭","☕","🍵","🍎","🥗","🏋️","🧘","🌱","🌿","🐶","🐱","❤️","⭐","🔥","⚡","🌈","🎓","🏥","⚖️","🛡️","🔒","👥","👤","🤝","🧩","🎁"];
-function pickerTab(which){$('picker-choice').classList.toggle('hidden',which!=='choose');document.querySelector('.picker-tabs').classList.toggle('hidden',which==='choose');$('installed-panel').classList.toggle('hidden',which!=='installed');$('website-form').classList.toggle('hidden',which!=='website');$('browser-form').classList.toggle('hidden',which!=='browser');$('group-form').classList.toggle('hidden',which!=='group');$('tab-installed').setAttribute('aria-pressed',which==='installed');$('tab-website').setAttribute('aria-pressed',which==='website');$('tab-browser').setAttribute('aria-pressed',which==='browser');$('tab-group').setAttribute('aria-pressed',which==='group');if(which==='website')$('website-url').focus();if(which==='group'){renderGroupForm();$('group-name').focus();}else editingGroup=null;if(which==='browser'){renderBrowserForm();$('browser-name').focus();}else editingBrowser=null;}
-const SYMBOL_NAMES=Object.keys(MS).sort();
-function iconGrid(container,input,selected){
- let bar=container.previousElementSibling;
- if(!bar || !bar.classList.contains('icon-picker-bar')){
-  bar=el('div','icon-picker-bar');const emojiTab=el('button',null,'Emoji'),symbolTab=el('button',null,'Symbols');emojiTab.type=symbolTab.type='button';const search=document.createElement('input');search.type='search';search.placeholder='Search symbols…';search.setAttribute('aria-label','Search symbols');
-  bar.append(emojiTab,symbolTab,search);container.before(bar);container.dataset.mode='emoji';
-  emojiTab.onclick=()=>{container.dataset.mode='emoji';paint();};symbolTab.onclick=()=>{container.dataset.mode='symbols';paint();};search.oninput=()=>{container.dataset.mode='symbols';paint();};
-  input.addEventListener('input',()=>preview());
- }
- const [emojiTab,symbolTab,search]=bar.children;const preview=()=>{const node=document.getElementById(input.id+'-preview');if(node)node.replaceChildren(iconNode(input.value.trim() || '◫'));};
- function paint(){
-  const mode=container.dataset.mode || 'emoji';emojiTab.setAttribute('aria-pressed',String(mode==='emoji'));symbolTab.setAttribute('aria-pressed',String(mode==='symbols'));search.classList.toggle('hidden',mode!=='symbols');container.replaceChildren();
-  const current=input.value.trim();
-  const choose=(value,b)=>{for(const other of container.children)other.setAttribute('aria-pressed','false');b.setAttribute('aria-pressed','true');input.value=value;preview();};
-  if(mode==='emoji'){for(const icon of GROUP_ICONS){const b=el('button',null,icon);b.type='button';b.setAttribute('aria-pressed',String(icon===current));b.onclick=()=>choose(icon,b);container.append(b);}}
-  else{const q=search.value.trim().toLowerCase();const names=SYMBOL_NAMES.filter(n=>!q || n.includes(q)).slice(0,160);for(const name of names){const b=el('button');b.type='button';b.title=name.replace(/-/g,' ');b.setAttribute('aria-pressed',String('ms:'+name===current));b.append(iconNode('ms:'+name));b.onclick=()=>choose('ms:'+name,b);container.append(b);}if(!names.length)container.append(el('p','todo-empty','No symbol matches.'));}
- }
- if(selected!==undefined)input.value=selected || '';container.dataset.mode=isSymbol(input.value.trim())?'symbols':'emoji';search.value='';paint();preview();
-}
-let editingBrowser=null;
-async function openBrowserEditor(item){editingBrowser=item;await openPicker('browser');}
-function renderBrowserForm(){const editing=editingBrowser;$('browser-name').value=editing?editing.name:'';iconGrid($('browser-icons'),$('browser-icon'),editing?editing.icon || '':'');$('browser-form').querySelector('.dialog-actions button').textContent=editing?'Save browser':'Add browser';$('browser-form').querySelector('p').textContent=editing?'Editing “'+editing.name+'”.':'A browser is a tab bar for any website, with its own logins and cookies. Keep one per client, project or side of your life.';}
-function renderGroupForm(){const icons=$('group-icons');
- const editing=editingGroup;$('group-name').value=editing?editing.name:'';iconGrid(icons,$('group-icon'),editing?editing.icon || '':'');$('group-form').querySelector('.dialog-actions button').textContent=editing?'Save group':'Create group';$('group-form').querySelector('p').textContent=editing?'Editing “'+editing.name+'”. Tick the apps that belong in it.':'A group is one tile in the sidebar that opens a visual menu of related apps.';
- const apps=$('group-apps');apps.replaceChildren();for(const item of sidebarItems.filter(openable)){const label=document.createElement('label');const box=document.createElement('input');box.type='checkbox';box.value=item.id || item.url;box.checked=Boolean(editing && item.folderId===editing.id);const name=el('span',null,item.name);if(item.folderId && (!editing || item.folderId!==editing.id)){const folder=serviceFolders.find(f=>f.id===item.folderId);if(folder)name.textContent+=' · '+folder.name;}label.append(box,name);apps.append(label);}if(!sidebarItems.some(s=>s.url))apps.append(el('p','todo-empty','Add some apps first, then group them here.'));}
-async function openPicker(tab='installed'){
-  suspendViews();$('app-dialog').showModal();pickerTab(tab);$('app-search').value='';$('app-category').value='';catalogPage=0;$('app-list').textContent='Loading the app library…';catalog=await call('web-apps');
-  $('app-category').replaceChildren(new Option('All categories',''));for(const category of [...new Set(catalog.map(a=>a.category))].sort())$('app-category').add(new Option(category,category));renderApps();if(tab==='installed')$('app-search').focus();if(tab==='choose')$('picker-choice button')?.focus();
-}
-function renderApps(){
-  const query=$('app-search').value.normalize('NFKD').toLowerCase().trim();const category=$('app-category').value;
-  const matches=catalog.filter(a=>(!category || a.category===category) && query.split(/\s+/).every(term=>(a.name+' '+a.category+' '+a.url).normalize('NFKD').toLowerCase().includes(term)));
-  const perPage=36,pages=Math.max(1,Math.ceil(matches.length/perPage));catalogPage=Math.min(catalogPage,pages-1);$('app-list').replaceChildren();
-  $('app-count').textContent=matches.length.toLocaleString()+' of '+catalog.length.toLocaleString()+' apps';$('apps-page').textContent='Page '+(catalogPage+1)+' of '+pages;$('apps-prev').disabled=catalogPage===0;$('apps-next').disabled=catalogPage===pages-1;
-  for(const item of matches.slice(catalogPage*perPage,(catalogPage+1)*perPage)){
-    const row=document.createElement('div');row.className='app-row';const tile=document.createElement('img');tile.className='app-library-icon';tile.src=item.icon;tile.alt='';tile.width=34;tile.height=34;
-    const info=document.createElement('div');info.className='app-info';const name=document.createElement('strong');name.textContent=item.name;const detail=document.createElement('small');detail.textContent=item.category;const address=document.createElement('small');address.className='app-domain';address.textContent=new URL(item.url).hostname.replace(/^www\./,'');info.append(name,detail,address);
-    const add=document.createElement('button');add.className='secondary';add.textContent=item.added?'Added ✓':'+ Add';add.setAttribute('aria-label',(item.added?'Added ':'Add ')+item.name);add.disabled=item.added;
-    add.onclick=()=>attempt(async()=>{add.disabled=true;try{services(await call('add-catalog-app',item.id));item.added=true;add.textContent='Added ✓';add.setAttribute('aria-label','Added '+item.name);notice(item.name+' added to your sidebar');}catch(e){add.disabled=false;throw e;}});
-    row.append(tile,info,add);$('app-list').append(row);
-  }
-  if(!matches.length){const empty=document.createElement('p');empty.textContent='No matches. Try another search, or add a website link.';$('app-list').append(empty);}
-}
-const chatWelcome=$('chat-messages').firstElementChild.cloneNode(true);
-// Actions under a Claude reply: turn its list into tasks, pin it to the whiteboard, open a link it mentioned, go back to the source.
-function replyLines(text){return String(text || '').split('\n').map(l=>l.replace(/^\s*(?:[-*•]|\d+[.)])\s+/,'').replace(/^\[[ xX]\]\s*/,'').replace(/\*\*/g,'').trim()).filter((l,i,a)=>l && /^\s*(?:[-*•]|\d+[.)]|\[[ xX]\])\s+/.test(String(text).split('\n')[i] || '')).slice(0,50);}
-function replyActions(message,state){
- const bar=el('div','reply-actions');const lines=replyLines(message.text);const links=[...new Set((String(message.text || '').match(/https?:\/\/[^\s)<>"']+/g) || []).map(u=>u.replace(/[.,;:]+$/,'')))].slice(0,3);
- const idx=state.messages.indexOf(message);let from=null;for(let i=idx-1;i>=0;i--){const mm=state.messages[i];if(mm.role==='user'){from=mm.from || null;break;}}
- if(lines.length){const b=el('button',null,'Add '+lines.length+' as tasks');b.type='button';b.onclick=()=>attempt(async()=>{const result=await call('add-todos',{texts:lines,from});todos=result.todos;taskTab='todo';renderTodos();if(!document.body.classList.contains('tasks-open'))$('tasks-rail').click();notice(result.added+' task'+(result.added===1?'':'s')+' added.');});bar.append(b);}
- const pin=el('button',null,'Put on the whiteboard');pin.type='button';pin.onclick=()=>attempt(async()=>{await call('whiteboard-add-note',{text:String(message.text || '').slice(0,4000),html:DOMPurify.sanitize(marked.parse(String(message.text || '').slice(0,4000),{gfm:true}),{ALLOWED_TAGS:['b','strong','i','em','u','s','br','p','div','ul','ol','li','h3'],ALLOWED_ATTR:[]})});notice('Pinned to the whiteboard.',{action:'Show me',onAction:()=>show('overview')});});bar.append(pin);
- for(const url of links){const b=el('button',null,'Open '+hostOf(url));b.type='button';b.title=url;b.onclick=()=>attempt(()=>openBrowser(url));bar.append(b);}
- if(from?.kind==='tab' && serviceOf(from.key) && !isBrowserItem(serviceOf(from.key))){const b=el('button',null,'Paste into '+fromLabel(from));b.type='button';b.title='Puts the reply into the message box in '+fromLabel(from)+'. Nothing is sent until you send it.';b.onclick=()=>attempt(async()=>{const placed=await call('deliver-text',{serviceKey:from.key,tabId:from.tabId,text:stripCode(message.text),mode:'reply'});await openInTile(placed.serviceKey,placed.tabId);notice('Pasted into '+fromLabel(from)+'. Check it, then send when you are ready.');});bar.append(b);}
- for(const draft of draftBlocks(message.text)){const app=sidebarItems.find(s=>openable(s) && s.name.toLowerCase()===draft.app.toLowerCase());const b=el('button',null,'Paste into '+draft.app);b.type='button';b.classList.add('primary-chip');b.onclick=()=>attempt(async()=>{if(!app)throw Error(draft.app+' is not in your apps.');const placed=await call('deliver-text',{serviceKey:app.id || app.url,text:draft.text,mode:'compose'});await openInTile(placed.serviceKey,placed.tabId);notice('Pasted into '+app.name+'. Check it, then send when you are ready.');});bar.append(b);}
- const chip=fromChip(from);if(chip){chip.textContent='↩ Back to '+fromLabel(from);bar.append(chip);}
- return bar;
-}
-function draftBlocks(text){const out=[];const re=/```message:([^\n`]+)\n([\s\S]*?)```/g;let m;while((m=re.exec(String(text || ''))))out.push({app:m[1].trim(),text:m[2].trim()});return out;}
-function stripCode(text){return String(text || '').replace(/```[\s\S]*?```/g,s=>s.replace(/^```[^\n]*\n?/,'').replace(/```$/,'')).trim();}
-window.hearth.on('whiteboard-changed',board=>whiteboard.setBoard(board));
-const chatNodes=new Map(),permissionNodes=new Map();
-function surfaceSignIn(messages){const last=messages?.[messages.length-1];if(last && last.role==='error' && /sign in again/i.test(String(last.text || ''))){$('chat-signin').classList.remove('hidden');$('claude-login').classList.remove('hidden');}}
-function renderChat(state){chatState=state;surfaceSignIn(state.messages);const scroller=$('chat-messages');const nearBottom=scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<90;if(state.messages.length && scroller.querySelector('.chat-welcome'))scroller.replaceChildren();const ids=new Set(state.messages.map(m=>m.id));for(const [id,node] of chatNodes)if(!ids.has(id)){node.remove();chatNodes.delete(id);}
-  for(const message of state.messages){let node=chatNodes.get(message.id);if(!node){node=document.createElement(message.role==='tool'?'details':'div');node.className='chat-message '+message.role;chatNodes.set(message.id,node);scroller.append(node);}const signature=JSON.stringify(message);if(node.dataset.signature===signature)continue;node.dataset.signature=signature;
-    if(message.role==='tool'){const open=node.open;node.replaceChildren();const summary=document.createElement('summary');summary.textContent=message.tool+' · '+message.status;const pre=document.createElement('pre');pre.textContent=message.text+(message.output?'\n\n'+message.output:'');node.append(summary,pre);node.open=open;}
-    else if(message.role==='assistant'){node.classList.add('markdown-body');node.innerHTML=markdown(message.text || '…');if(!state.busy || message!==state.messages.at(-1))node.append(replyActions(message,state));}
-    else{node.textContent=message.text;const chip=fromChip(message.from);if(chip){node.append(document.createTextNode(' '));node.append(chip);}}
-  }
-  if(!state.messages.length && !scroller.querySelector('.chat-welcome'))scroller.append(chatWelcome.cloneNode(true));
-  const live=new Set((state.pending || []).map(p=>p.id));for(const [id,node] of permissionNodes)if(!live.has(id)){node.remove();permissionNodes.delete(id);}
-  for(const request of state.pending || []){if(permissionNodes.has(request.id))continue;const card=document.createElement('div');card.className='permission-card';const title=document.createElement('strong');title.textContent=request.title;card.append(title);if(request.description){const p=document.createElement('p');p.textContent=request.description;card.append(p);}const answers={};if(request.tool==='AskUserQuestion'){for(const q of request.input.questions || []){const label=document.createElement('label');label.textContent=q.question;const field=document.createElement('textarea');field.rows=2;field.placeholder=(q.options || []).map(o=>o.label).join(' / ');label.append(field);card.append(label);answers[q.question]=field;}}else{const detail=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent='Review action';pre.textContent=JSON.stringify(request.input,null,2);detail.append(summary,pre);detail.open=true;card.append(detail);}const actions=document.createElement('div');actions.className='dialog-actions';for(const allow of [false,true]){const b=document.createElement('button');b.className=allow?'primary':'secondary';b.textContent=allow?(request.tool==='AskUserQuestion'?'Send answer':'Allow once'):'Deny';b.onclick=()=>attempt(()=>call('chat-permission',{id:request.id,allow,answers:Object.fromEntries(Object.entries(answers).map(([q,f])=>[q,f.value]))}));actions.append(b);}card.append(actions);permissionNodes.set(request.id,card);$('chat-permissions').append(card);}
-  $('chat-send').disabled=state.busy;$('new-chat').disabled=state.busy;updateAgentStatus();if(nearBottom)scroller.scrollTop=scroller.scrollHeight;
-}
-$('home').onclick=()=>attempt(()=>show('overview'));
-// Files lives in the Claude pane: folders, the file list and the note editor in the centre.
-async function openFiles(){await applyLayout({agentCollapsed:false});applyMode('files');await call('appearance',{mode:'files'});const state=await call('state');renderConnectedFolders(state.connectedFolders || []);if(root)await list(directory);}
-$('claude-rail').onclick=()=>attempt(async()=>{await applyLayout({agentCollapsed:!layout.agentCollapsed});if(!layout.agentCollapsed){applyMode(mode==='terminal'?'terminal':'chat');$('chat-input')?.focus();}});
-$('settings-nav').onclick=()=>attempt(()=>show('settings-page'));$('settings-add').onclick=()=>attempt(()=>openPicker('choose'));
-$('security-nav').onclick=()=>attempt(()=>show('security-page'));
-$('brain-nav').onclick=()=>attempt(async()=>{await show('brain-page');brain.showMenu();});
-$('open-security-site').onclick=()=>attempt(()=>openBrowser('https://justzen.co/security.html'));
-$('toggle-app-lock').onclick=()=>attempt(async()=>{await call('set-app-lock',{enabled:!securityStatus.lock.enabled,minutes:Number($('auto-lock-minutes').value),passcode:$('new-lock-passcode').value});$('new-lock-passcode').value='';await renderSecurityStatus();notice('App lock setting saved.');});
-$('auto-lock-minutes').onchange=()=>attempt(async()=>{if(!securityStatus?.lock.enabled)return;await call('set-app-lock',{enabled:true,minutes:Number($('auto-lock-minutes').value)});await renderSecurityStatus();notice('Automatic lock delay saved.');});
-$('sleep-default').onchange=()=>attempt(async()=>{sleep=await call('set-sleep',{defaultMinutes:Number($('sleep-default').value)});await renderSecurityStatus();notice(sleep.defaultMinutes?'Hidden apps sleep after '+SLEEP_LABELS[sleep.defaultMinutes]+'.':'Apps stay awake.');});
-$('lock-now').onclick=()=>attempt(()=>call('lock-app'));
-$('isolate-all').onclick=()=>attempt(async()=>{if(!confirm('Move every website to its own isolated login profile? You may need to sign in again.'))return;services(await call('isolate-all-services'));await renderSecurityStatus();notice('Every website now has an isolated profile.');});
-$('clear-profile').onclick=()=>attempt(async()=>{const raw=$('clear-profile-target').value,parts=raw.split(':'),profile=parts.shift(),key=parts.length?decodeURIComponent(parts.join(':')):'';const label=$('clear-profile-target').selectedOptions[0]?.textContent;if(!confirm('Clear cookies and local website data for '+label+'? This signs those websites out.'))return;await call('clear-profile-data',{profile,key});if(profile==='browser'){tabs=await call('tabs');renderTiles();}notice(label+' cleared.');});
-$('clear-claude-history').onclick=()=>attempt(async()=>{if(!confirm('Clear the Claude conversations stored by Just Zen? Claude Code may retain its own separate history.'))return;await call('clear-claude-history');notice('Just Zen Claude history cleared.');});
-$('erase-hearth').onclick=()=>attempt(async()=>{if(!confirm('Erase Just Zen settings, tasks, browser sessions and saved Claude history from this Mac?'))return;const state=await call('erase-hearth-data');brain.reset();await hydrate(state);notice('All Just Zen data erased.');});
-$('unlock-app').onclick=async()=>{try{$('unlock-error').textContent='';const state=await call('unlock-app',$('unlock-passcode').value);await hydrate(state);}catch(error){$('unlock-error').textContent=error.message.replace(/^Error invoking remote method '[^']+': Error: /,'');}};$('unlock-passcode').onkeydown=e=>{if(e.key==='Enter')$('unlock-app').click();};
-$('choose-folder').onclick=()=>attempt(choose);
-$('choose-claude-folder').onclick=()=>attempt(chooseClaude);$('claude-login').onclick=()=>attempt(()=>start('login'));$('disconnect-claude').onclick=()=>attempt(async()=>{await call('disconnect-claude-folder');setClaudeAccess({root:null,policy:claudePolicy,workspaces:claudeWorkspaces});notice('Claude is disconnected from local files.');});$('claude-workspace').onchange=()=>attempt(async()=>{if(!$('claude-workspace').value)return;setClaudeAccess(await call('select-claude-folder',$('claude-workspace').value));notice('Switched Claude workspace.');});$('claude-policy').onchange=()=>attempt(async()=>{claudePolicy=await call('set-claude-policy',$('claude-policy').value);setClaudeAccess({root:claudeRoot,policy:claudePolicy,workspaces:claudeWorkspaces});notice('Claude access set to '+$('claude-policy').options[$('claude-policy').selectedIndex].text+'.');});
-$('add-app').onclick=()=>attempt(()=>openPicker('choose'));
-for(const b of document.querySelectorAll('#picker-choice [data-choice]'))b.onclick=()=>{pickerTab(b.dataset.choice);if(b.dataset.choice==='installed')$('app-search').focus();};
-$('start').onclick=()=>attempt(()=>start('claude'));$('shell').onclick=()=>attempt(()=>start('shell'));
-$('stop').onclick=()=>attempt(async()=>{if(mode==='chat'){if(chatState.busy)await call('chat-stop');}else if(running && confirm('Stop this running terminal session?'))await call('stop-terminal');});
-$('refresh').onclick=()=>attempt(()=>list(directory));$('save').onclick=()=>attempt(save);$('editor').oninput=()=>{$('save').disabled=!dirty();};
-$('note-preview').onclick=()=>setNoteMode('preview');$('note-edit').onclick=()=>setNoteMode('edit');
-$('app-search').oninput=()=>{catalogPage=0;renderApps();};$('app-category').onchange=()=>{catalogPage=0;renderApps();};$('apps-prev').onclick=()=>{catalogPage--;renderApps();$('app-list').scrollTop=0;};$('apps-next').onclick=()=>{catalogPage++;renderApps();$('app-list').scrollTop=0;};$('cancel-app').onclick=()=>$('app-dialog').close();$('tab-installed').onclick=()=>pickerTab('installed');$('tab-website').onclick=()=>pickerTab('website');$('tab-browser').onclick=()=>pickerTab('browser');$('tab-group').onclick=()=>pickerTab('group');
-$('browser-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const name=$('browser-name').value.trim();const icon=$('browser-icon').value.trim() || '🌐';if(editingBrowser){services(await call('update-service',{key:editingBrowser.id,name,icon}));notice(name+' updated.');editingBrowser=null;$('app-dialog').close();$('browser-form').reset();return;}const added=await call('add-browser',{name,icon});services(added.services);$('app-dialog').close();$('browser-form').reset();await openInTile(added.key);notice(name+' added. It keeps its own logins, separate from every other browser and app.');});};
-onDialogClosed($('app-dialog'),()=>{editingGroup=null;editingBrowser=null;resumeViews();});
-$('website-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const raw=$('website-url').value.trim();const url=new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw)?raw:'https://'+raw);const name=$('website-name').value.trim() || url.hostname.replace(/^www\./,'');const items=await call('add-service',{name,url:url.href});services(items);const item=items.find(value=>value.url===url.href);$('app-dialog').close();$('website-form').reset();if(item)await openInTile(item.id || item.url);notice(name+' added. Cookies are saved on this Mac.');});};
-$('group-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const name=$('group-name').value.trim();const icon=$('group-icon').value.trim() || GROUP_ICONS[0];const keys=[...$('group-apps').querySelectorAll('input:checked')].map(box=>box.value);let state;
- if(editingGroup){const id=editingGroup.id;state=await call('update-service-folder',{id,name,icon});for(const item of sidebarItems.filter(s=>s.url)){const key=item.id || item.url;const wanted=keys.includes(key),has=item.folderId===id;if(wanted && !has)state=await call('set-service-folder',{key,folderId:id});else if(!wanted && has)state=await call('set-service-folder',{key,folderId:null});}notice('Group "'+name+'" updated.');}
- else{state=await call('create-service-folder',{name,icon,keys});notice('Group "'+name+'" added to the sidebar.');}
- editingGroup=null;services(state.services,state.folders);$('app-dialog').close();$('group-form').reset();for(const b of $('group-icons').children)b.setAttribute('aria-pressed','false');});};
-$('theme-toggle').onclick=()=>attempt(async()=>{applyTheme(theme==='light'?'dark':'light');await call('appearance',{theme});});
-for(const next of ['chat','terminal'])$('mode-'+next).onclick=()=>attempt(async()=>{applyMode(next);await call('appearance',{mode:next});});
-$('mode-files').onclick=()=>attempt(openFiles);
-$('collapse-agent').onclick=()=>attempt(()=>applyLayout({agentCollapsed:true,centreCollapsed:false}));$('agent-rail').onclick=()=>attempt(()=>applyLayout({agentCollapsed:false}));$('collapse-centre').onclick=()=>attempt(()=>applyLayout({centreCollapsed:true,agentCollapsed:false}));$('restore-centre').onclick=()=>attempt(()=>applyLayout({centreCollapsed:false}));
-// The dock centres under the centre pane. When the apps need more room than that, it widens to the whole window and the side panes lift above it.
-// Accordion card deck. Cards keep their slot order; only the front card and the companion hint change.
-const DECK_CAP=6;let deckOverflow=[];
-let deckActive=null,deckPairs={};try{deckPairs=JSON.parse(localStorage.getItem('deck-pairs') || '{}') || {};}catch{}
-function deckCards(){return [...document.querySelectorAll('#services>.service-row')];}
-function deckMetrics(){const main=document.querySelector('main');const r=main.getBoundingClientRect();const s=document.body.style;s.setProperty('--main-left',r.left+'px');s.setProperty('--main-top',r.top+'px');s.setProperty('--main-width',r.width+'px');s.setProperty('--main-height',r.height+'px');deckLayout();}
-function deckLayout(){deckCards().forEach((card,i)=>{card.dataset.slot=String(i+1);card.title=card.dataset.name?card.dataset.name+' · ⌘'+Math.min(9,i+1):'';});}
-// Behind the active card, the rest of the deck peeks out as stacked edges.
-// The header carries the current app: name, address or title, tabs, navigation, and the way back to the canvas.
-window.hearth.on('tab-focused',({serviceKey,tabId})=>{const n=slotCount();const i=tiles.slots.findIndex((s,at)=>at<n && s && s.serviceKey===serviceKey && s.tabId===tabId);if(i<0 || tiles.focus===i)return;lastFocus=tiles.focus;tiles.focus=i;const focusedTile=tileEl(i);for(const t of $('tiles').querySelectorAll('.tile'))t.classList.toggle('focused',t===focusedTile);saveLayout();updateZoomControl();deckSync();});
-function cardFor(key){if(!key)return null;return deckCards().find(c=>c.dataset.key===key || c.querySelector(`.hand>.service-row[data-key="${CSS.escape(key)}"]`)) || null;}
-function cardKey(card){if(!card)return null;if(card.dataset.key)return card.dataset.key;return card.dataset.active || card.querySelector('.hand>.service-row')?.dataset.key || null;}
-function companionFor(key){const counts=deckPairs[key] || {};let best=null,max=0;for(const [other,count] of Object.entries(counts))if(other!==key && count>max && serviceOf(other)){best=other;max=count;}return best;}
-function deckSync(){const slot=page==='browser-page' && !layout.centreCollapsed?focusedSlot():null;const key=slot?.serviceKey || null;
- if(key!==deckActive){if(deckActive && key){deckPairs[deckActive]={...(deckPairs[deckActive] || {}),[key]:((deckPairs[deckActive] || {})[key] || 0)+1};try{localStorage.setItem('deck-pairs',JSON.stringify(deckPairs));}catch{}}deckActive=key;}
- const companion=key?companionFor(key):null;const frontCard=cardFor(key),companionCard=cardFor(companion);
- for(const card of deckCards()){const mine=card===frontCard;card.classList.toggle('front',mine);card.classList.toggle('companion',Boolean(companionCard) && card===companionCard && !mine);card.querySelector('.nav')?.setAttribute('aria-selected',String(mine));if(card===companionCard)card.dataset.companionKey=companion;else delete card.dataset.companionKey;
-  if(card.classList.contains('group-card')){if(mine){card.classList.remove('open');card.dataset.active=key;const member=serviceOf(key);card.querySelector('.nav>.label').textContent=card.dataset.name+' › '+(member?.name || '');}else{delete card.dataset.active;card.querySelector('.nav>.label').textContent=card.dataset.name;}}}
- deckLayout();}
-function deckSelect(index){const card=deckCards()[index];const item=serviceOf(cardKey(card));if(item)return openService(item);}
-function deckStep(direction){const cards=deckCards();if(!cards.length)return;const at=cards.findIndex(c=>c.classList.contains('front'));const next=at<0?(direction>0?0:cards.length-1):Math.max(0,Math.min(cards.length-1,at+direction));return deckSelect(next);}
-function deckCompanion(){const card=deckCards().find(c=>c.classList.contains('companion'));const item=card?serviceOf(card.dataset.companionKey || card.dataset.key):null;if(item)return openService(item);notice('No companion yet. Switch between two apps a few times and the deck will learn the pair.');}
-function fanDeck(on){document.querySelector('body>aside').classList.toggle('fanned',on);deckLayout();}
-// Search is the navigation: a visual picker that fills the pane it was opened from.
-let searchTarget=0,searchIndex=0,appUses={},searchMode='pane';
-function searchGlyph(){const ns='http://www.w3.org/2000/svg';const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 20 20');svg.setAttribute('aria-hidden','true');const c=document.createElementNS(ns,'circle');c.setAttribute('cx','8.5');c.setAttribute('cy','8.5');c.setAttribute('r','5.5');const p=document.createElementNS(ns,'path');p.setAttribute('d','M12.8 12.8 17 17');svg.append(c,p);return svg;}
-function iconFor(item){if(isBrowserItem(item)){const i=el('span','group-icon');i.append(iconNode(item.icon || '🌐'));return i;}const wrap=el('span','icon-pair');const img=el('img','site-favicon');img.alt='';img.hidden=true;const fallback=el('span','site-fallback',item.name.slice(0,1).toUpperCase());wrap.append(img,fallback);call('favicon',item.id || item.url).then(icon=>paintIcon(img,icon)).catch(()=>{});return wrap;}
-function initials(name){return name.split(/[\s._/-]+/).filter(Boolean).map(w=>w[0]).join('').toLowerCase();}
-function loose(name,needle){let at=0;for(const ch of needle){at=name.indexOf(ch,at);if(at<0)return false;at++;}return true;}
-function searchResults(q){const needle=q.trim().toLowerCase();const out=[];
- for(const item of sidebarItems.filter(openable)){
-  const key=item.id || item.url;const group=item.folderId?serviceFolders.find(f=>f.id===item.folderId)?.name || '':'';const name=item.name.toLowerCase();
-  const score=!needle?1:name===needle?5:name.startsWith(needle)?4:initials(item.name).startsWith(needle)?3.5:name.split(/\s+/).some(w=>w.startsWith(needle))?3:name.includes(needle)?2.5:group.toLowerCase().includes(needle)?1.5:hostOf(item.url || '').includes(needle)?1.4:loose(name,needle)?1:0;
-  if(score>0)out.push({item,group,score,uses:appUses[key] || 0});
- }
- return out.sort((a,b)=>b.score-a.score || b.uses-a.uses || a.item.name.localeCompare(b.item.name));}
-function openAppSearch(target=0){if(typeof target==='number')searchMode=searchMode==='sidecar'?'sidecar':'pane';searchTarget=Math.max(0,Math.min(slotCount()-1,target));searchIndex=0;const dialog=$('find-app');const n=page==='browser-page'?slotCount():1;$('app-search-target').textContent=n>1?'Pane '+(searchTarget+1):'';$('app-search-input').value='';if(!dialog.open){suspendViews();dialog.showModal();}renderAppSearch();$('app-search-input').focus();}
-function closeAppSearch(){searchMode='pane';const dialog=$('find-app');if(dialog.open)dialog.close();}
-function pickApp(item){const key=item.id || item.url;const mode=searchMode;searchMode='pane';closeAppSearch();appUses[key]=(appUses[key] || 0)+1;call('search-used',{key}).catch(()=>{});if(mode==='sidecar')return attempt(()=>setSidecarApp(item));attempt(async()=>{if(page!=='browser-page')await show('browser-page');await openInTile(item.id || item.url,undefined,searchTarget);});}
-function renderWaiting(){const host=$('app-search-waiting');host.replaceChildren();const chips=[];const seen=new Set();
- for(const entry of recent){if(seen.has(entry.key))continue;const item=serviceOf(entry.key);if(!item)continue;seen.add(entry.key);const count=serviceBadges.get(entry.key) || 0;chips.push({item,label:item.name+(count?' · '+count:''),detail:(entry.title?entry.title+': ':'')+(entry.body || (entry.added+' new'))});}
- for(const feed of nowFeed){if(seen.has(feed.key) || !feed.count)continue;const item=serviceOf(feed.key);if(!item)continue;seen.add(feed.key);const first=feed.items?.[0];chips.push({item,label:item.name+' · '+feed.count,detail:first?(first.sub?first.sub+': ':'')+first.title:feed.count+' unread'});}
- const nextTask=todos.find(t=>!t.done);
- if(!chips.length && !nextTask){host.hidden=true;return;}host.hidden=false;
- host.append(el('span','waiting-label','Waiting for you'));
- for(const c of chips.slice(0,4)){const b=el('button','waiting-chip');b.type='button';b.append(iconFor(c.item),el('b',null,c.label),el('span',null,c.detail));b.title=c.detail;b.onclick=()=>pickApp(c.item);host.append(b);}
- if(nextTask){const b=el('button','waiting-chip waiting-task');b.type='button';b.append(el('b',null,'Next task'),el('span',null,nextTask.text));b.onclick=()=>{closeAppSearch();$('tasks-rail').click();};host.append(b);}}
-function paneOf(key){const n=slotCount();for(let i=0;i<n;i++){const slot=tiles.slots[i];if(slot && slot.serviceKey===key)return i;}return -1;}
-function appTile(r,onPick){
- const key=r.item.id || r.item.url;const t=el('button','app-tile');t.type='button';t.setAttribute('role','option');t.dataset.key=key;
- const art=el('span','art');art.append(iconFor(r.item));t.append(art,el('span','app-tile-name',r.item.name));
- const at=paneOf(key);t.append(el('span','app-tile-group',at>=0 && slotCount()>1?'Pane '+(at+1):(r.group || '')));
- const count=serviceBadges.get(key) || 0;if(count)t.append(el('small','service-badge',count>99?'99+':String(count)));
- if(at>=0)t.classList.add('on-screen');
- t.title=r.item.name;t.onclick=onPick || (()=>pickApp(r.item));
- const more=el('span','tile-more','⋯');more.setAttribute('role','button');more.title='Manage '+r.item.name;more.tabIndex=0;more.onclick=e=>{e.stopPropagation();const b=more.getBoundingClientRect();tileMenu(r.item,b.left,b.bottom+4);};more.onkeydown=e=>{if(e.key==='Enter' || e.key===' '){e.preventDefault();e.stopPropagation();more.click();}};t.append(more);
- t.oncontextmenu=e=>{e.preventDefault();tileMenu(r.item,e.clientX,e.clientY);};
- return t;
-}
-// With a lot of apps a single wall of icons is hard to read, so the picker groups them: what this pane can do,
-// the ones you reach for most, then each folder. Typing collapses it all into one ranked list.
-function renderAppSearch(){
- renderWaiting();const grid=$('app-search-grid');grid.replaceChildren();
- const query=$('app-search-input').value.trim();const needle=query.toLowerCase();
- const results=searchResults(query);
- const extras=[{label:'A document',sub:'PDF, Word, PowerPoint, text',glyph:'▤',run:()=>{closeAppSearch();attempt(()=>openDocumentInTile(searchTarget));}}];
- if(page==='browser-page'){const slot=tiles.slots[searchTarget];const group=slot && slot.serviceKey?tabs[slot.serviceKey]:null;if(group && group.items.length>1)for(const tab of group.items)if(tab.id!==slot.tabId)extras.push({label:tabTitle(slot.serviceKey,tab),sub:'Tab in '+(serviceOf(slot.serviceKey)?.name || ''),glyph:'⧉',run:()=>{closeAppSearch();attempt(()=>activateTab(searchTarget,slot.serviceKey,tab.id));}});}
- const shownExtras=extras.filter(x=>!needle || x.label.toLowerCase().includes(needle));
- const section=text=>{const h=el('div','app-search-section',text);grid.append(h);};
- const extraTile=x=>{const t=el('button','app-tile app-tile-extra');t.type='button';t.setAttribute('role','option');t.append(el('span','art',x.glyph),el('span','app-tile-name',x.label),el('span','app-tile-group',x.sub));t.title=x.label;t.onclick=x.run;grid.append(t);};
- if(needle){
-  for(const x of shownExtras)extraTile(x);
-  for(const r of results)grid.append(appTile(r));
- }else{
-  if(shownExtras.length){section('This pane');for(const x of shownExtras)extraTile(x);}
-  const used=results.filter(r=>r.uses>0).sort((a,b)=>b.uses-a.uses).slice(0,6);
-  const usedKeys=new Set(used.map(r=>r.item.id || r.item.url));
-  if(used.length>1 && results.length>8){section('Most used');for(const r of used)grid.append(appTile(r));}
-  const rest=used.length>1 && results.length>8?results.filter(r=>!usedKeys.has(r.item.id || r.item.url)):results;
-  const groups=new Map();
-  for(const r of rest){const name=r.group || 'All apps';if(!groups.has(name))groups.set(name,[]);groups.get(name).push(r);}
-  const names=[...groups.keys()].sort((a,b)=>a==='All apps'?1:b==='All apps'?-1:a.localeCompare(b));
-  for(const name of names){if(groups.size>1 || rest.length>8 || grid.children.length)section(name);for(const r of groups.get(name))grid.append(appTile(r));}
- }
- const add=el('button','app-tile app-tile-add');add.type='button';add.setAttribute('role','option');add.append(el('span','art','＋'),el('span','app-tile-name','Add an app'));add.onclick=()=>{closeAppSearch();attempt(()=>openPicker('choose'));};grid.append(add);
- const options=[...grid.querySelectorAll('.app-tile')];
- searchIndex=Math.max(0,Math.min(searchIndex,options.length-1));
- options.forEach((t,i)=>t.setAttribute('aria-selected',String(i===searchIndex)));
- if(!results.length && !shownExtras.length && query)grid.prepend(el('div','app-search-empty','No app called "'+query+'". Add it, or try another name.'));
- options[searchIndex]?.scrollIntoView({block:'nearest'});
-}
-// Arrows follow the grid as it is actually laid out, whatever the window width.
-function searchColumns(){const grid=$('app-search-grid');const tracks=getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length;return Math.max(1,tracks);}
-// Meeting mode: a live call in any pane offers a fresh note beside it and quiet chat apps until the call ends.
-let meeting=null;
-window.hearth.on('call-started',info=>{if(info.key)callSlots.add(info.key+'/'+info.tabId);if(meeting)return;toast('In a call? Meeting mode opens a fresh note beside it and quiets chat pings until it ends.',{action:'Meeting mode',onAction:()=>attempt(()=>startMeeting(info)),duration:20000});});
-window.hearth.on('call-ended',info=>{if(info.key)callSlots.delete(info.key+'/'+info.tabId);if(!meeting || (meeting.key && info.key!==meeting.key))return;attempt(endMeeting);});
-async function startMeeting(info){if(info.peek){const opened=await call('peek-action',{action:'tab'});if(opened)await openInTile(opened.serviceKey,opened.tabId);}
- meeting={key:info.key || null,startedAt:Date.now()};
- const muted=await call('mute-chat',{minutes:120});
- const stamp=new Date();const name='Meeting '+stamp.toISOString().slice(0,10)+' '+stamp.toTimeString().slice(0,5).replace(':','.');
- try{if(!root){notice('Chat is quiet. Choose a folder for Claude and notes to get a note beside your calls.');}else{const relative=await call('create-note',{name,text:'# '+name+'\n\n'+(info.url?info.url+'\n\n':'')+'## Notes\n\n- \n\n## Actions\n\n- '});await openFiles();await openFile(relative);$('editor').focus();}}catch(e){notice(e.message);}
- notice('Meeting mode: '+(muted?muted+' chat app'+(muted===1?'':'s')+' quiet ':'')+'until the call ends.');}
-async function endMeeting(){meeting=null;const n=await call('unmute-chat');if(n)notice('Call over. Chat pings are back on.');}
-$('app-search-close').onclick=closeAppSearch;$('app-search-manage').onclick=()=>{closeAppSearch();attempt(()=>show('settings-page'));};$('app-search-add').onclick=()=>{closeAppSearch();attempt(()=>openPicker('choose'));};onDialogClosed($('find-app'),resumeViews);$('find-app').addEventListener('click',e=>{if(e.target===$('find-app'))closeAppSearch();});
-$('app-search-input').oninput=e=>{const input=e.target;searchIndex=0;if(e.inputType==='insertText'){const typed=input.value;const top=searchResults(typed)[0];if(top && typed && top.item.name.toLowerCase().startsWith(typed.toLowerCase()) && top.item.name.length>typed.length){input.value=top.item.name;input.setSelectionRange(typed.length,input.value.length);}}renderAppSearch();};
-$('app-search-input').onkeydown=e=>{const options=$('app-search-grid').querySelectorAll('.app-tile');const cols=searchColumns();if(!options.length)return;const move=d=>{e.preventDefault();searchIndex=Math.max(0,Math.min(options.length-1,searchIndex+d));renderAppSearch();};if(e.key==='ArrowRight')move(1);else if(e.key==='ArrowLeft')move(-1);else if(e.key==='ArrowDown')move(cols);else if(e.key==='ArrowUp')move(-cols);else if(e.key==='Enter'){e.preventDefault();options[searchIndex]?.click();}};
+function rememberFolded(){try{localStorage.setItem('zen-folded-lists',JSON.stringify([...foldedLists]));}catch{}}
 
-$('deck-zone').addEventListener('mouseover',e=>{if(!e.target.closest('.front'))fanDeck(true);});
-$('deck-zone').addEventListener('mouseout',e=>{const to=e.relatedTarget;if(!to || !$('deck-zone').contains(to) || to.closest('.front'))fanDeck(false);});
-$('deck-zone').addEventListener('wheel',e=>{if(e.deltaY<-12)fanDeck(true);else if(e.deltaY>12)fanDeck(false);},{passive:true});
-window.hearth.on('deck-command',cmd=>attempt(()=>{if(typeof cmd?.search==='number')return openAppSearch(cmd.search);if(typeof cmd?.close==='number')return closePane(cmd.close);if(typeof cmd?.split==='number')return splitPane(cmd.split<0?tiles.focus:cmd.split);if(cmd?.addPane)return addPane();if(typeof cmd?.openPane==='string')return openInTile(cmd.openPane);
- if(typeof cmd?.workspaceId==='string')return switchWorkspace(cmd.workspaceId);
- if(cmd?.addWorkspace)return addWorkspace();if(cmd?.sidecar)return toggleSidecar();if(cmd?.workspace)return stepWorkspace(cmd.workspace);if(cmd?.replace)return placeViews();if(cmd?.move)return movePane(cmd.move,cmd.from);if(cmd?.swap)return swapPanes();if(cmd?.wide)return widenPane();if(cmd?.page)return show(cmd.page);if(typeof cmd?.slot==='number')return deckSelect(cmd.slot);if(cmd?.step)return deckStep(cmd.step);if(cmd?.companion)return deckCompanion();}));
-new ResizeObserver(deckMetrics).observe(document.querySelector('main'));addEventListener('resize',deckMetrics);
-function sidebarMenu(x,y){showMenu([{label:'Add an app, website or group',run:()=>$('add-app').click()},{label:'Home · the canvas',hint:'⌘⇧H',run:()=>show('overview')}],x,y);}
-document.querySelector('body>aside').addEventListener('contextmenu',e=>{if(e.target.closest('.service-row,.service-group'))return;e.preventDefault();sidebarMenu(e.clientX,e.clientY);});
-$('sidecar-rail').onclick=()=>attempt(toggleSidecar);
-$('sidecar-rail').oncontextmenu=e=>{e.preventDefault();sidecarMenu(e.clientX,e.clientY);};
-$('sidecar-close').onclick=()=>attempt(toggleSidecar);
-$('sidecar-change').onclick=()=>{searchMode='sidecar';openAppSearch(0);};
-function sidecarMenu(x,y){const item=sidecarItem();showMenu([{label:item?'Choose another app…':'Choose an app…',run:()=>{searchMode='sidecar';openAppSearch(0);}},...(item?[{label:'Open '+item.name+' in this pane',run:()=>attempt(()=>openInTile(sidecar.key,undefined,Math.min(tiles.focus,slotCount()-1)))},'-',{label:'Remove from the sidebar',run:clearSidecar}]:[])],x,y);}
-$('tasks-rail').onclick=()=>{document.body.classList.add('tasks-open');requestAnimationFrame(()=>{placeViews();$('todo-input').focus();});};$('close-tasks').onclick=()=>{document.body.classList.remove('tasks-open');placeViews();};
-$('todo-tab').onclick=()=>{taskTab='todo';renderTodos();};$('done-tab').onclick=()=>{taskTab='done';renderTodos();};$('todo-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{todos=await call('add-todo',{text:$('todo-input').value,folderId:taskTarget});$('todo-input').value='';taskTab='todo';renderTodos();});};
+function folderName(id){return taskFolders.find(f=>f.id===id)?.name || '';}
+
+function hostOf(url){try{return new URL(url).hostname.replace(/^www\./,'');}catch{return '';}}
+
+// ---- Beyond this window: the panel, the menu bar, deep links, tab reuse ----
+
+// ---- Startup ----
+function hydrate(state){
+ homeDir=state.home || homeDir;platform=state.platform || platform;
+ document.body.classList.toggle('platform-win',platform==='win32');
+ if(state.claudeSupported===false){$('agent-state').textContent='Not available on Windows yet';const card=$('chat-signin');if(card){card.replaceChildren(el('h3',null,'Claude is macOS-only for now'),el('p',null,'Claude runs inside a macOS sandbox, and Just Zen will not run it without one. The panel, ⌥Space, your notes and your tasks all work.'));}}
+ showVersion(state);attempt(refreshClaudeAuth);
+ setLocked(false);setRoot(state.root);
+ setClaudeAccess({root:state.claudeRoot,policy:state.claudePolicy,workspaces:state.claudeWorkspaces});
+ todos=state.todos || [];taskFolders=state.taskFolders || [];renderTodos();
+ applyTheme(state.theme);renderChat(state.chat);applyMode(state.mode);
+ layout={agentCollapsed:state.layout?.agentCollapsed!==false};
+ applyLayout({},false);
+}
+$('claude-rail').onclick=()=>attempt(async()=>{await applyLayout({agentCollapsed:!layout.agentCollapsed});if(!layout.agentCollapsed){applyMode(mode==='terminal'?'terminal':'chat');$('chat-input')?.focus();}});
+$('tasks-rail').onclick=()=>{document.body.classList.add('tasks-open');requestAnimationFrame(()=>$('todo-input').focus());};
+$('close-tasks').onclick=()=>document.body.classList.remove('tasks-open');
+$('sidecar-rail').onclick=()=>attempt(()=>call('flick-toggle',{}));
+$('theme-toggle').onclick=()=>attempt(async()=>{const next=theme==='dark'?'light':'dark';await call('appearance',{theme:next});applyTheme(next);});
+$('todo-tab').onclick=()=>{taskTab='todo';renderTodos();};
+$('done-tab').onclick=()=>{taskTab='done';renderTodos();};
+$('todo-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{todos=await call('add-todo',{text:$('todo-input').value,folderId:taskTarget});$('todo-input').value='';taskTab='todo';renderTodos();});};
 $('new-list').onclick=()=>attempt(()=>newTaskList());
 $('todo-target').onclick=()=>{taskTarget=null;renderTodos();$('todo-input').focus();};
 window.hearth.on('todos-changed',list=>{todos=list;taskTab='todo';renderTodos();if(!document.body.classList.contains('tasks-open'))$('tasks-rail').click();});
-$('chat-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const prompt=$('chat-input').value;if(!prompt.trim())return;if(!claudeRoot && !await chooseClaude())return;let text=prompt,from=composerFrom;if(claudeContext && !claudeContext.sent && !prompt.includes(claudeContext.text.slice(0,200))){text=prompt+'\n\nThe text below came from '+claudeContext.source+'.\n\n"""\n'+claudeContext.text+'\n"""';from=from || claudeContext.from;claudeContext.sent=true;$('chat-context-title').textContent='Claude has read '+claudeContext.source+' · ask away';}await call('chat-send',text,{from});composerFrom=null;$('chat-input').value='';});};
+$('name-cancel').onclick=()=>$('name-dialog').close();
+$('chat-form').onsubmit=e=>{e.preventDefault();attempt(async()=>{const prompt=$('chat-input').value;if(!prompt.trim())return;if(!claudeRoot && !await chooseClaude())return;let text=prompt,from=composerFrom;if(claudeContext && !claudeContext.sent && !prompt.includes(claudeContext.text.slice(0,200))){text=prompt+'\n\nThe text below came from '+claudeContext.source+'.\n\n"""\n'+claudeContext.text+'\n"""';from=from || claudeContext.from;claudeContext.sent=true;}await call('chat-send',text,{from});composerFrom=null;$('chat-input').value='';});};
 $('chat-input').onkeydown=e=>{if(e.key==='Enter' && !e.shiftKey && !e.isComposing){e.preventDefault();if(!chatState.busy)$('chat-form').requestSubmit();}};
-$('new-chat').onclick=()=>attempt(async()=>{if(chatState.messages.length && !confirm('Start a new conversation? The previous session remains in Claude Code’s history.'))return;await call('chat-new');});
+$('new-chat').onclick=()=>attempt(async()=>{if(chatState.messages.length && !confirm('Start a new conversation? The previous session remains in Claude Code\u2019s history.'))return;await call('chat-new');});
+$('stop').onclick=()=>attempt(()=>call('chat-stop'));
+for(const next of ['chat','terminal'])$('mode-'+next).onclick=()=>attempt(async()=>{applyMode(next);await call('appearance',{mode:next});});
 terminal.onData(data=>call('terminal-input',data).catch(e=>notice(e.message)));
-window.hearth.on('terminal-data',data=>terminal.write(data));window.hearth.on('notice',notice);window.hearth.on('chat-state',renderChat);
-window.hearth.on('terminal-exit',code=>{running=false;const wasLogin=loginInProgress;loginInProgress=false;terminal.reset();if(wasLogin){applyMode('chat');attempt(()=>call('appearance',{mode:'chat'}));notice(code===0?'Signed in to Claude. You can chat now.':'Sign-in did not complete · exit '+code);attempt(refreshClaudeAuth);return;}applyMode(mode);notice('Terminal session ended · exit '+code);});
-window.hearth.on('app-locked',setLocked);window.hearth.on('data-erased',()=>notice('All Just Zen data erased.'));
-new ResizeObserver(size).observe($('terminal'));
-window.addEventListener('beforeunload',e=>{if(dirty() || running || chatState.busy){if(!confirm('Close Just Zen? Unsaved edits and running work will be stopped.')){e.preventDefault();e.returnValue=false;}}});
-for(const id of ['markdown-preview','chat-messages'])$(id).addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;e.preventDefault();const href=a.getAttribute('href');attempt(async()=>{if(href.startsWith('#vault-note=')){const target=decodeURIComponent(href.slice(12)).split('#')[0];await openFile(await call('resolve-note',{target,from:currentFile}));}else if(/^https?:/i.test(href)){await openBrowser(href);}else if(!href.startsWith('#')){const target=decodeURIComponent(href).split('#')[0];await openFile(await call('resolve-note',{target,from:currentFile}));}});});
-document.addEventListener('keydown',e=>{if(e.key==='Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && (document.activeElement===document.body || document.activeElement===null) && !document.querySelector('dialog[open]') && deckCards().some(c=>c.classList.contains('companion'))){e.preventDefault();attempt(deckCompanion);return;}if(!e.metaKey)return;if(e.key==='s' && page==='files-page'){e.preventDefault();attempt(save);}if(e.shiftKey && e.key.toLowerCase()==='f'){e.preventDefault();attempt(openFiles);}if(e.key===',' && !e.shiftKey){e.preventDefault();attempt(()=>show('settings-page'));}if(e.shiftKey && e.key.toLowerCase()==='d'){e.preventDefault();attempt(()=>show('security-page'));}if(/^[1-9]$/.test(e.key) && !e.shiftKey && !e.altKey){e.preventDefault();attempt(()=>deckSelect(Number(e.key)-1));}if((e.key==='[' || e.key===']') && !e.shiftKey && !e.altKey){e.preventDefault();attempt(()=>deckStep(e.key===']'?1:-1));}if(e.key.toLowerCase()==='k' && !e.shiftKey && !e.altKey){e.preventDefault();attempt(openPalette);}});
-// Quiet chrome: the pane buttons stay out of the way and come back on hover, or while ⌘ is held.
-let revealHeld=false;
-function holdReveal(on){if(on===revealHeld)return;revealHeld=on;call('badge-reveal',{on}).catch(()=>{});}
-document.addEventListener('keydown',e=>{if(e.key==='Meta' || e.key==='Control')holdReveal(true);});
-document.addEventListener('keyup',e=>{if(e.key==='Meta' || e.key==='Control')holdReveal(false);});
-window.addEventListener('blur',()=>holdReveal(false));
-let lastActivity=0;for(const event of ['pointerdown','keydown'])document.addEventListener(event,()=>{const now=Date.now();if(now-lastActivity>60_000){lastActivity=now;call('app-activity').catch(()=>{});}},{capture:true});
-attempt(async()=>{const state=await call('state');applyTheme(state.theme || 'light');showVersion(state);if(state.locked)setLocked(true,state.lockMethod);else await hydrate(state);});
-
-// Documents open in a pane. Only one document viewer exists, so opening one elsewhere moves it.
-// Panes that are in a call (a meeting page, or simply making sound, like a huddle) are not replaced by a new app in single-pane mode.
-const callSlots=new Set(),audibleSlots=new Set();
-function inCall(slot){if(!slot || !slot.serviceKey)return false;const k=slot.serviceKey+'/'+slot.tabId;return callSlots.has(k) || audibleSlots.has(k);}
-window.hearth.on('audio-state',({key,tabId,audible})=>{const k=key+'/'+tabId;if(audible)audibleSlots.add(k);else audibleSlots.delete(k);});
-// Rearranging panes from the keyboard or the ⇄ badge: the focused pane trades places with its neighbour.
-let lastFocus=0;
-function swapSlots(a,b){const n=slotCount();if(a===b || a<0 || b<0 || a>=n || b>=n)return false;[tiles.slots[a],tiles.slots[b]]=[tiles.slots[b],tiles.slots[a]];lastFocus=a;tiles.focus=b;renderTiles();saveLayout();return true;}
-function movePane(direction,from){const n=slotCount();if(n<2){notice('Split the screen first, then panes can move.');return;}const i=Number.isInteger(from)?from:Math.min(tiles.focus,n-1);const j=(i+direction+n)%n;swapSlots(i,j);}
-function swapPanes(){const n=slotCount();if(n<2){notice('Split the screen first, then panes can swap.');return;}const i=Math.min(tiles.focus,n-1);const j=lastFocus!==i && lastFocus<n?lastFocus:(i+1)%n;swapSlots(i,j);}
-function widenPane(){const n=tiles.cols.length;if(n<2){notice('Add a second column first, then one can be the wide one.');return;}const {col}=slotPos(tiles.focus);const wide=Math.max(.5,1/n);if(Math.abs(tiles.widths[col]-wide)<.01 && n>1){tiles.widths=evenWidths(n);notice('Columns evened out.');}else{tiles.widths=tiles.widths.map((_,i)=>i===col?wide:(1-wide)/(n-1));notice('This column is now the wide one.');}renderTiles();saveLayout();}
-// Closing a pane closes its tab (the app itself stays), empties the pane, and asks what should go there instead.
-async function closePane(index){const n=slotCount();if(index<0 || index>=n)return;const slot=tiles.slots[index];if(slot && slot.kind!=='document'){const group=tabs[slot.serviceKey];if(group && group.items.length>1){tabs[slot.serviceKey]=await call('close-tab',{serviceKey:slot.serviceKey,tabId:slot.tabId});tabLive.delete(liveKey(slot.serviceKey,slot.tabId));}}removePane(index);renderTiles();saveLayout();if(slotCount()===1 && !tiles.slots[0])return openAppSearch(0);}
-function documentSlot(){return tiles.slots.findIndex((s,i)=>i<slotCount() && s && s.kind==='document');}
-async function openDocumentInTile(index=null,choose=true){cancelPaneChoice();if(page!=='browser-page')await show('browser-page');const n=slotCount();const at=documentSlot();let target=Number.isInteger(index) && index>=0 && index<n?index:(at>=0?at:Math.min(tiles.focus,n-1));if(at>=0 && at!==target)tiles.slots[at]=null;tiles.slots[target]={kind:'document'};tiles.focus=target;renderTiles();saveLayout();if(choose)await call('document-request-open');}
-window.hearth.on('document-collapse',()=>{const at=documentSlot();if(at>=0){tiles.slots[at]=null;renderTiles();saveLayout();}});
-
-
-function renderConnectedFolders(folders){
- $('connected-folders').replaceChildren();
- for(const folder of folders){const button=document.createElement('button');button.className='connected-folder';button.classList.toggle('selected',folder===root);button.textContent='▱ '+pretty(folder);button.title='Use this folder in Files and Claude';button.onclick=()=>attempt(async()=>{if(!discard())return;const state=await call('select-files-folder',folder);setRoot(state.root);renderConnectedFolders(state.connectedFolders);setClaudeAccess({root:state.claudeRoot,policy:state.claudePolicy,workspaces:state.claudeWorkspaces});currentFile=null;original='';directory='';$('editor').value='';$('editor').disabled=true;$('save').disabled=true;$('markdown-preview').textContent='';$('note-tabs').classList.add('hidden');$('filename').textContent='Select a note or source file';await list('');});$('connected-folders').append(button);}
-}
-
-// ---- Command palette (⌘K, or ⌘⇧P from anywhere) ----
-const palette=$('palette'),paletteInput=$('palette-input'),paletteList=$('palette-list');
-let paletteItems=[],paletteIndex=0,paletteSearch=0;
-function staticPaletteItems(){
- const items=[];
- for(const item of sidebarItems)items.push({label:(isBrowserItem(item) && iconLabel(item.icon)?iconLabel(item.icon)+' ':'')+item.name,hint:isBrowserItem(item)?'Browser · tabs for any website':item.url?new URL(item.url).hostname.replace(/^www\./,''):'App',run:()=>openService(item)});
- for(const folder of serviceFolders)items.push({label:(iconLabel(folder.icon)?iconLabel(folder.icon)+' ':'')+folder.name,hint:'Group',run:()=>openGroupPopover(folder,document.querySelector(`.service-group[data-folder="${CSS.escape(folder.id)}"]`))});
- items.push({label:'New tab',hint:'In the current app · ⌘T',run:()=>{const slot=page==='browser-page'?focusedSlot():null;return slot?newTab(slot.serviceKey):openBrowser();}},{label:'Apps as a dock along the bottom',hint:'Layout',run:()=>applyLayout({navDock:true})},{label:'Apps as a sidebar on the left',hint:'Layout',run:()=>applyLayout({navDock:false})},...presets.map(p=>({label:'Layout: '+p.name,hint:'Switch apps and split',run:()=>applyPreset(p)})),{label:'Save current layout…',hint:'Presets',run:openPresetDialog},{label:'Sidebar icons in one column, scrolling',hint:'Sidebar',run:()=>applyLayout({navCollapsed:true,navColumns:1})},{label:'Sidebar icons in two columns',hint:'Sidebar',run:()=>applyLayout({navCollapsed:true,navColumns:2})},{label:'One app in the centre',hint:'Layout',run:()=>setTilesMode('1')},{label:'Two apps side by side',hint:'Layout',run:()=>setTilesMode('2h')},{label:'Two apps stacked',hint:'Layout',run:()=>setTilesMode('2v')},{label:'Four apps in a grid',hint:'Layout',run:()=>setTilesMode('4')},{label:'Add a pane',hint:'A new column beside this one',run:addPane},{label:'Find anything on this Mac',hint:'Apps, documents, tabs · ⌥Space',run:()=>call('flick-toggle',{})},{label:'Add something to the panel',hint:'The pill on the edge of the screen',run:()=>call('flick-toggle',{mode:'pin'})},{label:'Sidebar app',hint:'One app kept in every workspace · ⌘⇧E',run:toggleSidecar},{label:'New workspace',hint:'The same apps, arranged differently · ⌘⇧W',run:addWorkspace},...workspaces.filter(w=>w.id!==workspaceId).map(w=>({label:'Workspace: '+w.name,hint:'Switch',run:()=>switchWorkspace(w.id)})),{label:'Name, icon and colour…',hint:'Workspaces',run:()=>editWorkspace(workspaceId)},{label:'Close this workspace',hint:'Workspaces',run:()=>closeWorkspace(workspaceId)},{label:'Split this pane top and bottom',hint:'Layout',run:()=>splitPane()},{label:'Close this pane',hint:'Layout',run:()=>closePane(Math.min(tiles.focus,slotCount()-1))});
- items.push({label:'Sign in to Claude',hint:'Browser sign-in for Just Zen',run:()=>start('login')},{label:'Sign out of Claude',hint:'Just Zen login only',run:()=>$('claude-logout').click()},{label:'Scribble',hint:'Whiteboard',run:()=>show('overview')},{label:'Files',hint:'Folders and notes · ⌘⇧F',run:openFiles},{label:'Privacy & data',hint:'Build status and controls · ⌘⇧D',run:()=>show('security-page')},{label:'Brain break',hint:'AI Buster puzzles',run:()=>$('brain-nav').click()},{label:'Ask Claude about an open tab',hint:'No selection needed',run:async()=>{await applyLayout({agentCollapsed:false});applyMode('chat');renderAboutOptions();$('chat-about').focus();}},{label:'Check for updates',hint:'Look for a new version now',run:()=>$('check-updates').click()},{label:'Recent notifications',hint:'What pinged while you were elsewhere',run:()=>toggleRecent()},{label:chimeOn?'Turn the chime off':'Turn the chime on',hint:'A soft tone when something pings while you are elsewhere',run:()=>{$('chime-toggle').checked=!chimeOn;$('chime-toggle').onchange();}},{label:'Show the tour again',hint:'Four quick steps',run:startTour},{label:'Tasks',hint:'Open the task list',run:()=>$('tasks-rail').click()},{label:'Open a document',hint:'PDF, Word, PowerPoint, text or RTF in the current pane',run:()=>openDocumentInTile()},{label:'Apps & settings',hint:'Add, rename, remove apps · ⌘,',run:()=>show('settings-page')},{label:'Claude Chat',hint:'Talk to Claude',run:async()=>{await applyLayout({agentCollapsed:false});applyMode('chat');$('chat-input').focus();}},{label:'Claude Terminal',hint:'Claude Code in a terminal',run:()=>start('claude')},{label:'Add app or website',hint:'App library',run:()=>openPicker('installed')},{label:'New browser',hint:'A separate, isolated browser',run:()=>openPicker('browser')});
- for(const todo of todos.filter(t=>!t.done))items.push({label:'Complete task: '+todo.text,hint:'Tasks',run:async()=>{if(await toggleTodo(todo))notice('Task completed.');}});
- return items;
-}
-let paletteCatalog=null;
-function dynamicPaletteItems(q){
- if(!q)return [];
- if(!paletteCatalog){paletteCatalog=[];call('web-apps').then(list=>{paletteCatalog=list;}).catch(()=>{});}
- const have=new Set(sidebarItems.map(s=>s.id));const ql=q.toLowerCase();
- const library=q.length>=2?paletteCatalog.filter(a=>!have.has(a.id) && (a.name.toLowerCase().includes(ql) || a.url.includes(ql))).slice(0,5).map(a=>({label:'Open '+a.name,hint:'Adds it to your apps · '+a.url.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''),run:async()=>{services(await call('add-catalog-app',a.id));await openInTile(a.id);notice(a.name+' added and opened.');}})):[];
- return [...library,...dynamicPaletteItemsRest(q)];
-}
-function dynamicPaletteItemsRest(q){
- const items=[{label:'Ask Claude: '+q,hint:'Chat',run:async()=>{await applyLayout({agentCollapsed:false});applyMode('chat');$('chat-input').value=q;$('chat-input').focus();}},{label:'New task: '+q,hint:'Tasks',run:async()=>{todos=await call('add-todo',q);renderTodos();notice('Task added.');}}];
- if(/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(q))items.unshift({label:'Open website: '+q,hint:'Browser',run:()=>openBrowser(/^https?:/i.test(q)?q:'https://'+q)});
- return items;
-}
-function renderPalette(){
- paletteList.replaceChildren();
- if(!paletteItems.length){const p=document.createElement('div');p.className='palette-empty';p.textContent='Nothing matches.';paletteList.append(p);return;}
- paletteIndex=Math.max(0,Math.min(paletteIndex,paletteItems.length-1));
- paletteItems.forEach((item,i)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','option');b.setAttribute('aria-selected',String(i===paletteIndex));const label=document.createElement('span');label.textContent=item.label;const hint=document.createElement('small');hint.textContent=item.hint || '';b.append(label,hint);b.onmousemove=()=>{if(paletteIndex!==i){paletteIndex=i;renderPalette();}};b.onclick=()=>runPaletteItem(i);paletteList.append(b);});
- paletteList.children[paletteIndex]?.scrollIntoView({block:'nearest'});
-}
-async function updatePalette(){
- const q=paletteInput.value.trim();const token=++paletteSearch;
- paletteItems=[...rank(staticPaletteItems(),q,q?6:12),...dynamicPaletteItems(q)];paletteIndex=0;renderPalette();
- if(root && q.length>=2){const notes=await call('search-notes',q).catch(()=>[]);if(token!==paletteSearch)return;const noteItems=notes.map(path=>({label:'Open note: '+path,hint:'Files',run:async()=>{await show('files-page');await openFile(path);}}));paletteItems=[...paletteItems.filter(i=>!i.label.startsWith('Ask Claude') && !i.label.startsWith('New task')),...noteItems,...paletteItems.filter(i=>i.label.startsWith('Ask Claude') || i.label.startsWith('New task'))];renderPalette();}
-}
-async function runPaletteItem(i){const item=paletteItems[i];if(!item)return;palette.close();await attempt(()=>item.run());}
-async function openPalette(){
- if(document.body.classList.contains('is-locked') || palette.open)return;
- closePopovers();suspendViews();
- paletteInput.value='';palette.showModal();if(!paletteCatalog){paletteCatalog=[];call('web-apps').then(list=>{paletteCatalog=list;}).catch(()=>{});}await updatePalette();paletteInput.focus();
-}
-onDialogClosed(palette,resumeViews);
-palette.addEventListener('click',e=>{if(e.target===palette)palette.close();});
-paletteInput.oninput=()=>attempt(updatePalette);
-paletteInput.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();paletteIndex=Math.min(paletteIndex+1,paletteItems.length-1);renderPalette();}else if(e.key==='ArrowUp'){e.preventDefault();paletteIndex=Math.max(paletteIndex-1,0);renderPalette();}else if(e.key==='Enter'){e.preventDefault();runPaletteItem(paletteIndex);}};
-window.hearth.on('open-palette',()=>attempt(openPalette));
-window.hearth.on('update-ready',version=>{$('restart-update').classList.remove('hidden');$('restart-update').textContent='Restart to update to '+version;});
-$('check-updates').onclick=()=>attempt(async()=>{$('check-updates').disabled=true;setTimeout(()=>{$('check-updates').disabled=false;},5000);await call('check-updates');});
-$('restart-update').onclick=()=>attempt(async()=>{if(dirty() && !confirm('Save your note first? Unsaved edits will be lost when the app restarts.'))return;await call('install-update');});
-
-
-// ---- Send this to Claude (⌘⇧A) or to Tasks (⌘⇧T) ----
-let claudeContext=null;
-function currentSelection(){
- const el=document.activeElement;
- if(el && el.tagName==='TEXTAREA'){const t=el.value.slice(el.selectionStart,el.selectionEnd);if(t.trim())return {text:t,source:el.id==='editor'?'your note':'the composer'};}
- if(mode==='terminal' && running){const t=terminal.getSelection();if(t.trim())return {text:t,source:'the terminal'};}
- const t=String(window.getSelection?.() || '');if(t.trim())return {text:t,source:'the page'};
- return null;
-}
-// A chip that takes you back to where a task or message came from.
-function fromLabel(from){if(!from)return '';if(from.kind==='tab')return from.name || 'the app';if(from.kind==='note')return from.path.split('/').pop();if(from.kind==='document')return 'the document';return '';}
-async function jumpTo(from){if(!from)return;if(from.kind==='document'){if(documentSlot()<0)await openDocumentInTile(null,false);return;}if(from.kind==='note'){await openFiles();await openFile(from.path);return;}if(from.kind==='tab'){if(!serviceOf(from.key)){if(from.url)await openBrowser(from.url);else notice('That app is no longer in your sidebar.');return;}if(!tabs[from.key])tabs=await call('tabs');const group=tabs[from.key];if(group && from.tabId && group.items.some(t=>t.id===from.tabId)){await openInTile(from.key,from.tabId);return;}if(from.url){const opened=await call('open-tab',{serviceKey:from.key,url:from.url});tabs[from.key]=opened.tabs;await openInTile(from.key,opened.tabId);return;}await openInTile(from.key);}}
-function fromChip(from){if(!from)return null;const b=el('button','from-chip','↩ '+fromLabel(from));b.type='button';b.title='Back to where this came from';b.onclick=e=>{e.preventDefault();e.stopPropagation();attempt(()=>jumpTo(from));};return b;}
-function showClaudeContext(context){
- claudeContext={text:String(context.text).slice(0,20000),source:context.source || 'your selection',from:context.from || null};
- $('chat-context-title').textContent=(context.whole?'Text from ':'Selected text from ')+claudeContext.source+' · '+claudeContext.text.length.toLocaleString()+' characters';
- $('chat-context-preview').textContent=claudeContext.text.slice(0,400);
- $('chat-context').classList.remove('hidden');
- attempt(async()=>{await applyLayout({agentCollapsed:false});applyMode('chat');});
-}
-// Claude can read anything that is open: the composer's About dropdown loads a pane, the document, a note or the task list as context.
-function aboutOptions(){const out=[];const n=slotCount();
- for(let i=0;i<n;i++){const slot=tiles.slots[i];if(!slot)continue;const item=serviceOf(slot.serviceKey);const group=tabs[slot.serviceKey];if(!item || !group)continue;for(const tab of group.items){const title=tabTitle(slot.serviceKey,tab);out.push({id:'tab:'+slot.serviceKey+'/'+tab.id,label:(n>1?'Pane '+(i+1)+' · ':'')+item.name+(group.items.length>1 || isBrowserItem(item)?' · '+title.slice(0,32):''),read:async()=>{const got=await call('tab-text',{serviceKey:slot.serviceKey,tabId:tab.id});if(!got.text.trim())throw Error(item.name+' has no readable text yet.');return {whole:true,text:(got.title?got.title+'\n'+got.url+'\n\n':'')+got.text,source:item.name+(got.title?' ('+got.title.slice(0,60)+')':''),from:{kind:'tab',key:slot.serviceKey,tabId:tab.id,url:got.url,name:item.name}};}});}}
- if(out.length>1)out.unshift({id:'all',label:'Everything open',read:async()=>{const parts=[];for(let i=0;i<n;i++){const slot=tiles.slots[i];if(!slot)continue;const item=serviceOf(slot.serviceKey);if(!item)continue;try{const got=await call('tab-text',{serviceKey:slot.serviceKey,tabId:slot.tabId});if(got.text.trim())parts.push('## '+item.name+(got.title?' · '+got.title.slice(0,80):'')+'\n'+got.url+'\n\n'+got.text.slice(0,15000));}catch{}}const open=todos.filter(t=>!t.done);if(open.length)parts.push('## My open tasks\n'+open.map(t=>'- '+t.text).join('\n'));if(currentFile)parts.push('## My note '+currentFile+'\n'+$('editor').value.slice(0,15000));if(!parts.length)throw Error('Nothing readable is open yet.');return {whole:true,text:parts.join('\n\n'),source:'everything open ('+parts.length+' parts)'};}});
- if(documentSlot()>=0)out.push({id:'document',label:'The open document',read:async()=>{await call('document-capture-all');return null;}});
- if(todos.length)out.push({id:'tasks',label:'My tasks',read:async()=>{const open=todos.filter(t=>!t.done),done=todos.filter(t=>t.done).slice(-10);return {whole:true,text:'Open tasks:\n'+(open.map(t=>'- '+t.text).join('\n') || '(none)')+(done.length?'\n\nRecently completed:\n'+done.map(t=>'- '+t.text).join('\n'):''),source:'your task list'};}});
- if(currentFile)out.push({id:'note',label:'The note in the editor ('+currentFile.split('/').pop()+')',read:async()=>({whole:true,text:$('editor').value,source:'your note '+currentFile,from:{kind:'note',path:currentFile}})});
- return out;}
-// Just Zen reaching past its own window: the pill, the menu bar, deep links and Safari tabs.
-let nativeSettings={pillOn:false,safariTabs:false,deepLinks:true,menuBarOnly:false};
-function paintNative(){
- $('opt-pill').checked=nativeSettings.pillOn;
- $('opt-menubar').checked=nativeSettings.menuBarOnly;
- $('opt-deeplinks').checked=nativeSettings.deepLinks;
- $('opt-safari').checked=nativeSettings.safariTabs;
- $('opt-safari').parentElement.hidden=platform!=='darwin';
- $('opt-menubar').parentElement.hidden=platform!=='darwin';
-}
-async function loadNative(){nativeSettings=await call('native-settings');paintNative();}
-for(const [id,key] of [['opt-pill','pillOn'],['opt-menubar','menuBarOnly'],['opt-deeplinks','deepLinks'],['opt-safari','safariTabs']])
- $(id).onchange=()=>attempt(async()=>{nativeSettings=await call('native-set',{key,value:$(id).checked});paintNative();if(key==='pillOn')notice($(id).checked?'The pill is on the right edge of your screen. Drag it anywhere.':'The pill is off.');if(key==='safariTabs' && $(id).checked)notice('Safari tabs will appear in ⌥Space. macOS asks once whether Just Zen may control Safari.');});
-window.hearth.on('pill-state',on=>{nativeSettings.pillOn=on===true;paintNative();});
-function renderSettings(){const host=$('settings-apps');host.replaceChildren();const items=sidebarItems.filter(openable);if(!items.length){host.append(el('div','settings-empty','No apps yet. Add one and it will be a couple of letters away in every pane.'));return;}
- for(const item of items){const key=item.id || item.url;const row=el('div','settings-row');row.append(iconFor(item));
-  const name=document.createElement('input');name.className='settings-name';name.value=item.name;name.setAttribute('aria-label','Name');name.onchange=()=>attempt(async()=>{const next=name.value.trim();if(!next || next===item.name){name.value=item.name;return;}services(await call('update-service',{key,name:next}));notice('Renamed to '+next+'.');renderSettings();});row.append(name);
-  row.append(el('span','settings-kind',isBrowserItem(item)?'Browser':item.url?hostOf(item.url) || 'Website':'App'));
-  if(item.url){const profile=document.createElement('select');profile.setAttribute('aria-label','Login profile');for(const [value,label] of [['isolated','Own login'],['shared','Shared login'],['personal','Personal'],['work','Work']])profile.add(new Option(label,value));profile.value=item.profile || 'isolated';profile.onchange=()=>attempt(async()=>{services(await call('set-service-profile',{key,profile:profile.value}));notice(item.name+' now uses the '+profile.options[profile.selectedIndex].text+' profile.');});row.append(profile);}else row.append(el('span','settings-kind','Own tabs and logins'));
-  const actions=el('div','settings-actions');const open=el('button',null,'Open');open.type='button';open.onclick=()=>attempt(()=>openService(item));actions.append(open);
-  if(isBrowserItem(item)){const edit=el('button',null,'Icon…');edit.type='button';edit.onclick=()=>attempt(()=>openBrowserEditor(item));actions.append(edit);}
-  const mute=el('button',null,mutes[key]?'Muted…':'Mute…');mute.type='button';mute.onclick=e=>{const b=e.currentTarget.getBoundingClientRect();showMenu(muteMenu(item),b.left,b.bottom+4);};actions.append(mute);
-  if(item.url){const sleepBtn=el('button',null,'Sleep…');sleepBtn.type='button';sleepBtn.onclick=e=>{const b=e.currentTarget.getBoundingClientRect();showMenu(sleepMenu(key),b.left,b.bottom+4);};actions.append(sleepBtn);}
-  const mobile=el('button',null,item.mobile?'Mobile: on':'Mobile: off');mobile.type='button';mobile.title='Show the mobile site when this app is in a narrow pane';mobile.onclick=()=>attempt(async()=>{services(await call('update-service',{key,mobile:!item.mobile}));renderSettings();});actions.append(mobile);
-  const remove=el('button','danger','Remove');remove.type='button';remove.onclick=()=>attempt(async()=>{await removeApp(item);renderSettings();});actions.append(remove);
-  row.append(actions);host.append(row);}}
-function tileMenu(item,x,y){const key=item.id || item.url;showMenu([{label:'Open here',run:()=>pickApp(item)},{label:'Open beside the current app',run:async()=>{closeAppSearch();ensureTwo();await openInTile(key);}},'-',{label:'Rename…',run:()=>{closeAppSearch();attempt(async()=>{await show('settings-page');const row=[...document.querySelectorAll('.settings-row')].find(r=>r.querySelector('.settings-name')?.value===item.name);const input=row?.querySelector('.settings-name');if(input){input.focus();input.select();}});}},...(isBrowserItem(item)?[{label:'Icon…',run:()=>{closeAppSearch();return openBrowserEditor(item);}}]:[]),{label:muteLabel(key),keep:true,run:()=>muteMenu(item)},...(item.url?[{label:'Sleep when hidden…',keep:true,run:()=>sleepMenu(key)}]:[]),{label:'Pin to the pill',hint:'Always one click away',run:()=>attempt(async()=>{await call('pill-pin',{kind:'pane',key:item.id || item.url});notice(item.name+' is on the pill.');})},{label:'Mobile site when the pane is narrow',checked:item.mobile===true,run:async()=>{services(await call('update-service',{key,mobile:!item.mobile}));notice(item.mobile?item.name+' shows the desktop site everywhere.':item.name+' shows its mobile site in narrow panes.');renderAppSearch();}},'-',{label:'Remove '+item.name,run:async()=>{await removeApp(item);renderAppSearch();}}],x,y);}
-function renderAboutOptions(){const select=$('chat-about');const keep=select.value;select.replaceChildren(new Option('nothing in particular',''));for(const o of aboutOptions())select.add(new Option(o.label,o.id));select.value=[...select.options].some(x=>x.value===keep)?keep:'';if(keep && !select.value)clearClaudeContext();}
-$('chat-about').addEventListener('mousedown',renderAboutOptions);$('chat-about').addEventListener('focus',renderAboutOptions);
-$('chat-about').onchange=()=>attempt(async()=>{const id=$('chat-about').value;if(!id){clearClaudeContext();return;}const option=aboutOptions().find(o=>o.id===id);if(!option)return;notice('Reading…',{duration:1500});const context=await option.read();if(context)showClaudeContext(context);});
-
-function clearClaudeContext(){claudeContext=null;$('chat-context').classList.add('hidden');if($('chat-about').value)$('chat-about').value='';}
-async function sendClaudeContext(instruction){
- if(!claudeContext)return;const {text,source}=claudeContext;
- if(!claudeRoot && !await chooseClaude())return;
- await call('chat-send',instruction+'\n\nThe text below came from '+source+'.\n\n"""\n'+text+'\n"""',{from:claudeContext.from});clearClaudeContext();
-}
-window.hearth.on('capture-selection',payload=>{const target=payload && typeof payload==='object'?payload.target:'claude';const found=currentSelection();if(!found){notice('Select some text first, then press '+(target==='task'?'⌘⇧T.':'⌘⇧A.'));return;}if(target==='task'){attempt(async()=>{todos=await call('add-todo',{text:found.text.replace(/\s+/g,' ').trim().slice(0,300),from:found.source==='your note' && currentFile?{kind:'note',path:currentFile}:null});taskTab='todo';renderTodos();if(!document.body.classList.contains('tasks-open'))$('tasks-rail').click();notice('Added to your tasks.');});return;}showClaudeContext(found);});
+window.hearth.on('terminal-data',data=>terminal.write(data));
+window.hearth.on('notice',notice);
+window.hearth.on('chat-state',renderChat);
+window.hearth.on('terminal-exit',code=>{running=false;const wasLogin=loginInProgress;loginInProgress=false;terminal.reset();if(wasLogin){applyMode('chat');notice(code===0?'Signed in to Claude. You can chat now.':'Sign-in did not complete · exit '+code);attempt(refreshClaudeAuth);return;}applyMode(mode);notice('Terminal session ended · exit '+code);});
+window.hearth.on('app-locked',setLocked);
+window.hearth.on('data-erased',()=>notice('All Just Zen data erased.'));
+window.hearth.on('capture-selection',payload=>{const target=payload && typeof payload==='object'?payload.target:'claude';const found=String(window.getSelection?.() || '').trim();if(!found){notice('Select some text first.');return;}if(target==='task')attempt(async()=>{todos=await call('add-todo',{text:found});renderTodos();notice('Added to your tasks.');});else showClaudeContext({text:found,source:'this window'});});
 window.hearth.on('claude-context',context=>{if(context && typeof context.text==='string')showClaudeContext(context);});
 for(const b of document.querySelectorAll('#chat-context [data-instruction]'))b.onclick=()=>attempt(()=>sendClaudeContext(b.dataset.instruction));
-let composerFrom=null;
 $('chat-context-ask').onclick=()=>{if(!claudeContext)return;const {text,source}=claudeContext;composerFrom=claudeContext.from || null;$('chat-input').value='\n\nThe text below came from '+source+'.\n\n"""\n'+text+'\n"""';$('chat-input').setSelectionRange(0,0);$('chat-input').focus();clearClaudeContext();};
 $('chat-context-discard').onclick=clearClaudeContext;
+new ResizeObserver(size).observe($('terminal'));
+document.addEventListener('keydown',e=>{
+ if(!e.metaKey && !e.ctrlKey)return;
+});
+window.addEventListener('beforeunload',e=>{if(running || chatState.busy){if(!confirm('Close this window? Unsaved edits and running work will be stopped.')){e.preventDefault();e.returnValue=false;}}});
+attempt(async()=>{const state=await call('state');applyTheme(state.theme || 'light');showVersion(state);if(state.locked)setLocked(true,state.lockMethod);else hydrate(state);});

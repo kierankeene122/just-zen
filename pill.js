@@ -49,7 +49,8 @@ function folderFor(name,items){
 }
 function render(){
  const host=$('spots');host.replaceChildren();
- if(!pins.length){const empty=document.createElement('div');empty.id='empty';empty.textContent='＋ to add';host.append(empty);return;}
+ document.body.classList.toggle('empty',!pins.length);
+ if(!pins.length){const empty=document.createElement('div');empty.id='empty';empty.textContent='Add the apps you flick between';host.append(empty);return;}
  const groups=new Map();
  for(const pin of pins){const key=pin.folder || '';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(pin);}
  for(const [name,items] of groups){
@@ -62,6 +63,12 @@ function render(){
   }
  }
 }
+// Naming a group happens here, in the panel, because there is nowhere else to ask.
+let groupFor=null;
+window.pill.onAskGroup(id=>{groupFor=id;$('group-ask').hidden=false;$('group-name').value='';$('group-name').focus();});
+$('group-ask').onsubmit=e=>{e.preventDefault();const name=$('group-name').value.trim();$('group-ask').hidden=true;if(groupFor && name)window.pill.group(groupFor,name);groupFor=null;};
+$('group-name').onkeydown=e=>{if(e.key==='Escape'){$('group-ask').hidden=true;groupFor=null;}};
+$('group-name').onblur=()=>{setTimeout(()=>{if(!$('group-ask').hidden && document.activeElement!==$('group-name')){$('group-ask').hidden=true;groupFor=null;}},150);};
 $('add').onclick=()=>window.pill.add();
 $('flick').onclick=()=>window.pill.flick();
 $('home').onclick=()=>window.pill.home();

@@ -30,10 +30,7 @@
     "appId": "com.hearth.workspace",
     "asar": true,
     "asarUnpack": [
-      "node_modules/**/*",
-      "document-worker.cjs",
-      "document-sanitize.cjs",
-      "pptx.cjs"
+      "node_modules/**/*"
     ],
     "extraResources": [
       {

@@ -1,25 +1,24 @@
 # Just Zen
 
-A calm local workspace for Mac: your web apps, your files and notes, your documents and tasks, and Claude Code as a copilot, all in one window.
+A small launcher for macOS and Windows: a floating panel on the edge of your screen, and ⌥Space for everything else.
 
-- Download: https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg (Apple silicon, macOS 13 or later, signed and notarized)
-- Security: see `SECURITY.md`, `SECURITY-REVIEW-2026-09-08.md`, `SECURITY-TOOLING-2026-09-09.md` and https://justzen.co/security.html
+- **The panel** — the apps, web apps, groups and documents you flick between, above every app and on every Space. Drop a file on an app to open it there. Right-click to group things; a group folds behind one icon.
+- **⌥Space** — one field over your installed applications, your documents (through Spotlight), a library of about a hundred web apps, any address you type, and the tabs already open in your browser. ⌘↵ pins a result to the panel.
+- **Your browser stays yours** — web apps open in Safari or Chrome, whichever this machine opens links with, reusing the tab that already has the site open. Claude, Gemini, ChatGPT and Slack open through their own links.
+- **Claude, when you want it** — Claude Code in its own window, sandboxed to a folder you choose, with a task list beside it. Opened from the panel or ⌘⌥Space; closed, Just Zen keeps running in the menu bar.
 
-## Licence and warranty
+No account, no sync, no telemetry. Settings stay on your machine, encrypted with the Keychain where macOS allows it.
 
-Just Zen is free, open-source software released under the ISC licence (see `LICENSE`). It is provided **as is, without warranty of any kind**, and the author accepts no liability for any loss or damage arising from its use. Inspect the code, decide for yourself, and keep backups of anything you connect to it.
+## Install
 
-## Third-party assets
+Download the latest build from [Releases](https://github.com/kierankeene122/just-zen/releases) — `Just-Zen-arm64.dmg` for Apple Silicon, `Just-Zen-Setup.exe` for Windows 10 and 11. Claude is macOS-only for now, because it needs the sandbox.
 
-Group and browser icons include a curated subset of Google's Material Symbols (Apache License 2.0), bundled in `assets/icons/` so icon choices work offline. See `assets/icons/LICENSE-material-symbols.txt`.
-
-## Development
+## Develop
 
 ```
-npm ci
-npm test
-npm run smoke
-npm start              # runs from source against a separate profile (Hearth-dev), never your real one
-npm run package        # local ad hoc build into ../../outputs
-npm run release        # tag a version; GitHub builds the signed release
+npm install
+npm start          # run it
+npm test           # unit tests
+npm run smoke      # end-to-end: bridge, lock, finder, panel, tasks, a real PTY
+npm run release    # tag and push; CI builds and signs
 ```

@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('pill',{
   drop:(id,files)=>ipcRenderer.send('pill-drop',{id:String(id || '').slice(0,2000),files:(Array.isArray(files)?files:[]).slice(0,10).map(f=>String(f).slice(0,4000))}),
   flick:()=>ipcRenderer.send('pill-flick'),
   add:()=>ipcRenderer.send('pill-add'),
+  group:(id,folder)=>ipcRenderer.send('pill-group',{id:String(id || '').slice(0,2000),folder:String(folder || '').slice(0,40)}),
+  onAskGroup:fn=>ipcRenderer.on('pill-ask-group',(_e,payload)=>fn(payload && payload.id)),
   home:()=>ipcRenderer.send('pill-home'),
   pathFor:file=>{try{return webUtils.getPathForFile(file);}catch{return '';}},
   onPins:fn=>ipcRenderer.on('pill-pins',(_e,pins)=>fn(pins)),
