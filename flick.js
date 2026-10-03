@@ -37,7 +37,7 @@ function paint(){
  rows.forEach((row,i)=>row.setAttribute('aria-selected',String(i===index)));
  rows[index]?.scrollIntoView({block:'nearest'});
 }
-const GROUP_ORDER=['Pinned','Apps','Web apps','In Just Zen','Workspaces','Documents','Safari tabs'];
+const GROUP_ORDER=['Pinned','Your web apps','Apps','Web apps','Open tabs','Workspaces','Documents'];
 function order(list){
  const seen=new Set();
  const unique=list.filter(item=>{const key=(item.label||'')+'|'+(item.group||'');if(seen.has(key))return false;seen.add(key);return true;});

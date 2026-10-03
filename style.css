@@ -789,3 +789,19 @@ body{--dock:178px}
 .ws-open-results button:hover{background:rgba(120,140,160,.14)}
 .ws-open-results img{width:18px;height:18px;border-radius:5px;object-fit:contain;flex:0 0 18px}
 .ws-open-results small{color:var(--muted);font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* The in-app browser is gone: the window is Claude, notes, tasks and settings. */
+#browser-page,#dock #dock-layouts,#dock .ws-switch,#stack-edges{display:none!important}
+body{--dock:68px}
+#dock .brand{margin-bottom:14px}
+
+/* Without panes the rail is five icons: compact again, labels beneath. */
+body{--dock:64px}
+#dock{align-items:center;padding-left:0;padding-right:0}
+#dock>button,#dock .ws-tab,#dock .ws-add{width:48px!important;min-width:48px;max-width:48px;flex-direction:column!important;justify-content:center!important;gap:3px!important;padding:7px 0 6px!important;height:auto!important}
+#dock>button b{font-size:8px!important;letter-spacing:.5px!important;text-transform:uppercase!important;font-weight:600!important;max-width:52px;text-align:center!important}
+#dock #bell::after,#dock #theme-toggle::after{content:none}
+#dock #bell,#dock #theme-toggle{width:48px!important;height:40px!important;justify-content:center!important}
+#dock #bell-count{position:absolute;top:3px;right:9px}
+#dock #tasks-rail small{position:absolute;top:3px;right:7px}
+#dock .brand{align-self:center;margin:0 0 10px}

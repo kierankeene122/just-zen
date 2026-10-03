@@ -215,8 +215,8 @@ function score(label,needle){
 function paneTargets(){
   const out=[];
   for(const item of (config.services || []).filter(openable)){
-    const key=item.id || item.url;
-    out.push({kind:'pane',id:'pane:'+key,label:item.name,detail:isBrowserItem(item)?'Browser in Just Zen':hostOf(item.url || ''),hint:'pane',glyph:'▣'});
+    if(!item.url || isBrowserItem(item))continue;
+    out.push({kind:'web',id:'web:'+item.url,label:item.name,detail:hostOf(item.url),target:item.url,glyph:'◐',hint:'go to'});
   }
   for(const workspace of workspaceState().list)out.push({kind:'workspace',id:'workspace:'+workspace.id,label:workspace.name,detail:'Workspace',hint:'switch',glyph:'◧'});
   return out;
@@ -244,13 +244,13 @@ async function catalogueIcon(relative){
 }
 // Going to a web app: if it is already open in a Safari tab, switch to that tab; otherwise open it as a new one.
 async function openWebTarget(url){
-  // Reuse a tab that already has the site open; if macOS refuses the permission, stop asking and just open a new tab.
+  // Reuse a tab that already has the site open, in whichever browser this Mac calls the default one.
   if(config.safariTabs!==false && nativeApps.MAC){
     try{
       const want=new URL(url);
-      const tabs=await nativeApps.safariTabs();
+      const tabs=await nativeApps.browserTabs();
       const match=tabs.find(tab=>{try{const have=new URL(tab.url);return have.hostname.replace(/^www\./,'')===want.hostname.replace(/^www\./,'') && (want.pathname==='/' || have.pathname.startsWith(want.pathname.replace(/\/$/,'')));}catch{return false;}});
-      if(match){await nativeApps.focusSafariTab(match.target);return {ok:true};}
+      if(match){await nativeApps.focusBrowserTab(match.target);return {ok:true};}
     }catch(error){config.safariTabs=false;persistSoon();await nativeApps.openInBrowser(url);return {ok:true,message:'Opened a new tab. '+error.message};}
   }
   await nativeApps.openInBrowser(url);
@@ -286,7 +286,7 @@ async function flickResults(query,stage,mode='open'){
   if(stage==='fast'){
     const apps=await nativeApps.listApps();
     for(const item of apps){const s=score(item.label,needle);if(s)out.push({...item,group:'Apps',hint:'open',score:s});}
-    for(const item of paneTargets()){const s=score(item.label,needle);if(s)out.push({...item,group:item.kind==='workspace'?'Workspaces':'In Just Zen',score:s});}
+    for(const item of paneTargets()){const s=score(item.label,needle);if(s)out.push({...item,group:item.kind==='workspace'?'Workspaces':'Your web apps',score:s});}
     const typed=webFromQuery(needle);
     if(typed)out.push({...typed,group:'Web apps',hint:mode==='pin'?'add':'go to',score:9});
     for(const entry of catalogue){const s=needle?score(entry.name,needle):(mode==='pin'?1:0);if(s)out.push({kind:'web',id:'web:'+entry.url,label:entry.name,detail:hostOf(entry.url),target:entry.url,glyph:'◐',group:'Web apps',hint:mode==='pin'?'add':'go to',score:s-0.2,iconFile:entry.icon});}
@@ -300,7 +300,7 @@ async function flickResults(query,stage,mode='open'){
   if(needle.length>=2){
     try{for(const doc of await nativeApps.findDocs(needle,{limit:8}))slow.push({...doc,group:'Documents',hint:'open',icon:await appIcon(doc.target)});}catch{}
     if(config.safariTabs!==false){
-      try{for(const tab of await nativeApps.safariTabs()){const s=score(tab.label,needle);if(s)slow.push({...tab,group:'Safari tabs',hint:'switch to',score:s});}}catch(error){slow.push({kind:'notice',id:'notice:safari',label:'Safari tabs are not available',detail:error.message,group:'Safari tabs',glyph:'!'});}
+      try{for(const tab of await nativeApps.browserTabs()){const s=score(tab.label,needle);if(s)slow.push({...tab,group:'Open tabs',hint:'switch to',score:s});}}catch(error){slow.push({kind:'notice',id:'notice:tabs',label:'Open tabs are not available',detail:error.message,group:'Open tabs',glyph:'!'});}
     }
   }
   return slow.slice(0,14);
@@ -315,10 +315,10 @@ async function openFlick(id){
     await nativeApps.openApp(item.target);return {ok:true};
   }
   if(item.kind==='file'){await nativeApps.openFile(item.target);return {ok:true};}
-  if(item.kind==='tab'){await nativeApps.focusSafariTab(item.target);return {ok:true};}
+  if(item.kind==='tab'){await nativeApps.focusBrowserTab(item.target);return {ok:true};}
   if(item.kind==='url'){await shell.openExternal(item.target);return {ok:true};}
   if(item.kind==='web')return openWebTarget(item.target);
-  if(item.kind==='pane'){showMainWindow();send('deck-command',{openPane:item.id.slice(5)});return {ok:true};}
+
   if(item.kind==='workspace'){showMainWindow();send('deck-command',{workspaceId:item.id.slice(10)});return {ok:true};}
   return {ok:false,message:'Nothing to open there.'};
 }
@@ -350,6 +350,17 @@ function toggleFlick(mode='open'){
   else pendingFlickMode=mode==='pin'?'pin':'open';
 }
 // ---- The pill: the few places you flick between, parked on an edge ----
+function migratePins(){
+  let changed=false;
+  config.pins=(Array.isArray(config.pins)?config.pins:[]).map(pin=>{
+    if(pin.kind!=='pane')return pin;
+    const item=serviceItem(String(pin.id || '').slice(5));
+    changed=true;
+    if(item?.url)return {...pin,kind:'web',id:'web:'+item.url,target:item.url,detail:hostOf(item.url),glyph:'◐'};
+    return null;
+  }).filter(Boolean);
+  if(changed)persistSoon();
+}
 function pinList(){
   return (Array.isArray(config.pins)?config.pins:[]).slice(0,40).map(pin=>({id:String(pin.id || '').slice(0,2000),kind:pin.kind,label:String(pin.label || '').slice(0,80),detail:String(pin.detail || '').slice(0,120),target:pin.target,icon:pin.icon || '',glyph:pin.glyph || '',folder:String(pin.folder || '').slice(0,40),iconFile:pin.iconFile || ''}));
 }
@@ -886,6 +897,7 @@ app.whenReady().then(async () => {
   if(!config.whiteboard && Array.isArray(config.stickyNotes)){config.whiteboard={items:config.stickyNotes.map((note,index)=>({id:note.id || crypto.randomUUID(),type:'note',x:80+(index%4)*245,y:90+Math.floor(index/4)*195,w:220,h:170,text:String(note.text || ''),color:{sun:'#fff0a8',blue:'#dcecff',mint:'#dff2df',rose:'#f7dfe5'}[note.color] || '#fff0a8',rotation:(index%2?1:-1)*.6}))};delete config.stickyNotes;await persist();}
   locked=Boolean(config.appLock);
   if(config.startMode===undefined)config.startMode='panel';
+  migratePins();
   if(config.pillOn===undefined)config.pillOn=true;
   if(config.menuBarOnly===undefined)config.menuBarOnly=process.platform==='darwin';
   favicon=createFaviconCache(path.join(app.getPath('userData'),'favicons'),net,createImageDecoder({BrowserWindow}));

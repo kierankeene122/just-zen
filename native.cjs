@@ -120,10 +120,10 @@ async function raiseWindow(appName,titlePart=''){
     : `tell application "System Events" to tell process "${name}" to set frontmost to true`;
   try{await run('/usr/bin/osascript',['-e',script],{timeout:8000});return true;}catch(error){throw Error(accessibilityMessage(error));}
 }
-function automationMessage(error){
+function automationMessage(error,app='Safari'){
   const text=String(error?.stderr || error?.message || '');
-  if(/not allowed|1743|-1743/.test(text))return 'macOS has not been told that Just Zen may control Safari. Allow it under Privacy & Security \u203a Automation, then try again.';
-  return 'Safari did not answer: '+text.split('\n')[0].slice(0,120);
+  if(/not allowed|1743|-1743/.test(text))return 'macOS has not been told that Just Zen may control '+app+'. Allow it under Privacy & Security \u203a Automation, then try again.';
+  return app+' did not answer: '+text.split('\n')[0].slice(0,120);
 }
 function accessibilityMessage(error){
   const text=String(error?.stderr || error?.message || '');
@@ -172,11 +172,53 @@ async function appIconPng(bundle,cacheDir){
   try{await run('/usr/bin/sips',['-s','format','png','-Z','72',icns,'--out',out],{timeout:8000});return out;}catch{return '';}
 }
 
-// Web apps open in Safari (the browser the user keeps their profiles in), not merely the default handler.
-async function openInBrowser(url,{browser='Safari'}={}){
-  if(MAC){try{return await run('/usr/bin/open',['-a',browser,url]);}catch{return run('/usr/bin/open',[url]);}}
+// Web apps open in whatever browser the machine calls the default one.
+async function openInBrowser(url){
+  if(MAC)return run('/usr/bin/open',[url]);
   if(WIN)return run('cmd.exe',['/c','start','',url]);
   throw Error('Unsupported platform');
 }
+// Which browser that is, read from Launch Services rather than guessed.
+let defaultBrowserCache={at:0,id:''};
+async function defaultBrowser(){
+  if(!MAC)return '';
+  if(defaultBrowserCache.id && Date.now()-defaultBrowserCache.at<10*60_000)return defaultBrowserCache.id;
+  let id='';
+  const plist=path.join(os.homedir(),'Library','Preferences','com.apple.LaunchServices','com.apple.launchservices.secure.plist');
+  try{
+    const json=JSON.parse(await run('/usr/bin/plutil',['-convert','json','-o','-',plist],{timeout:4000}));
+    const handlers=Array.isArray(json?.LSHandlers)?json.LSHandlers:[];
+    const http=handlers.find(h=>h?.LSHandlerURLScheme==='http');
+    id=String(http?.LSHandlerRoleAll || http?.LSHandlerRoleViewer || '').toLowerCase();
+  }catch{}
+  if(!id)id='com.apple.safari';
+  defaultBrowserCache={at:Date.now(),id};
+  return id;
+}
+// Chrome keeps its tabs in the same shape as Safari, so one path covers both.
+const CHROME_IDS=new Set(['com.google.chrome','com.google.chrome.beta','com.google.chrome.canary','com.brave.browser','com.microsoft.edgemac']);
+function browserName(id){
+  if(CHROME_IDS.has(id))return id==='com.microsoft.edgemac'?'Microsoft Edge':id==='com.brave.browser'?'Brave Browser':'Google Chrome';
+  return 'Safari';
+}
+const CHROME_TABS=app=>`tell application "${app}"\nset out to ""\nrepeat with w from 1 to count of windows\nrepeat with t from 1 to count of tabs of window w\nset out to out & w & "\\t" & t & "\\t" & (title of tab t of window w) & "\\t" & (URL of tab t of window w) & "\\n"\nend repeat\nend repeat\nreturn out\nend tell`;
+async function browserTabs(){
+  if(!MAC)return [];
+  const id=await defaultBrowser();
+  const app=browserName(id);
+  const script=app==='Safari'?SAFARI_TABS:CHROME_TABS(app);
+  let out='';
+  try{out=await run('/usr/bin/osascript',['-e',script],{timeout:8000});}catch(error){throw Error(automationMessage(error,app));}
+  return out.split('\n').map(line=>line.split('\t')).filter(parts=>parts.length>=4)
+    .map(([w,t,name,url])=>({kind:'tab',id:'tab:'+w+':'+t,label:(name || url).slice(0,120),detail:app+' \u00b7 '+hostOf(url),target:{window:Number(w),tab:Number(t),app},url}));
+}
+async function focusBrowserTab({window:w,tab:t,app}={}){
+  if(!MAC)return false;
+  const name=String(app || 'Safari').replace(/"/g,'');
+  const script=name==='Safari'
+    ? `tell application "Safari"\nactivate\nset current tab of window ${Number(w)} to tab ${Number(t)} of window ${Number(w)}\nset index of window ${Number(w)} to 1\nend tell`
+    : `tell application "${name}"\nactivate\nset active tab index of window ${Number(w)} to ${Number(t)}\nset index of window ${Number(w)} to 1\nend tell`;
+  try{await run('/usr/bin/osascript',['-e',script],{timeout:8000});return true;}catch(error){throw Error(automationMessage(error,name));}
+}
 
-module.exports={openInBrowser,appIconFile,appIconPng,listApps,findDocs,openApp,openFile,safariTabs,focusSafariTab,raiseWindow,deepLinkFor,isAppPath,prettyDir,MAC,WIN};
+module.exports={openInBrowser,defaultBrowser,browserName,browserTabs,focusBrowserTab,appIconFile,appIconPng,listApps,findDocs,openApp,openFile,safariTabs,focusSafariTab,raiseWindow,deepLinkFor,isAppPath,prettyDir,MAC,WIN};
