@@ -10,7 +10,7 @@ const crypto=require('node:crypto');
 const MAC=process.platform==='darwin';
 const WIN=process.platform==='win32';
 const APP_DIRS=MAC
-  ? ['/Applications','/Applications/Utilities','/System/Applications',path.join(os.homedir(),'Applications'),path.join(os.homedir(),'Applications','Chrome Apps.localized')]
+  ? ['/Applications','/Applications/Utilities','/System/Applications',path.join(os.homedir(),'Applications')]
   : WIN
     ? [path.join(process.env.ProgramData || 'C:\\ProgramData','Microsoft','Windows','Start Menu','Programs'),path.join(process.env.APPDATA || '','Microsoft','Windows','Start Menu','Programs')]
     : [];

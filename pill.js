@@ -14,17 +14,22 @@ window.pill.onBadges(map=>{
  }
 });
 
-let openFolder='';
+let openFolder='',dragging=null,groupPair=null;
 function spotFor(pin){
  const spot=document.createElement('button');spot.className='spot';spot.dataset.pin=pin.id;spot.title=pin.label+(pin.detail?' · '+pin.detail:'');
  if(pin.icon){const img=document.createElement('img');img.src=pin.icon;img.alt='';spot.append(img);}
  else{const glyph=document.createElement('span');glyph.className='glyph';glyph.textContent=pin.glyph || '◆';spot.append(glyph);}
  spot.onclick=()=>window.pill.open(pin.id);
  spot.oncontextmenu=e=>{e.preventDefault();window.pill.menu(pin.id);};
- spot.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';spot.classList.add('over');});
+ spot.draggable=true;
+ spot.addEventListener('dragstart',e=>{dragging=pin.id;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',pin.label);}catch{}spot.classList.add('lifting');});
+ spot.addEventListener('dragend',()=>{dragging=null;spot.classList.remove('lifting');for(const s of document.querySelectorAll('.spot'))s.classList.remove('over');});
+ spot.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect=dragging?'move':'copy';spot.classList.add('over');});
  spot.addEventListener('dragleave',()=>spot.classList.remove('over'));
  spot.addEventListener('drop',e=>{
   e.preventDefault();spot.classList.remove('over');
+  // Dropped another pin: the two become a group. Dropped a file: it opens with this app.
+  if(dragging && dragging!==pin.id){const pair=[dragging,pin.id];dragging=null;askGroupFor(pair,pin.folder);return;}
   const files=[...(e.dataTransfer?.files || [])].map(file=>window.pill.pathFor(file)).filter(Boolean);
   if(files.length)window.pill.drop(pin.id,files);
  });
@@ -65,9 +70,14 @@ function render(){
 }
 // Naming a group happens here, in the panel, because there is nowhere else to ask.
 let groupFor=null;
-window.pill.onAskGroup(id=>{groupFor=id;$('group-ask').hidden=false;$('group-name').value='';$('group-name').focus();});
-$('group-ask').onsubmit=e=>{e.preventDefault();const name=$('group-name').value.trim();$('group-ask').hidden=true;if(groupFor && name)window.pill.group(groupFor,name);groupFor=null;};
-$('group-name').onkeydown=e=>{if(e.key==='Escape'){$('group-ask').hidden=true;groupFor=null;}};
+function askGroupFor(ids,suggestion=''){groupPair=Array.isArray(ids)?ids:[ids];groupFor=null;$('group-ask').hidden=false;$('group-name').value=suggestion || '';$('group-name').focus();$('group-name').select();}
+window.pill.onAskGroup(id=>{groupPair=null;groupFor=id;$('group-ask').hidden=false;$('group-name').value='';$('group-name').focus();});
+$('group-ask').onsubmit=e=>{
+ e.preventDefault();const name=$('group-name').value.trim();$('group-ask').hidden=true;
+ if(name){for(const id of (groupPair || (groupFor?[groupFor]:[])))window.pill.group(id,name);}
+ groupFor=null;groupPair=null;
+};
+$('group-name').onkeydown=e=>{if(e.key==='Escape'){$('group-ask').hidden=true;groupFor=null;groupPair=null;}};
 $('group-name').onblur=()=>{setTimeout(()=>{if(!$('group-ask').hidden && document.activeElement!==$('group-name')){$('group-ask').hidden=true;groupFor=null;}},150);};
 $('add').onclick=()=>window.pill.add();
 $('flick').onclick=()=>window.pill.flick();

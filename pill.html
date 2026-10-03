@@ -7,6 +7,8 @@ body[data-theme=dark] #pill{background:rgba(29,34,31,.95);border-color:rgba(255,
 .spot{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;position:relative;flex:0 0 38px;-webkit-app-region:no-drag;cursor:pointer;background:transparent;border:0;padding:0;color:inherit}
 .spot:hover{background:rgba(120,140,160,.16)}
 .spot.over{background:rgba(66,181,245,.22);box-shadow:inset 0 0 0 1.5px rgba(66,181,245,.65)}
+.spot.lifting{opacity:.4}
+#group-name::placeholder{opacity:.6}
 .spot img{width:28px;height:28px;border-radius:7px;object-fit:contain;pointer-events:none}
 .spot .glyph{font-size:17px;pointer-events:none}
 .folder{position:relative}
@@ -42,6 +44,6 @@ body.empty #tail{margin-top:0}
     <button class="spot" id="home" title="Claude, notes and tasks"><span class="glyph">✳</span></button>
   </div>
 </div>
-<form id="group-ask" hidden><input id="group-name" maxlength="40" placeholder="Group name" autocomplete="off" aria-label="Group name"></form>
+<form id="group-ask" hidden><input id="group-name" maxlength="40" placeholder="Name this group" autocomplete="off" aria-label="Group name"></form>
 <script src="pill.js"></script>
 </body></html>

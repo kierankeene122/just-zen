@@ -555,6 +555,7 @@ app.whenReady().then(async () => {
         ...folders.map(name=>({label:name,type:'radio',checked:pin.folder===name,click:()=>{const p=(config.pins || []).find(x=>x.id===pin.id);if(p){p.folder=name;persistSoon();sendPins();}}})),
         ...(folders.length?[{type:'separator'}]:[]),
         {label:'New group…',click:()=>askFolder(pin.id)},
+        {label:'Tip: drag one icon onto another',enabled:false},
         ...(pin.folder?[{label:'Out of '+pin.folder,click:()=>{const p=(config.pins || []).find(x=>x.id===pin.id);if(p){p.folder='';persistSoon();sendPins();}}}]:[])
       ]},
       {label:'Add an app…',click:()=>toggleFlick('pin')},
