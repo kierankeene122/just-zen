@@ -6,8 +6,7 @@ A small launcher for macOS and Windows. It is not a browser and has no window yo
 - ⌥Space: one field over installed applications, documents found through Spotlight (including Google Drive, OneDrive and Proton Drive), a library of about a hundred web apps, any address you type, and the tabs already open in Safari or Chrome. ⌘↵ pins a result to the panel.
 - Web apps open in the user's own browser — Safari or Chrome, whichever the machine opens links with — and switch to the tab that already has the site open rather than opening another. Profiles, extensions and logins stay in that browser.
 - Deep links: Claude, Gemini, ChatGPT and Slack open through their own URL schemes, so the user lands inside the app.
-- Claude Code runs in Just Zen's own window (opened from the panel or ⌘⌥Space), sandboxed on macOS to a chosen folder, with Notes-only, Read-only and Full modes, beside Markdown notes and a task list with user-made lists.
-- Menu bar: settings, the panel toggle, checking for updates and quitting all live in the tray menu. No Dock icon by default on macOS.
+- Menu bar: settings, the panel toggle, checking for updates and quitting all live in the tray menu. There is no application window at all, and no Dock icon by default on macOS.
 - Privacy: no account, no sync, no telemetry. Settings are stored locally and encrypted with the Keychain. Open source: https://github.com/kierankeene122/just-zen
 
-Download: https://justzen.co · macOS 13+ on Apple Silicon, Windows 10 and 11. Claude is macOS-only for now because it needs the sandbox.
+Download: https://justzen.co · macOS 13+ on Apple Silicon, Windows 10 and 11.

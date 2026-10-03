@@ -15,6 +15,16 @@ window.pill.onBadges(map=>{
 });
 
 let openFolder='',dragging=null,groupPair=null;
+// The panel's order is the user's: dropping between two icons moves one there, and the main process keeps it.
+function reorder(movedId,targetId,after){
+ const ids=pins.map(p=>p.id).filter(id=>id!==movedId);
+ const at=ids.indexOf(targetId);
+ if(at<0)return;
+ ids.splice(at+(after?1:0),0,movedId);
+ const moved=pins.find(p=>p.id===movedId),target=pins.find(p=>p.id===targetId);
+ if(moved && target && moved.folder!==target.folder)window.pill.group(movedId,target.folder || '');
+ window.pill.order(ids);
+}
 function spotFor(pin){
  const spot=document.createElement('button');spot.className='spot';spot.dataset.pin=pin.id;spot.title=pin.label+(pin.detail?' · '+pin.detail:'');
  if(pin.icon){const img=document.createElement('img');img.src=pin.icon;img.alt='';spot.append(img);}
@@ -24,12 +34,26 @@ function spotFor(pin){
  spot.draggable=true;
  spot.addEventListener('dragstart',e=>{dragging=pin.id;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',pin.label);}catch{}spot.classList.add('lifting');});
  spot.addEventListener('dragend',()=>{dragging=null;spot.classList.remove('lifting');for(const s of document.querySelectorAll('.spot'))s.classList.remove('over');});
- spot.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect=dragging?'move':'copy';spot.classList.add('over');});
- spot.addEventListener('dragleave',()=>spot.classList.remove('over'));
+ // Dropping on the top or bottom of an icon moves yours there; dropping on its middle makes a group of the two.
+ const zoneFor=e=>{const r=spot.getBoundingClientRect();const y=e.clientY-r.top;return y<r.height*0.33?'before':y>r.height*0.67?'after':'group';};
+ spot.addEventListener('dragover',e=>{
+  e.preventDefault();e.dataTransfer.dropEffect=dragging?'move':'copy';
+  const zone=dragging && dragging!==pin.id?zoneFor(e):'group';
+  spot.classList.toggle('over',zone==='group');
+  spot.classList.toggle('above',zone==='before');
+  spot.classList.toggle('below',zone==='after');
+ });
+ spot.addEventListener('dragleave',()=>spot.classList.remove('over','above','below'));
  spot.addEventListener('drop',e=>{
-  e.preventDefault();spot.classList.remove('over');
-  // Dropped another pin: the two become a group. Dropped a file: it opens with this app.
-  if(dragging && dragging!==pin.id){const pair=[dragging,pin.id];dragging=null;askGroupFor(pair,pin.folder);return;}
+  e.preventDefault();
+  const zone=dragging && dragging!==pin.id?zoneFor(e):'group';
+  spot.classList.remove('over','above','below');
+  if(dragging && dragging!==pin.id){
+   const moved=dragging;dragging=null;
+   if(zone==='group'){askGroupFor([moved,pin.id],pin.folder);return;}
+   reorder(moved,pin.id,zone==='after');
+   return;
+  }
   const files=[...(e.dataTransfer?.files || [])].map(file=>window.pill.pathFor(file)).filter(Boolean);
   if(files.length)window.pill.drop(pin.id,files);
  });
@@ -48,6 +72,15 @@ function folderFor(name,items){
  spot.append(stack);
  spot.onclick=()=>{openFolder=openFolder===name?'':name;render();};
  spot.oncontextmenu=e=>{e.preventDefault();if(items[0])window.pill.menu(items[0].id);};
+ // Dropping an icon on a group puts it in that group; dropping a file opens it with the first thing inside.
+ spot.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect=dragging?'move':'copy';spot.classList.add('over');});
+ spot.addEventListener('dragleave',()=>spot.classList.remove('over'));
+ spot.addEventListener('drop',e=>{
+  e.preventDefault();spot.classList.remove('over');
+  if(dragging){const moved=dragging;dragging=null;window.pill.group(moved,name);openFolder=name;return;}
+  const files=[...(e.dataTransfer?.files || [])].map(file=>window.pill.pathFor(file)).filter(Boolean);
+  if(files.length && items[0])window.pill.drop(items[0].id,files);
+ });
  wrap.append(spot);
  const label=document.createElement('div');label.className='folder-name';label.textContent=name.slice(0,7);wrap.append(label);
  return wrap;
@@ -63,6 +96,9 @@ function render(){
   host.append(folderFor(name,items));
   if(openFolder===name){
    const kids=document.createElement('div');kids.className='kids';
+   kids.addEventListener('dragover',e=>{if(!dragging)return;e.preventDefault();e.dataTransfer.dropEffect='move';kids.classList.add('over');});
+   kids.addEventListener('dragleave',()=>kids.classList.remove('over'));
+   kids.addEventListener('drop',e=>{e.preventDefault();kids.classList.remove('over');if(!dragging)return;const moved=dragging;dragging=null;window.pill.group(moved,name);});
    for(const pin of items)kids.append(spotFor(pin));
    host.append(kids);
   }
@@ -81,7 +117,6 @@ $('group-name').onkeydown=e=>{if(e.key==='Escape'){$('group-ask').hidden=true;gr
 $('group-name').onblur=()=>{setTimeout(()=>{if(!$('group-ask').hidden && document.activeElement!==$('group-name')){$('group-ask').hidden=true;groupFor=null;}},150);};
 $('add').onclick=()=>window.pill.add();
 $('flick').onclick=()=>window.pill.flick();
-$('home').onclick=()=>window.pill.home();
 document.addEventListener('contextmenu',e=>{if(e.target.closest('.spot'))return;e.preventDefault();window.pill.menu('');});
 document.addEventListener('dragover',e=>e.preventDefault());
 document.addEventListener('drop',e=>e.preventDefault());

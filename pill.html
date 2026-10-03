@@ -8,6 +8,8 @@ body[data-theme=dark] #pill{background:rgba(29,34,31,.95);border-color:rgba(255,
 .spot:hover{background:rgba(120,140,160,.16)}
 .spot.over{background:rgba(66,181,245,.22);box-shadow:inset 0 0 0 1.5px rgba(66,181,245,.65)}
 .spot.lifting{opacity:.4}
+.spot.above{box-shadow:inset 0 3px 0 -1px #39c7c0}
+.spot.below{box-shadow:inset 0 -3px 0 -1px #39c7c0}
 #group-name::placeholder{opacity:.6}
 .spot img{width:28px;height:28px;border-radius:7px;object-fit:contain;pointer-events:none}
 .spot .glyph{font-size:17px;pointer-events:none}
@@ -17,6 +19,7 @@ body[data-theme=dark] #pill{background:rgba(29,34,31,.95);border-color:rgba(255,
 body[data-theme=dark] .folder .stack i{background:rgba(220,230,220,.5)}
 .folder .stack img{width:100%;height:100%;border-radius:2px;object-fit:cover}
 .folder-name{font-size:8px;letter-spacing:.3px;text-transform:uppercase;opacity:.65;text-align:center;line-height:1;margin-top:1px}
+.kids.over{box-shadow:inset 0 0 0 1.5px rgba(66,181,245,.65)}
 .kids{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0;margin:2px 0;border-radius:14px;background:rgba(120,140,160,.1)}
 .spot small{position:absolute;top:-2px;right:-2px;min-width:15px;height:15px;border-radius:999px;background:#d9483b;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px}
 #grip{width:22px;height:14px;display:flex;align-items:center;justify-content:center;gap:3px;flex:0 0 14px;-webkit-app-region:drag;cursor:grab;opacity:.5}
@@ -41,7 +44,7 @@ body.empty #tail{margin-top:0}
   <div id="spots"></div>
   <div id="tail">
     <button class="spot" id="add" title="Add an app to the panel"><span class="glyph">＋</span></button><button class="spot" id="flick" title="Find anything (⌥Space)"><span class="glyph">⌕</span></button>
-    <button class="spot" id="home" title="Claude, notes and tasks"><span class="glyph">✳</span></button>
+    
   </div>
 </div>
 <form id="group-ask" hidden><input id="group-name" maxlength="40" placeholder="Name this group" autocomplete="off" aria-label="Group name"></form>

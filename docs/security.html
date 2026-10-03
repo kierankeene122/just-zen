@@ -3,136 +3,64 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Security — Just Zen</title>
-<meta name="description" content="How Just Zen keeps your apps, logins and Claude sessions private: sandboxing, local-only data, signed automatic updates, what is tested and what remains a risk.">
+<title>How Just Zen is built</title>
+<meta name="description" content="Just Zen is a launcher: it opens things. No web engine, no account, no telemetry, and one permission it asks for only when you use the feature that needs it.">
 <meta name="color-scheme" content="light">
-<meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://justzen.co/security.html">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Security — Just Zen">
-<meta property="og:description" content="How Just Zen keeps your apps, logins and Claude sessions private: sandboxing, local-only data, signed automatic updates, what is tested and what remains a risk.">
+<meta property="og:title" content="How Just Zen is built">
+<meta property="og:description" content="A launcher that opens things, and nothing else: no web engine, no account, no telemetry.">
 <meta property="og:url" content="https://justzen.co/security.html">
-<meta property="og:image" content="https://justzen.co/hero.png">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Security — Just Zen">
-<meta name="twitter:description" content="How Just Zen keeps your apps, logins and Claude sessions private: sandboxing, local-only data, signed automatic updates, what is tested and what remains a risk.">
-<meta name="twitter:image" content="https://justzen.co/hero.png">
+<meta property="og:image" content="https://justzen.co/logo.png">
 <link rel="icon" href="logo.png">
 <link rel="stylesheet" href="fonts/fonts.css">
-<link rel="stylesheet" href="site.css?v=20260912c">
+<link rel="stylesheet" href="site.css?v=20261003">
 </head>
 <body>
-<!-- Fonts are served with the page: no third-party requests, no cookies, nothing to consent to. -->
-
 <div class="wrap">
 <header class="top">
   <a class="brand" href="./" aria-label="Just Zen home"><img src="logo.png" alt="" width="44" height="44">JUST ZEN</a>
-  <nav><a href="features.html">Features</a><a href="security.html" aria-current="page">Security</a><a href="https://github.com/kierankeene122/just-zen/releases">What's new</a><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg">Mac</a><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-Setup.exe">Windows</a></nav>
+  <nav><a href="./">Home</a><a href="features.html">Features</a><a href="https://github.com/kierankeene122/just-zen/releases">What's new</a></nav>
 </header>
 
-<div class="water" aria-hidden="true"><i></i><i></i><i></i></div>
-<section class="page-hero">
-  <div class="eyebrow">Security</div>
-  <h1 style="margin-top:18px">What protects you. What still depends on you.</h1>
-  <p class="lede">Just Zen keeps signed-in websites, Claude and your documents apart from each other and from the rest of your Mac. This page explains each protection, how security updates reach you without anyone touching them, what is tested, and the risks that remain.</p>
-  <p class="lede" style="margin-top:14px">These are best efforts. This is what we have done, described plainly, not a guarantee of anything. Every claim on this page can be checked against the code, the review and the automated checks in the <a href="https://github.com/kierankeene122/just-zen">git repository</a>, which has more detail than fits here.</p>
+<section class="hero" style="padding-bottom:10px">
+  <div class="eyebrow">How it is built</div>
+  <h1 style="margin-top:16px;max-width:18ch">A launcher that opens things, and nothing else.</h1>
+  <p class="lede" style="max-width:64ch">Just Zen used to be a browser with your apps inside it. It is not any more, and that removes most of what a page like this used to have to explain. What is left is small enough to describe in one screen.</p>
 </section>
 
-<div class="prose">
-<div class="callout-box"><b>Current assessment.</b> Designed for personal and small-team use. A full code review on 8 September 2026 fixed every finding; CodeQL and Semgrep run on every change; on 9 September 2026 a red-team suite, network interception, binary decompilation and runtime-instrumentation checks all found the protections holding; releases are signed and notarized, and security updates ship automatically. An independent penetration test has not been carried out. Just Zen is free, open-source software provided as is, without warranty.</div>
+<section class="pillars">
+  <h2>What it touches</h2>
+  <div class="facts" style="grid-template-columns:repeat(2,1fr)">
+    <div class="fact"><b>No web engine of its own</b><p>Web apps open in Safari or Chrome. Just Zen renders no pages, stores no cookies, and holds no logins for the sites you use. Your browser's profiles, extensions and passwords stay where they are.</p></div>
+    <div class="fact"><b>Spotlight, not an index</b><p>Documents come from macOS Spotlight as you type. Nothing is copied, catalogued or kept. On Windows it looks in your usual folders instead.</p></div>
+    <div class="fact"><b>One permission, asked late</b><p>Reading which tabs are open needs macOS Automation, asked the first time you use it. Say no and Just Zen simply opens a new tab instead, and stops asking.</p></div>
+    <div class="fact"><b>Opens, never reads</b><p>Applications are launched with <code>open</code>, files with their own app, web apps with a URL. Just Zen has no access to the contents of any of them.</p></div>
+    <div class="fact"><b>Everything stays here</b><p>No account, no sync, no telemetry, no crash reporting. Your panel, your groups and your settings live in your user folder, encrypted with the Keychain where macOS allows it.</p></div>
+    <div class="fact"><b>Three small pages</b><p>The panel and the finder are the only HTML in the app. Each runs sandboxed, with no Node access, and is fenced to its own files by a content security policy and a request filter.</p></div>
+  </div>
 
-<h2>The protections</h2>
-<div class="grid3 tight">
-<div class="pillar"><span class="tag" style="background:var(--accent)"></span><h3>Websites</h3><ul><li>Every site runs in Chromium's sandbox with Node.js disabled and no bridge into Just Zen, your files or Claude.</li>
-<li>New apps get their own isolated cookie and storage profile. Shared, Personal and Work profiles share logins only when you choose them.</li>
-<li>Links opened from an app land in a Quick Look drawer over the right of the centre (Esc closes it) rather than replacing what you were looking at; the drawer runs in the same isolated profile as the app it came from.</li>
-<li>Calls in Slack, Google Chat and Meet need your camera and microphone. A saved app asks you once per site, the answer is remembered per app and can be forgotten from Privacy &amp; data, and macOS asks separately for the app itself. Screen sharing stays off. Downloads go through the system save dialog, then a message offers to reveal the file.</li>
-<li>Just Zen can remember website passwords, like Safari. They are stored encrypted with your Mac's Keychain, matched to the exact site, and only filled when you click a login field. Websites cannot read the store; a small isolated script inside each site only watches for a login form and fills one on request. Forget any or all of them from Privacy &amp; data.</li>
-<li>Logins are kept between launches: cookies a site marks as session-only are given a rolling 30-day expiry inside that app's own profile, the same way other app shells keep you signed in. Clearing the profile removes them.</li>
-<li>Each browser app has its own profile, separate from every other browser and saved app; links from notes and chat open in the first one. Any of them can be cleared from Privacy &amp; data.</li>
-<li>Apps you are not looking at can be put to sleep after a quiet period: the page is closed and its memory released, then it reloads when you open it again.</li>
-<li>Camera, microphone, screen capture, native-app launches and other permissions are refused. Saved apps may send notifications only from the address they were saved at.</li>
-<li>Downloads always go through a native save dialog. Sites with invalid certificates are refused.</li></ul></div>
-<div class="pillar"><span class="tag" style="background:var(--sage)"></span><h3>Encrypted state and app lock</h3><ul><li>Settings, tasks, whiteboard and Claude chat history are encrypted with a key held in the macOS Keychain. Website cookies are encrypted too.</li>
-<li>Optional Touch ID or passcode lock after inactivity. Passcode attempts back off after three failures.</li>
-<li>Claude's history and all Just Zen data can be cleared from the menu bar at any time; there are no website profiles to clear, because the websites live in your browser.</li></ul></div>
-<div class="pillar"><span class="tag" style="background:var(--violet)"></span><h3>Claude Chat</h3><ul><li>Runs inside Anthropic Sandbox Runtime and macOS Seatbelt. It can read only the workspace you choose plus its own login, and write only where the access mode allows.</li>
-<li>The Claude Code program it runs is the signed copy that ships inside Just Zen, not whatever happens to be installed on the Mac, so nothing on the machine can stand in for it.</li>
-<li>Uses a Claude login and history owned by Just Zen. Your personal ~/.claude, home folder, other users, external volumes and temporary folders are denied. The only other home-folder path it may read is the encrypted Keychain database, so it can use that login; the system's security daemon does the unlocking, not Claude.</li>
-<li>Network access is limited to Anthropic's servers. Chat refuses to start if the sandbox is not active.</li>
-<li>Text from a website, note or document reaches Claude only when you select it and press ⌘⇧A, and then only after you choose what to do with it. Nothing is sent automatically.</li>
-<li>Chat starts in Notes-only: Claude may change Markdown notes and must ask before touching anything else. Read-only blocks all changes at the operating-system level. Full access is a deliberate choice for when you are building something. Shell commands, sub-agents and MCP tools always ask first.</li></ul></div>
-<div class="pillar"><span class="tag" style="background:var(--accent)"></span><h3>Claude Terminal and shell</h3><ul><li>Runs with your normal macOS user permissions, exactly like Claude Code in Terminal.app. Just Zen adds no privilege and no sandbox here.</li>
-<li>Claude Code's own command approval applies. Use Chat when you want enforced Read-only or Notes-only access.</li></ul></div>
-<div class="pillar"><span class="tag" style="background:var(--sage)"></span><h3>Documents</h3><ul><li>PDFs and text render in a separate sandboxed view with no bridge to the main app or Claude, and no network.</li>
-<li>DOCX and RTF conversion runs in a deny-by-default Seatbelt process with a private temporary folder and no network. Formatted text is reduced to plain allowlisted tags before export.</li>
-<li>Save copy refuses symbolic and hard links so the original can never be overwritten.</li></ul></div>
-<div class="pillar"><span class="tag" style="background:var(--violet)"></span><h3>App integrity and updates</h3><ul><li>Releases are signed with a Developer ID and notarized by Apple.</li>
-<li>The app code ships in a single archive whose integrity is verified at launch. Node.js entry points into the app binary (run-as-node, NODE_OPTIONS, inspector) are disabled.</li>
-<li>Everything the app needs to run travels with it: its own signed, checksum-verified Node.js runtime and its own copy of Claude Code. It does not depend on Homebrew or any separately installed tool, so a broken or tampered install elsewhere on the Mac cannot affect it.</li>
-<li>Website favicons are decoded in a sandboxed renderer, never in the main process.</li>
-<li>Updates are checked 15 seconds after opening and every six hours, downloaded in the background, signature-verified and installed when you quit. Downgrades and pre-releases are refused.</li>
-<li>Electron only fixes Chromium flaws in its three newest major versions. The release notes show the date the bundled Electron stops receiving them, and a weekly check in the repository raises an issue a month before.</li></ul></div>
-</div>
+  <h2 style="margin-top:72px">Signing and updates</h2>
+  <div class="facts" style="grid-template-columns:repeat(2,1fr)">
+    <div class="fact"><b>Signed and notarised</b><p>The Mac build is signed with a Developer ID, hardened-runtime enabled, and notarised by Apple before release. Updates are downloaded over HTTPS and their signature is checked before anything is swapped.</p></div>
+    <div class="fact"><b>Windows is not signed yet</b><p>The Windows installer carries no certificate, so SmartScreen will warn the first time you run it. Until that changes, treat the Windows build as the lesser of the two.</p></div>
+    <div class="fact"><b>Dependencies are few</b><p>Dropping the browser dropped nearly all of them: the app ships Electron, the updater, and its own code. Every release runs an audit that fails the build on any advisory with a fix.</p></div>
+    <div class="fact"><b>Open source</b><p>All of it is on <a href="https://github.com/kierankeene122/just-zen">GitHub</a>, including the tests that run on every release: the finder, the panel, its order, and a check that a foreign page cannot reach the app's own channels.</p></div>
+  </div>
+</section>
 
-<div class="two">
-<div><h2>How automated security updates work</h2>
-<p>From a published patch to your installed app, without anyone touching it.</p>
-<ul>
-<li><strong>Detection.</strong> Dependabot checks weekly for new Electron and dependency versions, waiting three days for patches and seven for larger changes so bad releases surface first. Security advisories trigger a fix immediately.</li>
-<li><strong>Verification.</strong> Each proposed update runs the unit tests, the Seatbelt sandbox test and CodeQL static analysis.</li>
-<li><strong>Merge.</strong> If everything passes and it is not a major version change, the update is merged into the codebase. Major versions wait for a human.</li>
-<li><strong>Release.</strong> The merge is tagged as a new version and a signed, notarized DMG is built and published automatically.</li>
-<li><strong>Install.</strong> Every copy of Just Zen picks it up on next open and installs it on quit.</li>
-</ul>
+<section class="final">
+  <h2>Nothing to configure.</h2>
+  <p class="lede" style="margin-top:16px">Install it, pin a few things, and it stays out of the way.</p>
+  <div class="cta" style="justify-content:center">
+    <a class="btn btn-primary" href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg">Download for Mac<span aria-hidden="true">↓</span></a>
+    <a class="btn btn-secondary" href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-Setup.exe">Download for Windows</a>
+  </div>
+</section>
 
-</div>
-<div><h2>What is tested, and with what</h2>
-<ul>
-<li><strong>Static analysis.</strong> CodeQL and Semgrep run on every change and block the merge on any finding.</li>
-<li><strong>Dependencies.</strong> Dependabot version and security updates, npm audit on every build, and a cooldown before new releases are adopted.</li>
-<li><strong>Adversarial tests.</strong> Forged IPC from a foreign renderer, path traversal and symlink chains, popup containment and profile separation, run in CI on macOS.</li>
-<li><strong>Sandbox tests.</strong> The Seatbelt profiles are executed for real and asserted to deny the home folder, external volumes, temporary folders and other Claude projects. Chat keeps only its own workspace's transcripts, so conversations resume.</li>
-<li><strong>Review.</strong> A full code review on 8 September 2026 found and fixed thirteen issues, from Electron fuses to a Notes-only bypass. The report is in the repository.</li>
-<li><strong>Red-teaming.</strong> A Promptfoo suite drives the real Chat pipeline with hostile workspace content, a careless user who approves everything, and canary secrets. Eight cases, from hidden instructions in notes to symlink tricks and exfiltration by fetch, all held on 9 September 2026.</li>
-<li><strong>Network interception.</strong> Run through mitmproxy, the app refuses forged certificates outright; with TLS passed through, every destination belonged to the sites you opened, none was plain HTTP, and the sandboxed Claude only ever talked to its local egress proxy.</li>
-<li><strong>Binary and runtime checks.</strong> Every executable in the signed bundle carries the hardened runtime and no debugging entitlements; Frida cannot attach to it. Ghidra found nothing beyond standard library calls in the native terminal components, and no secrets anywhere in the bundle or repository.</li>
-<li><strong>Open source.</strong> The code, the review, the tooling results and every automated check are public, so anyone can inspect what runs on their Mac.</li>
-</ul>
-
-</div>
-</div>
-<div class="two">
-<div><h2>We tried to break it. Here is what happened.</h2>
-<p>On 9 September 2026 we ran five well-known security tools against Just Zen, the kind a professional tester would reach for. The technical detail is in the <a href="https://github.com/kierankeene122/just-zen/blob/main/SECURITY-TOOLING-2026-09-09.md">full write-up</a>; this is the plain-English version.</p>
-<ul>
-<li><strong>1. Tricking Claude (Promptfoo).</strong> We planted notes with hidden instructions telling Claude to steal secrets, dropped fake passwords around the workspace, set symlink traps, and pretended to be a user who clicks "Allow" on everything. Claude spotted the hidden instructions and refused to follow them, and every attempt to read a secret, change a protected file, reach the home folder or send data to an outside website was blocked. Eight attacks, eight stopped.</li>
-<li><strong>2. Spying on its internet traffic (mitmproxy).</strong> We put a fake "middleman" between the app and the internet. When it tried to impersonate real websites, the app refused to connect at all. When we just watched where traffic went, the app only ever talked to the websites you had opened, nothing was sent unencrypted, and Claude's connection went through a gate that only allows Anthropic.</li>
-<li><strong>3. Checking the app is what it says it is (Apple's own tools).</strong> Every part of the app is signed by the developer and approved by Apple, with the extra hardening switched on and no back doors for debuggers. While Claude was working, we watched what files it had open: nothing from the home folder.</li>
-<li><strong>4. Taking the app apart (Ghidra).</strong> We decompiled the two small pieces of native code Just Zen ships and searched the whole app and its history for hidden keys or passwords. Nothing suspicious, nothing hardcoded.</li>
-<li><strong>5. Trying to read its memory while running (Frida).</strong> A tool that lets you reach inside a running program could not get into Just Zen at all. It could get into the unsigned developer version, which is exactly why what you download is signed.</li>
-</ul>
-<p>Doing this found two real problems, both fixed in the next release: Claude's sign-in could expire after a few hours and not renew itself, and the app relied on a separately installed copy of Node.js that could break. It now renews the sign-in on its own and carries everything it needs.</p>
-
-<h2>Risks specific to Just Zen</h2>
-<ul>
-<li><strong>Browser vulnerabilities.</strong> Just Zen bundles its own copy of Chromium through Electron, so a new Chromium flaw can exist here until the next Electron patch ships. Sandboxing limits the impact; the automated update chain keeps that window to days.</li>
-<li><strong>Windows is newer and weaker than the Mac build.</strong> The same Chromium sandboxing, process isolation, content security policy, integrity-checked app archive and disabled Node entry points apply, and saved passwords and cookies are encrypted with Windows DPAPI instead of the Keychain. Three things do not carry over yet: the installer is not code-signed (Windows SmartScreen will warn, and you cannot verify the publisher), there is no Touch ID lock, and Claude is switched off entirely because the operating-system sandbox it runs in only exists on macOS; Just Zen will not run Claude unsandboxed. The Windows build has also not been through the adversarial test suite on Windows itself.</li>
-<li><strong>No independent audit yet.</strong> CodeQL and Semgrep scans, the adversarial and sandbox test suites and the code review all pass, but no third party has tested the running app. For regulated or highly sensitive work, commission an external assessment first.</li>
-</ul>
-
-</div>
-<div><h2>What you should do</h2>
-<p>Install updates when Just Zen asks by quitting; that is the whole ritual. Connect only the folders Claude needs and prefer Read-only or Notes-only in Chat. Keep apps isolated unless they genuinely need a shared login; sites in the Shared, Personal or Work profiles can see each other's cookies by design. Turn on the app lock if the Mac is shared or ever unattended.</p>
-
-</div>
-</div>
-<div class="callout-box"><b>As is.</b> Just Zen is free software provided under the <a href="https://github.com/kierankeene122/just-zen/blob/main/LICENSE">ISC licence</a>, without warranty of any kind. You are responsible for how you use it and for the accounts and data you connect to it. Inspect the code, decide for yourself, and keep backups.</div>
-</div>
-
-<footer class="pagefoot">
-  <div><a href="https://github.com/kierankeene122/just-zen/releases/latest/download/Just-Zen-arm64.dmg">Download</a><a href="https://github.com/kierankeene122/just-zen">Inspect the code</a><a href="./">Home</a></div>
-  <div>Just Zen · macOS</div>
+<footer class="foot">
+  <span>Just Zen · <a href="https://github.com/kierankeene122/just-zen">Open source on GitHub</a></span>
+  <span>Built by <a href="https://lashandigital.co.uk">Lashan Digital</a></span>
 </footer>
 </div>
 </body>
