@@ -172,4 +172,11 @@ async function appIconPng(bundle,cacheDir){
   try{await run('/usr/bin/sips',['-s','format','png','-Z','72',icns,'--out',out],{timeout:8000});return out;}catch{return '';}
 }
 
-module.exports={appIconFile,appIconPng,listApps,findDocs,openApp,openFile,safariTabs,focusSafariTab,raiseWindow,deepLinkFor,isAppPath,prettyDir,MAC,WIN};
+// Web apps open in Safari (the browser the user keeps their profiles in), not merely the default handler.
+async function openInBrowser(url,{browser='Safari'}={}){
+  if(MAC){try{return await run('/usr/bin/open',['-a',browser,url]);}catch{return run('/usr/bin/open',[url]);}}
+  if(WIN)return run('cmd.exe',['/c','start','',url]);
+  throw Error('Unsupported platform');
+}
+
+module.exports={openInBrowser,appIconFile,appIconPng,listApps,findDocs,openApp,openFile,safariTabs,focusSafariTab,raiseWindow,deepLinkFor,isAppPath,prettyDir,MAC,WIN};

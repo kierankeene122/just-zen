@@ -29,7 +29,8 @@ const SLEEP_CHOICES=new Set([0,5,15,30,60,120]);
 const notificationSources=new WeakMap(),notificationOrigins=new WeakMap(),serviceBadges=new Map();
 const { pathToFileURL } = require('node:url');
 let documentShown=false;
-let flickWindow=null,pillWindow=null,tray=null,trayRefresh=()=>{};
+let flickWindow=null,pillWindow=null,tray=null,trayRefresh=()=>{},flickReady=false,pendingFlickMode='';
+function panelMode(){return config.startMode!=='window';}
 function applyMenuBarOnly(){if(process.platform!=='darwin')return;try{if(config.menuBarOnly===true)app.dock?.hide();else app.dock?.show();}catch{}}
 let win, terminal, root = null, claudeRoot = null, config = {}, secureStore, locked=false, lockTimer=null;
 const entry = pathToFileURL(path.join(__dirname, 'index.html')).href;
@@ -221,6 +222,18 @@ function paneTargets(){
   return out;
 }
 function hostOf(url){try{return new URL(url).hostname.replace(/^www\./,'');}catch{return '';}}
+// Anything that looks like an address becomes a web app you can go to, or keep.
+function webFromQuery(text){
+  const raw=String(text || '').trim();
+  if(!raw || /\s/.test(raw))return null;
+  const candidate=/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)?raw:/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}([/?#].*)?$/i.test(raw)?'https://'+raw:'';
+  if(!candidate)return null;
+  try{
+    const url=new URL(candidate);
+    if(!['http:','https:'].includes(url.protocol))return null;
+    return {kind:'web',id:'web:'+url.href,label:hostOf(url.href) || url.href,detail:url.href.slice(0,80),target:url.href,glyph:'◐'};
+  }catch{return null;}
+}
 async function catalogueIcon(relative){
   if(!relative)return '';
   if(iconCache.has(relative))return iconCache.get(relative);
@@ -238,22 +251,48 @@ async function openWebTarget(url){
       const tabs=await nativeApps.safariTabs();
       const match=tabs.find(tab=>{try{const have=new URL(tab.url);return have.hostname.replace(/^www\./,'')===want.hostname.replace(/^www\./,'') && (want.pathname==='/' || have.pathname.startsWith(want.pathname.replace(/\/$/,'')));}catch{return false;}});
       if(match){await nativeApps.focusSafariTab(match.target);return {ok:true};}
-    }catch(error){config.safariTabs=false;persistSoon();await shell.openExternal(url);return {ok:true,message:'Opened a new tab. '+error.message};}
+    }catch(error){config.safariTabs=false;persistSoon();await nativeApps.openInBrowser(url);return {ok:true,message:'Opened a new tab. '+error.message};}
   }
-  await shell.openExternal(url);
+  await nativeApps.openInBrowser(url);
   return {ok:true};
 }
-async function flickResults(query,stage){
+// The page's own title makes a better label than its host name.
+function pageTitle(url){
+  return new Promise(resolve=>{
+    let done=false;const finish=value=>{if(!done){done=true;resolve(value);}};
+    setTimeout(()=>finish(''),4000);
+    try{
+      const request=net.request({url,redirect:'follow'});
+      let body='';
+      request.on('response',response=>{
+        if(response.statusCode>=400)return finish('');
+        response.on('data',chunk=>{body+=chunk.toString('utf8');if(body.length>8000){try{request.abort();}catch{}finish(titleFrom(body));}});
+        response.on('end',()=>finish(titleFrom(body)));
+        response.on('error',()=>finish(''));
+      });
+      request.on('error',()=>finish(''));
+      request.end();
+    }catch{finish('');}
+  });
+}
+function titleFrom(html){
+  const match=/<title[^>]*>([^<]{1,120})<\/title>/i.exec(html || '');
+  if(!match)return '';
+  return match[1].replace(/\s+/g,' ').trim().split(/\s[|\u2013\u2014-]\s/)[0].slice(0,40);
+}
+async function flickResults(query,stage,mode='open'){
   const needle=String(query || '').trim().toLowerCase();
   const out=[];
   if(stage==='fast'){
     const apps=await nativeApps.listApps();
     for(const item of apps){const s=score(item.label,needle);if(s)out.push({...item,group:'Apps',hint:'open',score:s});}
     for(const item of paneTargets()){const s=score(item.label,needle);if(s)out.push({...item,group:item.kind==='workspace'?'Workspaces':'In Just Zen',score:s});}
-    for(const entry of catalogue){const s=score(entry.name,needle);if(s)out.push({kind:'web',id:'web:'+entry.url,label:entry.name,detail:hostOf(entry.url),target:entry.url,glyph:'◐',group:'Web apps',hint:'go to',score:s-0.2,iconFile:entry.icon});}
+    const typed=webFromQuery(needle);
+    if(typed)out.push({...typed,group:'Web apps',hint:mode==='pin'?'add':'go to',score:9});
+    for(const entry of catalogue){const s=needle?score(entry.name,needle):(mode==='pin'?1:0);if(s)out.push({kind:'web',id:'web:'+entry.url,label:entry.name,detail:hostOf(entry.url),target:entry.url,glyph:'◐',group:'Web apps',hint:mode==='pin'?'add':'go to',score:s-0.2,iconFile:entry.icon});}
     for(const pin of (config.pins || [])){const s=score(pin.label,needle);if(s)out.push({...pin,group:'Pinned',score:s+1});}
     out.sort((a,b)=>b.score-a.score || a.label.localeCompare(b.label));
-    const top=out.slice(0,needle?14:10);
+    const top=out.slice(0,needle?14:(mode==='pin'?26:10));
     for(const item of top){if(item.kind==='app')item.icon=await appIcon(item.target);else if(item.iconFile)item.icon=await catalogueIcon(item.iconFile);}
     return top.map(item=>({...item,detail:item.detail || '',hint:item.hint || ''}));
   }
@@ -283,7 +322,7 @@ async function openFlick(id){
   if(item.kind==='workspace'){showMainWindow();send('deck-command',{workspaceId:item.id.slice(10)});return {ok:true};}
   return {ok:false,message:'Nothing to open there.'};
 }
-function showMainWindow(){if(!win || win.isDestroyed())return;if(win.isMinimized())win.restore();win.show();win.focus();app.focus?.({steal:true});}
+function showMainWindow(){if(!win || win.isDestroyed())return;if(win.isMinimized())win.restore();win.show();win.focus();app.focus?.({steal:true});send('deck-command',{replace:true});}
 function flickTheme(){return config.theme==='dark'?'dark':'light';}
 function ensureFlick(){
   if(flickWindow && !flickWindow.isDestroyed())return flickWindow;
@@ -297,7 +336,7 @@ function ensureFlick(){
   flickWindow.setVisibleOnAllWorkspaces?.(true,{visibleOnFullScreen:true});
   const c=flickWindow.webContents;
   c.setWindowOpenHandler(()=>({action:'deny'}));c.on('will-navigate',e=>e.preventDefault());
-  c.on('did-finish-load',()=>c.send('flick-theme',flickTheme()));
+  c.on('did-finish-load',()=>{flickReady=true;c.send('flick-theme',flickTheme());if(pendingFlickMode){c.send('flick-show',{mode:pendingFlickMode});pendingFlickMode='';}});
   flickWindow.on('blur',()=>{if(flickWindow && !flickWindow.isDestroyed())flickWindow.hide();});
   flickWindow.loadFile('flick.html');
   return flickWindow;
@@ -307,7 +346,8 @@ function toggleFlick(mode='open'){
   if(w.isVisible() && mode==='open'){w.hide();return;}
   w.webContents.send('flick-theme',flickTheme());
   w.showInactive();w.setAlwaysOnTop(true,'floating');w.focus();
-  w.webContents.send('flick-show',{mode:mode==='pin'?'pin':'open'});
+  if(flickReady)w.webContents.send('flick-show',{mode:mode==='pin'?'pin':'open'});
+  else pendingFlickMode=mode==='pin'?'pin':'open';
 }
 // ---- The pill: the few places you flick between, parked on an edge ----
 function pinList(){
@@ -316,7 +356,7 @@ function pinList(){
 async function sendPins(){
   if(!pillWindow || pillWindow.isDestroyed())return;
   const pins=pinList();
-  for(const pin of pins){if(pin.icon)continue;if(pin.iconFile)pin.icon=await catalogueIcon(pin.iconFile);else if(typeof pin.target==='string' && (pin.kind==='app' || pin.kind==='file'))pin.icon=await appIcon(pin.target);}
+  for(const pin of pins){if(pin.icon)continue;if(pin.iconFile)pin.icon=await catalogueIcon(pin.iconFile);else if(pin.kind==='web' && typeof pin.target==='string'){try{pin.icon=await favicon(pin.target) || '';}catch{}}else if(typeof pin.target==='string' && (pin.kind==='app' || pin.kind==='file'))pin.icon=await appIcon(pin.target);}
   pillWindow.webContents.send('pill-pins',pins);
   pillWindow.webContents.send('pill-badges',Object.fromEntries(pins.filter(p=>p.kind==='pane').map(p=>[p.id,visibleBadge(p.id.slice(5))]).filter(([,n])=>n)));
   const rows=new Set(pins.map(p=>p.folder).filter(Boolean)).size+pins.filter(p=>!p.folder).length;
@@ -845,6 +885,9 @@ app.whenReady().then(async () => {
   const unprofiled=(config.services || []).some(item=>item.url && !item.profile);if(unprofiled){config.services=config.services.map(item=>item.url && !item.profile?{...item,profile:'isolated'}:item);await persist();}
   if(!config.whiteboard && Array.isArray(config.stickyNotes)){config.whiteboard={items:config.stickyNotes.map((note,index)=>({id:note.id || crypto.randomUUID(),type:'note',x:80+(index%4)*245,y:90+Math.floor(index/4)*195,w:220,h:170,text:String(note.text || ''),color:{sun:'#fff0a8',blue:'#dcecff',mint:'#dff2df',rose:'#f7dfe5'}[note.color] || '#fff0a8',rotation:(index%2?1:-1)*.6}))};delete config.stickyNotes;await persist();}
   locked=Boolean(config.appLock);
+  if(config.startMode===undefined)config.startMode='panel';
+  if(config.pillOn===undefined)config.pillOn=true;
+  if(config.menuBarOnly===undefined)config.menuBarOnly=process.platform==='darwin';
   favicon=createFaviconCache(path.join(app.getPath('userData'),'favicons'),net,createImageDecoder({BrowserWindow}));
   nativeTheme.themeSource=config.theme || 'light';
   chat=new ChatSession({claudePath:claudeBinary(),emit:state=>send('chat-state',state),policy:()=>({mode:config.claudePolicy || 'notes',root:claudeRoot}),env:()=>({...subscriptionEnv(),ANTHROPIC_API_KEY:undefined,ANTHROPIC_AUTH_TOKEN:undefined,ANTHROPIC_BASE_URL:undefined,CLAUDE_CODE_USE_BEDROCK:undefined,CLAUDE_CODE_USE_VERTEX:undefined,CLAUDE_CODE_USE_FOUNDRY:undefined}),save:async state=>{if(!claudeRoot)return;config.chats=config.chats || {};config.chats[claudeRoot]=state;await persist();}});
@@ -867,7 +910,10 @@ app.whenReady().then(async () => {
   win.webContents.on('will-navigate', e => e.preventDefault());
   attachContextMenu(win.webContents,()=>'your workspace');
   win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
-  win.on('close',()=>{quitting=true;for(const key of [...views.keys()]){try{views.get(key)?.view.webContents.removeAllListeners('will-prevent-unload');destroyView(key);}catch{}}try{peekClose();}catch{}});
+  win.on('close',event=>{
+    // In menu-bar mode the window is just another surface: closing it puts it away and leaves Just Zen running.
+    if(!quitting && panelMode()){event.preventDefault();win.hide();return;}
+    quitting=true;for(const key of [...views.keys()]){try{views.get(key)?.view.webContents.removeAllListeners('will-prevent-unload');destroyView(key);}catch{}}try{peekClose();}catch{}});
   win.on('closed',() => { try{terminal?.kill();}catch{} try{chat.stop();}catch{} for(const key of [...views.keys()]){try{destroyView(key);}catch{}}
     // With the pill or the menu bar in play, closing the window puts Just Zen in the background rather than ending it.
     if(config.pillOn===true || config.menuBarOnly===true){if(flickWindow && !flickWindow.isDestroyed())flickWindow.hide();return;}
@@ -905,14 +951,14 @@ app.whenReady().then(async () => {
   ipcMain.on('pane-unhover',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && badgeHover===i)setBadgeHover(-1);});
   // ---- Flick bar and pill ----
   handle('flick-list',async ({query}={})=>{const items=await flickResults(query,'fast');const docs=await flickResults(query,'slow');const all=[...items,...docs].filter(i=>['app','file','url'].includes(i.kind));for(const item of all)flickIndex.set(item.id,item);return all.slice(0,12).map(({score,...rest})=>rest);});
-  handleShared('flick-search',async ({query,stage}={})=>{
-    const items=await flickResults(query,stage);
+  handleShared('flick-search',async ({query,stage,mode}={})=>{
+    const items=await flickResults(query,stage,mode==='pin'?'pin':'open');
     for(const item of items)flickIndex.set(item.id,item);
     if(flickIndex.size>600)flickIndex.clear();
     return items.map(({score,...rest})=>rest);
   },[()=>flickWindow]);
   handleShared('flick-open',async ({id,pin}={})=>{
-    if(pin===true){const item=flickIndex.get(String(id || ''));if(!item)throw Error('Nothing to pin');addPin(item);if(config.pillOn!==true)setPill(true);await persist();if(flickWindow && !flickWindow.isDestroyed())flickWindow.hide();return {ok:true,message:item.label+' is on the panel.'};}
+    if(pin===true){const item=flickIndex.get(String(id || ''));if(!item)throw Error('Nothing to pin');if(item.kind==='web' && !item.iconFile){const title=await pageTitle(item.target);if(title)item.label=title;}addPin(item);if(config.pillOn!==true)setPill(true);await persist();if(flickWindow && !flickWindow.isDestroyed())flickWindow.hide();return {ok:true,message:item.label+' is on the panel.'};}
     const result=await openFlick(String(id || ''));
     if(result?.ok && flickWindow && !flickWindow.isDestroyed())flickWindow.hide();
     return result;
@@ -979,14 +1025,15 @@ app.whenReady().then(async () => {
   handle('pill-state',()=>({on:config.pillOn===true,pins:pinList()}));
   handle('pill-unpin',async ({id}={})=>{config.pins=(config.pins || []).filter(p=>p.id!==id);await persist();sendPins();return pinList();});
   handle('safari-tabs-set',async ({on}={})=>{config.safariTabs=on===true;await persist();return config.safariTabs;});
-  handle('native-settings',()=>({pillOn:config.pillOn===true,safariTabs:config.safariTabs!==false,deepLinks:config.deepLinks!==false,menuBarOnly:config.menuBarOnly===true}));
+  handle('native-settings',()=>({pillOn:config.pillOn===true,safariTabs:config.safariTabs!==false,deepLinks:config.deepLinks!==false,menuBarOnly:config.menuBarOnly===true,startWindow:config.startMode==='window'}));
   handle('native-set',async ({key,value}={})=>{
-    if(!['pillOn','safariTabs','deepLinks','menuBarOnly'].includes(key))throw Error('Unknown setting');
+    if(!['pillOn','safariTabs','deepLinks','menuBarOnly','startWindow'].includes(key))throw Error('Unknown setting');
+    if(key==='startWindow'){config.startMode=value===true?'window':'panel';trayRefresh();}else
     if(key==='pillOn')setPill(value===true);
     else config[key]=value===true;
     if(key==='menuBarOnly')applyMenuBarOnly();
     await persist();
-    return {pillOn:config.pillOn===true,safariTabs:config.safariTabs!==false,deepLinks:config.deepLinks!==false,menuBarOnly:config.menuBarOnly===true};
+    return {pillOn:config.pillOn===true,safariTabs:config.safariTabs!==false,deepLinks:config.deepLinks!==false,menuBarOnly:config.menuBarOnly===true,startWindow:config.startMode==='window'};
   });
   ipcMain.on('flick-close',e=>{if(flickWindow && !flickWindow.isDestroyed() && e.sender===flickWindow.webContents)flickWindow.hide();});
   const fromPill=e=>Boolean(pillWindow && !pillWindow.isDestroyed() && e.sender===pillWindow.webContents);
@@ -1096,6 +1143,7 @@ app.whenReady().then(async () => {
   ipcMain.on('web-unread',(e,count)=>{try{const entry=[...views.values()].find(v=>v.view.webContents===e.sender);if(!entry || e.senderFrame!==e.sender.mainFrame)return;const source=notificationSources.get(e.sender);if(!source?.saved)return;const n=Math.max(0,Math.min(9999,Number(count) || 0));if(source.domUnread===n)return;source.domUnread=n;const previous=serviceBadges.get(entry.serviceKey) || 0;const merged=Math.max(unreadCount(e.sender.getTitle()),n);updateServiceBadge(entry.serviceKey,merged);if(merged>previous && !entry.visible && !isMuted(entry.serviceKey))pushRecent({key:entry.serviceKey,name:source.name,count:merged});}catch{}});
   handle('peek-bounds',box=>{if(!box || !['x','y','width','height'].every(k=>Number.isFinite(box[k])))throw Error('Invalid peek bounds');peekPlace(box);return true;});
   handle('peek-close',()=>{peekClose();return true;});
+  if(!app.isPackaged)handle('debug-shell',()=>({winVisible:win.isVisible(),panelMode:panelMode(),pill:Boolean(pillWindow && !pillWindow.isDestroyed() && pillWindow.isVisible()),flick:Boolean(flickWindow && !flickWindow.isDestroyed()),dockHidden:process.platform==='darwin'?!app.dock?.isVisible?.():null,startMode:config.startMode,pins:(config.pins||[]).length}));
   if(!app.isPackaged)handle('debug-views',()=>({order:win.contentView.children.map(v=>{const b=badges.findIndex(x=>x && x.view===v);if(b>=0)return 'badge'+b;const e=[...views.values()].find(x=>x.view===v);return e?(e.serviceKey.slice(0,8)+(e.visible?'*':'')):(v===documentView?'document':'other');}),tiles:[...views.values()].map(v=>({key:v.serviceKey.slice(0,8),tab:v.tabId.slice(0,6),visible:v.visible,bounds:v.view.getBounds(),peeked:appPeek===v})),peek:peek?{visible:peek.visible,bounds:peek.view.getBounds()}:null,badges:badges.map(b=>b&&b.visible?b.view.getBounds():null)}));
   handle('peek-action',({action}={})=>{if(appPeek){const key=appPeek.serviceKey,tabId=appPeek.tabId;if(action==='tab' || action==='beside'){peekClose();return {serviceKey:key,tabId,tabs:tabsFor(key),beside:action==='beside'};}if(action==='reload'){appPeek.view.webContents.reload();return true;}return null;}if(!peek)return null;const c=peek.view.webContents;if(action==='back' && c.navigationHistory.canGoBack()){c.navigationHistory.goBack();return true;}if(action==='reload'){c.reload();return true;}const url=c.getURL(),key=peek.serviceKey;if(!/^https?:/i.test(url))return null;if(action==='tab'){const opened=openTab(key,url,true);peekClose();return opened;}if(action==='beside'){const opened=openTab(key,url,false);peekClose();return {...opened,beside:true};}return null;});
   handle('set-peek-links',async on=>{config.peekLinks=Boolean(on);await persist();return config.peekLinks;});
@@ -1171,7 +1219,7 @@ app.whenReady().then(async () => {
   handle('terminal-size',({cols,rows}) => { if(Number.isInteger(cols) && Number.isInteger(rows) && cols>0 && rows>0 && cols<1000 && rows<1000) terminal?.resize(cols,rows); });
   await win.loadFile('index.html');
   if(locked)await win.webContents.executeJavaScript("document.body.classList.add('is-locked');document.getElementById('lock-screen').classList.remove('hidden')");
-  win.show();
+  if(!panelMode() || !config.tourDone || locked)win.show();
   if(!locked)scheduleLock();
   const updates=startAutoUpdates(message=>send('notice',message),version=>send('update-ready',version));
   handle('install-update',()=>{if(!updates.install)throw Error('No update is ready');updates.install();return true;});
@@ -1192,6 +1240,7 @@ app.whenReady().then(async () => {
       {type:'separator'},
       {label:'Show the pill',type:'checkbox',checked:config.pillOn===true,click:item=>setPill(item.checked)},
       {label:'Menu bar only',type:'checkbox',checked:config.menuBarOnly===true,click:item=>{config.menuBarOnly=item.checked;applyMenuBarOnly();persistSoon();}},
+      {label:'Open the window at launch',type:'checkbox',checked:config.startMode==='window',click:item=>{config.startMode=item.checked?'window':'panel';persistSoon();trayRefresh();}},
       {type:'separator'},
       {label:'Quit Just Zen',click:()=>{quitting=true;app.quit();}}
     ]);

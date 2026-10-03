@@ -16,7 +16,7 @@ function note(text){const n=$('note');n.textContent=text||'';n.classList.toggle(
 
 function render(){
  const list=$('list');list.replaceChildren();
- if(!results.length){const empty=document.createElement('div');empty.id='empty';empty.textContent=$('q').value.trim()?'Nothing matches that yet.':'Type to find an app, a document, a tab or a workspace.';list.append(empty);return;}
+ if(!results.length){const empty=document.createElement('div');empty.id='empty';empty.textContent=$('q').value.trim()?'Nothing matches that yet.':(mode==='pin'?'Pick a web app, or type any address to add your own.':'Type to find an app, a document, a tab or a workspace.');list.append(empty);return;}
  let group='';
  results.forEach((item,i)=>{
   if(item.group!==group){group=item.group;const head=document.createElement('div');head.className='group';head.textContent=group;list.append(head);}
@@ -48,10 +48,10 @@ function order(list){
 }
 async function search(query){
  const mine=++token;
- const first=await window.flick.search({query,stage:'fast'});
+ const first=await window.flick.search({query,stage:'fast',mode});
  if(mine!==token)return;
  results=order(first);index=0;render();
- const rest=await window.flick.search({query,stage:'slow'});
+ const rest=await window.flick.search({query,stage:'slow',mode});
  if(mine!==token)return;
  const seen=new Set(results.map(r=>r.id));
  results=order([...results,...rest.filter(r=>!seen.has(r.id))]);
