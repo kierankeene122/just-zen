@@ -65,7 +65,8 @@ jobs:
           test -n "$APPLE_API_KEY_CONTENT"
       - run: npm ci
       - run: npm test
-      - run: npm audit --omit=dev
+      # Blocks on anything with a non-breaking fix; breaking-only fixes are reported for a human to decide.
+      - run: node scripts/audit-gate.cjs
       - run: npm run rebuild
       - name: Bundle the Node.js runtime for the sandbox supervisor and document worker
         run: |

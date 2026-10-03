@@ -21,7 +21,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm audit --omit=dev
+      # Blocks on anything with a non-breaking fix; breaking-only fixes are reported for a human to decide.
+      - run: node scripts/audit-gate.cjs
       - run: npm test
 
   macos-tests:
