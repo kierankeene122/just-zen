@@ -55,7 +55,7 @@ function folderFor(name,items){
 function render(){
  const host=$('spots');host.replaceChildren();
  document.body.classList.toggle('empty',!pins.length);
- if(!pins.length){const empty=document.createElement('div');empty.id='empty';empty.textContent='Add the apps you flick between';host.append(empty);return;}
+ if(!pins.length){const empty=document.createElement('div');empty.id='empty';empty.textContent='Add the apps you flick between';empty.title='Right-click the panel for more';host.append(empty);return;}
  const groups=new Map();
  for(const pin of pins){const key=pin.folder || '';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(pin);}
  for(const [name,items] of groups){
@@ -82,6 +82,7 @@ $('group-name').onblur=()=>{setTimeout(()=>{if(!$('group-ask').hidden && documen
 $('add').onclick=()=>window.pill.add();
 $('flick').onclick=()=>window.pill.flick();
 $('home').onclick=()=>window.pill.home();
+document.addEventListener('contextmenu',e=>{if(e.target.closest('.spot'))return;e.preventDefault();window.pill.menu('');});
 document.addEventListener('dragover',e=>e.preventDefault());
 document.addEventListener('drop',e=>e.preventDefault());
 window.pill.ready();

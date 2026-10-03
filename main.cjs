@@ -9,6 +9,7 @@ const {catalogue,findApp,isAdded,addApp,bundledIcon} = require('./app-catalog.cj
 const {createFaviconCache}=require('./favicons.cjs');
 const {startAutoUpdates}=require('./auto-update.cjs');
 const nativeApps=require('./native.cjs');
+const {seedPins}=require('./panel-seed.cjs');
 const {createSecureStore}=require('./secure-store.cjs');
 const {prepareClaudeSandbox}=require('./claude-sandbox.cjs');
 const {findNode}=require('./node-runtime.cjs');
@@ -254,7 +255,6 @@ function toggleFlick(mode='open'){
   if(flickReady)w.webContents.send('flick-show',{mode:mode==='pin'?'pin':'open'});
   else pendingFlickMode=mode==='pin'?'pin':'open';
 }
-// Pins that pointed at an in-app pane become web pins now that web apps open in your browser.
 function migratePins(){
   let changed=false;
   config.pins=(Array.isArray(config.pins)?config.pins:[]).map(pin=>{
@@ -439,6 +439,7 @@ app.whenReady().then(async () => {
   locked=Boolean(config.appLock);
   if(config.startMode===undefined)config.startMode='panel';
   migratePins();
+  {const seeded=seedPins({pins:config.pins,services:config.services,seeded:config.pinsSeeded===true});if(seeded.changed){config.pins=seeded.pins;config.pinsSeeded=true;persistSoon();}}
   if(config.pillOn===undefined)config.pillOn=true;
   if(config.menuBarOnly===undefined)config.menuBarOnly=process.platform==='darwin';
   favicon=createFaviconCache(path.join(app.getPath('userData'),'favicons'),net,createImageDecoder({BrowserWindow}));
@@ -546,7 +547,21 @@ app.whenReady().then(async () => {
   ipcMain.on('pill-home',e=>{if(fromPill(e))showMainWindow();});
   ipcMain.on('pill-menu',(e,id)=>{
     if(!fromPill(e))return;
-    const pin=pinList().find(p=>p.id===String(id || ''));if(!pin)return;
+    const pin=pinList().find(p=>p.id===String(id || ''));
+    if(!pin){
+      // Right-clicking the panel itself: everything you can do to the panel as a whole.
+      const groups=[...new Set(pinList().map(p=>p.folder).filter(Boolean))];
+      Menu.buildFromTemplate([
+        {label:'Add an app…',click:()=>toggleFlick('pin')},
+        {label:'New group…',enabled:pinList().length>0,click:()=>askFolder(pinList()[0]?.id)},
+        ...(groups.length?[{label:'Groups',submenu:groups.map(name=>({label:name,enabled:false}))}]:[]),
+        {label:'Drag one icon onto another to group them',enabled:false},
+        {type:'separator'},
+        {label:'Find anything…',click:()=>toggleFlick()},
+        {label:'Hide the panel',click:()=>setPill(false)}
+      ]).popup({window:pillWindow});
+      return;
+    }
     const folders=[...new Set(pinList().map(p=>p.folder).filter(Boolean))];
     Menu.buildFromTemplate([
       {label:'Open '+pin.label,click:()=>openPin(pin.id).catch(()=>{})},
