@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src data:"><title>Flick</title><style>
+html,body{margin:0;height:100%;background:transparent;overflow:hidden;font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#243040}
+body[data-theme=dark]{color:#e4eae2}
+#shell{height:100%;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;background:rgba(255,255,255,.98);border:1px solid rgba(60,70,80,.16);box-shadow:0 28px 70px -30px rgba(15,25,35,.6)}
+body[data-theme=dark] #shell{background:rgba(27,32,30,.98);border-color:rgba(255,255,255,.12)}
+#top{display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid rgba(60,70,80,.12)}
+body[data-theme=dark] #top{border-bottom-color:rgba(255,255,255,.08)}
+#glass{width:17px;height:17px;flex:0 0 17px;fill:none;stroke:#8b979f;stroke-width:2;stroke-linecap:round}
+#q{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:17px;color:inherit}
+#q::placeholder{color:#9aa5ad}
+#hint{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#9aa5ad;white-space:nowrap}
+#list{flex:1;overflow:auto;padding:6px}
+.row{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:10px;cursor:default}
+.row[aria-selected=true]{background:rgba(70,120,190,.13)}
+body[data-theme=dark] .row[aria-selected=true]{background:rgba(140,190,255,.14)}
+.row img{width:26px;height:26px;flex:0 0 26px;border-radius:7px;object-fit:contain}
+.row .glyph{width:26px;height:26px;flex:0 0 26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;background:rgba(120,140,160,.16)}
+.row b{font-weight:500;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row small{color:#8b979f;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.row em{font-style:normal;margin-left:auto;font:10.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:#9aa5ad;white-space:nowrap;flex:0 0 auto}
+.group{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#9aa5ad;padding:12px 10px 4px}
+#empty{padding:26px 14px;color:#8b979f;text-align:center;font-size:13px}
+#note{padding:8px 14px;border-top:1px solid rgba(60,70,80,.12);color:#b4552f;font-size:11.5px;display:none}
+body[data-theme=dark] #note{border-top-color:rgba(255,255,255,.08);color:#dba06a}
+#note.on{display:block}
+</style></head><body>
+<div id="shell">
+  <div id="top">
+    <svg id="glass" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.8 12.8 17 17"/></svg>
+    <input id="q" type="text" autocomplete="off" spellcheck="false" placeholder="Apps, documents, tabs, workspaces…" aria-label="Find anything">
+    <span id="hint">↵ open · esc close</span>
+  </div>
+  <div id="list" role="listbox"></div>
+  <div id="note"></div>
+</div>
+<script src="flick.js"></script>
+</body></html>

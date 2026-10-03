@@ -1,4 +1,4 @@
-const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification, webContents, clipboard, shell, desktopCapturer } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, dialog, Menu, nativeTheme, net, nativeImage, safeStorage, systemPreferences, session, Notification, webContents, clipboard, shell, desktopCapturer, globalShortcut, Tray, screen } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const execFile = require('node:util').promisify(require('node:child_process').execFile);
@@ -10,6 +10,7 @@ const {webPreferences,browserWebPreferences,browserPartition,BROWSER_PARTITION,c
 const {reorder,createFolder,updateFolder,removeFolder,setFolder,cleanIcon}=require('./sidebar.cjs');
 const {createFaviconCache}=require('./favicons.cjs');
 const {startAutoUpdates}=require('./auto-update.cjs');
+const nativeApps=require('./native.cjs');
 const {createSecureStore}=require('./secure-store.cjs');
 const {createPasswordVault}=require('./passwords.cjs');
 let passwords;const passwordOffers=new Map();
@@ -28,6 +29,8 @@ const SLEEP_CHOICES=new Set([0,5,15,30,60,120]);
 const notificationSources=new WeakMap(),notificationOrigins=new WeakMap(),serviceBadges=new Map();
 const { pathToFileURL } = require('node:url');
 let documentShown=false;
+let flickWindow=null,pillWindow=null,tray=null,trayRefresh=()=>{};
+function applyMenuBarOnly(){if(process.platform!=='darwin')return;try{if(config.menuBarOnly===true)app.dock?.hide();else app.dock?.show();}catch{}}
 let win, terminal, root = null, claudeRoot = null, config = {}, secureStore, locked=false, lockTimer=null;
 const entry = pathToFileURL(path.join(__dirname, 'index.html')).href;
 // Test hooks are development-only: a packaged app ignores --smoke and HEARTH_DATA.
@@ -49,6 +52,16 @@ let persistTimer=null;function persistSoon(){clearTimeout(persistTimer);persistT
 function trusted(event) { if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame || event.senderFrame.url !== entry) throw Error('Untrusted request'); }
 const LOCK_ALLOWED=new Set(['state','security-status','unlock-app']);
 function handle(name, fn) { ipcMain.handle(name, async (e, ...args) => { trusted(e);if(locked && !LOCK_ALLOWED.has(name))throw Error('Just Zen is locked'); return fn(...args); }); }
+// The flick bar is a window of ours too: these two channels trust it as well as the main window, and nothing else.
+function handleShared(name,fn,getters){
+  ipcMain.handle(name,async (e,...args)=>{
+    const fromMain=win && !win.isDestroyed() && e.sender===win.webContents && e.senderFrame===win.webContents.mainFrame && e.senderFrame.url===entry;
+    const fromOurs=getters.some(get=>{const w=get();return w && !w.isDestroyed() && e.sender===w.webContents && e.senderFrame===w.webContents.mainFrame;});
+    if(!fromMain && !fromOurs)throw Error('Untrusted request');
+    if(locked)throw Error('Just Zen is locked');
+    return fn(...args);
+  });
+}
 function send(name, value) { if (win && !win.isDestroyed()) win.webContents.send(name, value); }
 function touchIDAvailable(){return process.platform==='darwin' && Boolean(systemPreferences.canPromptTouchID?.());}
 function scheduleLock(){clearTimeout(lockTimer);if(!config.appLock || locked)return;lockTimer=setTimeout(()=>lockApp(),Math.max(1,Number(config.autoLockMinutes) || 15)*60_000);lockTimer.unref?.();}
@@ -93,7 +106,7 @@ const MAX_WORKSPACES=9;
 function validWorkspaces(value){
  const raw=Array.isArray(value?.list)?value.list.slice(0,MAX_WORKSPACES):[];
  const colours=new Set(['slate','blue','green','amber','rose','violet','teal']);
- const list=raw.filter(w=>w && typeof w==='object').map((w,i)=>({id:typeof w.id==='string' && w.id.length<=64?w.id:crypto.randomUUID(),name:(typeof w.name==='string'?w.name:'').trim().slice(0,32) || 'Workspace '+(i+1),icon:typeof w.icon==='string' && /^[a-z]{2,12}$/.test(w.icon)?w.icon:'',colour:colours.has(w.colour)?w.colour:'slate',tiles:validLayout({tiles:w.tiles}).tiles || validLayout({tiles:{}}).tiles}));
+ const list=raw.filter(w=>w && typeof w==='object').map((w,i)=>({id:typeof w.id==='string' && w.id.length<=64?w.id:crypto.randomUUID(),name:(typeof w.name==='string'?w.name:'').trim().slice(0,32) || 'Workspace '+(i+1),icon:typeof w.icon==='string' && /^[a-z]{2,12}$/.test(w.icon)?w.icon:'',opens:Array.isArray(w.opens)?w.opens.slice(0,8).filter(o=>o && typeof o==='object' && ['app','file','url'].includes(o.kind) && typeof o.target==='string' && o.target.length<4000).map(o=>({kind:o.kind,label:String(o.label || '').slice(0,80),target:o.target,detail:String(o.detail || '').slice(0,120)})):[],colour:colours.has(w.colour)?w.colour:'slate',tiles:validLayout({tiles:w.tiles}).tiles || validLayout({tiles:{}}).tiles}));
  if(!list.length)list.push({id:crypto.randomUUID(),name:'Workspace 1',icon:'',colour:'slate',tiles:validLayout({tiles:{}}).tiles});
  const seen=new Set();for(const w of list){while(seen.has(w.id))w.id=crypto.randomUUID();seen.add(w.id);}
  const active=list.some(w=>w.id===value?.active)?value.active:list[0].id;
@@ -114,7 +127,7 @@ function isMuted(key){const until=(config.mutes || {})[key];return until===-1 ||
 function visibleBadge(key){return isMuted(key)?0:(serviceBadges.get(key) || 0);}
 function updateAppBadge(){let total=0;for(const key of serviceBadges.keys())total+=visibleBadge(key);app.setBadgeCount?.(Math.min(9999,total));}
 let nowTimer=null;function nowSoon(){clearTimeout(nowTimer);nowTimer=setTimeout(()=>send('now-changed',nowFeed()),250);}
-function updateServiceBadge(key,count){if(count)serviceBadges.set(key,count);else serviceBadges.delete(key);updateAppBadge();send('service-badge',{key,count:visibleBadge(key)});nowSoon();}
+function updateServiceBadge(key,count){if(count)serviceBadges.set(key,count);else serviceBadges.delete(key);sendPins();updateAppBadge();send('service-badge',{key,count:visibleBadge(key)});nowSoon();}
 // Zoom is remembered per app and applied to every page of that app, whatever site it navigates to.
 const ZOOM_STEPS=[0.5,0.67,0.75,0.8,0.9,1,1.1,1.25,1.5,1.75,2];
 function zoomFor(key){const z=(config.zoom || {})[key];return ZOOM_STEPS.includes(z)?z:1;}
@@ -159,6 +172,209 @@ async function mediaAllowed(source,contents,details){
   return response===0?systemMedia(kinds):false;
 }
 async function systemMedia(kinds){for(const kind of kinds){const type=kind==='video'?'camera':'microphone';try{const status=systemPreferences.getMediaAccessStatus?.(type);if(status==='granted')continue;if(status==='denied' || status==='restricted'){const {response}=await dialog.showMessageBox(win,{type:'warning',buttons:['Open System Settings','Cancel'],defaultId:0,cancelId:1,message:'macOS is blocking the '+type+' for Just Zen',detail:'Turn on Just Zen under Privacy & Security › '+(type==='camera'?'Camera':'Microphone')+', then try the call again.'});if(response===0)shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_'+(type==='camera'?'Camera':'Microphone')).catch(()=>{});return false;}const ok=await systemPreferences.askForMediaAccess?.(type);if(ok===false)return false;}catch{}}return true;}
+// The pill and the flick bar share a partition of their own, fenced to their own files.
+let chromeSessionReady=false;
+function chromeSession(){
+  const target=session.fromPartition('zen-chrome');
+  if(!chromeSessionReady){
+    chromeSessionReady=true;
+    const allowed=new Set(['flick.html','flick.js','pill.html','pill.js'].map(f=>pathToFileURL(path.join(__dirname,f)).href));
+    target.webRequest.onBeforeRequest((details,done)=>done({cancel:!allowed.has(details.url.split('#')[0])}));
+    target.setPermissionRequestHandler((_c,_p,done)=>done(false));
+    target.setPermissionCheckHandler(()=>false);
+  }
+  return target;
+}
+// ---- Flick: one field over the apps, documents, tabs and workspaces you already have ----
+const iconCache=new Map();
+async function appIcon(file){
+  if(iconCache.has(file))return iconCache.get(file);
+  let url='';
+  try{
+    const png=await nativeApps.appIconPng(file,path.join(app.getPath('userData'),'app-icons'));
+    if(png){const image=nativeImage.createFromPath(png);if(!image.isEmpty())url=image.resize({width:36,height:36}).toDataURL();}
+    if(!url){const image=await app.getFileIcon(file,{size:'normal'});url=image.isEmpty()?'':image.resize({width:36,height:36}).toDataURL();}
+  }catch{}
+  if(iconCache.size>400)iconCache.clear();
+  iconCache.set(file,url);
+  return url;
+}
+function score(label,needle){
+  const name=String(label).toLowerCase();
+  if(!needle)return 1;
+  if(name===needle)return 6;
+  if(name.startsWith(needle))return 5;
+  if(name.split(/[\s._/-]+/).some(w=>w.startsWith(needle)))return 4;
+  if(name.includes(needle))return 3;
+  const initials=name.split(/[\s._/-]+/).filter(Boolean).map(w=>w[0]).join('');
+  if(initials.startsWith(needle))return 3.5;
+  let at=0;for(const ch of needle){at=name.indexOf(ch,at);if(at<0)return 0;at++;}
+  return 1;
+}
+function paneTargets(){
+  const out=[];
+  for(const item of (config.services || []).filter(openable)){
+    const key=item.id || item.url;
+    out.push({kind:'pane',id:'pane:'+key,label:item.name,detail:isBrowserItem(item)?'Browser in Just Zen':hostOf(item.url || ''),hint:'pane',glyph:'▣'});
+  }
+  for(const workspace of workspaceState().list)out.push({kind:'workspace',id:'workspace:'+workspace.id,label:workspace.name,detail:'Workspace',hint:'switch',glyph:'◧'});
+  return out;
+}
+function hostOf(url){try{return new URL(url).hostname.replace(/^www\./,'');}catch{return '';}}
+async function catalogueIcon(relative){
+  if(!relative)return '';
+  if(iconCache.has(relative))return iconCache.get(relative);
+  let url='';
+  try{url='data:image/png;base64,'+(await fs.readFile(path.join(__dirname,relative))).toString('base64');}catch{}
+  iconCache.set(relative,url);
+  return url;
+}
+// Going to a web app: if it is already open in a Safari tab, switch to that tab; otherwise open it as a new one.
+async function openWebTarget(url){
+  // Reuse a tab that already has the site open; if macOS refuses the permission, stop asking and just open a new tab.
+  if(config.safariTabs!==false && nativeApps.MAC){
+    try{
+      const want=new URL(url);
+      const tabs=await nativeApps.safariTabs();
+      const match=tabs.find(tab=>{try{const have=new URL(tab.url);return have.hostname.replace(/^www\./,'')===want.hostname.replace(/^www\./,'') && (want.pathname==='/' || have.pathname.startsWith(want.pathname.replace(/\/$/,'')));}catch{return false;}});
+      if(match){await nativeApps.focusSafariTab(match.target);return {ok:true};}
+    }catch(error){config.safariTabs=false;persistSoon();await shell.openExternal(url);return {ok:true,message:'Opened a new tab. '+error.message};}
+  }
+  await shell.openExternal(url);
+  return {ok:true};
+}
+async function flickResults(query,stage){
+  const needle=String(query || '').trim().toLowerCase();
+  const out=[];
+  if(stage==='fast'){
+    const apps=await nativeApps.listApps();
+    for(const item of apps){const s=score(item.label,needle);if(s)out.push({...item,group:'Apps',hint:'open',score:s});}
+    for(const item of paneTargets()){const s=score(item.label,needle);if(s)out.push({...item,group:item.kind==='workspace'?'Workspaces':'In Just Zen',score:s});}
+    for(const entry of catalogue){const s=score(entry.name,needle);if(s)out.push({kind:'web',id:'web:'+entry.url,label:entry.name,detail:hostOf(entry.url),target:entry.url,glyph:'◐',group:'Web apps',hint:'go to',score:s-0.2,iconFile:entry.icon});}
+    for(const pin of (config.pins || [])){const s=score(pin.label,needle);if(s)out.push({...pin,group:'Pinned',score:s+1});}
+    out.sort((a,b)=>b.score-a.score || a.label.localeCompare(b.label));
+    const top=out.slice(0,needle?14:10);
+    for(const item of top){if(item.kind==='app')item.icon=await appIcon(item.target);else if(item.iconFile)item.icon=await catalogueIcon(item.iconFile);}
+    return top.map(item=>({...item,detail:item.detail || '',hint:item.hint || ''}));
+  }
+  const slow=[];
+  if(needle.length>=2){
+    try{for(const doc of await nativeApps.findDocs(needle,{limit:8}))slow.push({...doc,group:'Documents',hint:'open',icon:await appIcon(doc.target)});}catch{}
+    if(config.safariTabs!==false){
+      try{for(const tab of await nativeApps.safariTabs()){const s=score(tab.label,needle);if(s)slow.push({...tab,group:'Safari tabs',hint:'switch to',score:s});}}catch(error){slow.push({kind:'notice',id:'notice:safari',label:'Safari tabs are not available',detail:error.message,group:'Safari tabs',glyph:'!'});}
+    }
+  }
+  return slow.slice(0,14);
+}
+const flickIndex=new Map();
+async function openFlick(id){
+  const item=flickIndex.get(id);
+  if(!item)return {ok:false,message:'That result went away. Try again.'};
+  if(item.kind==='app'){
+    const link=config.deepLinks===false?'':nativeApps.deepLinkFor(item.label);
+    if(link){try{await shell.openExternal(link);return {ok:true};}catch{}}
+    await nativeApps.openApp(item.target);return {ok:true};
+  }
+  if(item.kind==='file'){await nativeApps.openFile(item.target);return {ok:true};}
+  if(item.kind==='tab'){await nativeApps.focusSafariTab(item.target);return {ok:true};}
+  if(item.kind==='url'){await shell.openExternal(item.target);return {ok:true};}
+  if(item.kind==='web')return openWebTarget(item.target);
+  if(item.kind==='pane'){showMainWindow();send('deck-command',{openPane:item.id.slice(5)});return {ok:true};}
+  if(item.kind==='workspace'){showMainWindow();send('deck-command',{workspaceId:item.id.slice(10)});return {ok:true};}
+  return {ok:false,message:'Nothing to open there.'};
+}
+function showMainWindow(){if(!win || win.isDestroyed())return;if(win.isMinimized())win.restore();win.show();win.focus();app.focus?.({steal:true});}
+function flickTheme(){return config.theme==='dark'?'dark':'light';}
+function ensureFlick(){
+  if(flickWindow && !flickWindow.isDestroyed())return flickWindow;
+  const {width,height}=screen.getPrimaryDisplay().workAreaSize;
+  flickWindow=new BrowserWindow({
+    width:720,height:460,x:Math.round((width-720)/2),y:Math.round(height*0.18),
+    show:false,frame:false,transparent:true,hasShadow:true,resizable:false,movable:true,minimizable:false,maximizable:false,
+    fullscreenable:false,skipTaskbar:true,alwaysOnTop:true,type:process.platform==='darwin'?'panel':undefined,
+    webPreferences:{preload:path.join(__dirname,'flick-preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,session:chromeSession()}
+  });
+  flickWindow.setVisibleOnAllWorkspaces?.(true,{visibleOnFullScreen:true});
+  const c=flickWindow.webContents;
+  c.setWindowOpenHandler(()=>({action:'deny'}));c.on('will-navigate',e=>e.preventDefault());
+  c.on('did-finish-load',()=>c.send('flick-theme',flickTheme()));
+  flickWindow.on('blur',()=>{if(flickWindow && !flickWindow.isDestroyed())flickWindow.hide();});
+  flickWindow.loadFile('flick.html');
+  return flickWindow;
+}
+function toggleFlick(mode='open'){
+  const w=ensureFlick();
+  if(w.isVisible() && mode==='open'){w.hide();return;}
+  w.webContents.send('flick-theme',flickTheme());
+  w.showInactive();w.setAlwaysOnTop(true,'floating');w.focus();
+  w.webContents.send('flick-show',{mode:mode==='pin'?'pin':'open'});
+}
+// ---- The pill: the few places you flick between, parked on an edge ----
+function pinList(){
+  return (Array.isArray(config.pins)?config.pins:[]).slice(0,40).map(pin=>({id:String(pin.id || '').slice(0,2000),kind:pin.kind,label:String(pin.label || '').slice(0,80),detail:String(pin.detail || '').slice(0,120),target:pin.target,icon:pin.icon || '',glyph:pin.glyph || '',folder:String(pin.folder || '').slice(0,40),iconFile:pin.iconFile || ''}));
+}
+async function sendPins(){
+  if(!pillWindow || pillWindow.isDestroyed())return;
+  const pins=pinList();
+  for(const pin of pins){if(pin.icon)continue;if(pin.iconFile)pin.icon=await catalogueIcon(pin.iconFile);else if(typeof pin.target==='string' && (pin.kind==='app' || pin.kind==='file'))pin.icon=await appIcon(pin.target);}
+  pillWindow.webContents.send('pill-pins',pins);
+  pillWindow.webContents.send('pill-badges',Object.fromEntries(pins.filter(p=>p.kind==='pane').map(p=>[p.id,visibleBadge(p.id.slice(5))]).filter(([,n])=>n)));
+  const rows=new Set(pins.map(p=>p.folder).filter(Boolean)).size+pins.filter(p=>!p.folder).length;
+  const height=Math.min(screen.getPrimaryDisplay().workAreaSize.height-80,130+rows*46);
+  pillWindow.setBounds({...pillWindow.getBounds(),height:Math.round(height)});
+}
+function ensurePill(){
+  if(pillWindow && !pillWindow.isDestroyed())return pillWindow;
+  const display=screen.getPrimaryDisplay();
+  const {x:ax,y:ay,width:aw,height:ah}=display.workArea;
+  const width=70,height=Math.min(ah-80,130+(config.pins || []).length*46);
+  const spot=config.pillSpot || {};
+  pillWindow=new BrowserWindow({
+    width,height:Math.round(height),
+    x:Number.isFinite(spot.x)?Math.round(spot.x):ax+aw-width-8,
+    y:Number.isFinite(spot.y)?Math.round(spot.y):Math.round(ay+(ah-height)/2),
+    show:false,frame:false,transparent:true,hasShadow:false,resizable:false,movable:true,minimizable:false,maximizable:false,
+    fullscreenable:false,skipTaskbar:true,alwaysOnTop:true,acceptFirstMouse:true,type:process.platform==='darwin'?'panel':undefined,
+    webPreferences:{preload:path.join(__dirname,'pill-preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,session:chromeSession()}
+  });
+  pillWindow.setVisibleOnAllWorkspaces?.(true,{visibleOnFullScreen:true});
+  const c=pillWindow.webContents;
+  c.setWindowOpenHandler(()=>({action:'deny'}));c.on('will-navigate',e=>e.preventDefault());
+  c.on('did-finish-load',()=>{c.send('pill-theme',flickTheme());sendPins();});
+  pillWindow.on('moved',()=>{const b=pillWindow.getBounds();config.pillSpot={x:b.x,y:b.y};persistSoon();});
+  pillWindow.loadFile('pill.html');
+  return pillWindow;
+}
+function setPill(on){
+  trayRefresh();
+  config.pillOn=on===true;
+  if(config.pillOn){const w=ensurePill();w.showInactive();}
+  else if(pillWindow && !pillWindow.isDestroyed()){pillWindow.destroy();pillWindow=null;}
+  persistSoon();
+  send('pill-state',config.pillOn);
+}
+async function askFolder(pinId){
+  const {response,checkboxChecked}=await dialog.showMessageBox(pillWindow || win,{type:'none',message:'Name this group',detail:'Groups keep the panel short: everything in a group folds away behind one icon.',buttons:['Work','Personal','Chat','Cancel'],defaultId:0,cancelId:3});
+  if(response===3)return;
+  const name=['Work','Personal','Chat'][response] || 'Group';
+  const pin=(config.pins || []).find(p=>p.id===pinId);
+  if(pin){pin.folder=name;persistSoon();sendPins();}
+}
+async function openPin(id){
+  const pin=pinList().find(p=>p.id===id);
+  if(!pin)return;
+  flickIndex.set(pin.id,pin);
+  try{const result=await openFlick(pin.id);if(result && result.message)send('notice',result.message);}
+  catch(error){send('notice',error.message);}
+}
+function addPin(item){
+  config.pins=Array.isArray(config.pins)?config.pins:[];
+  if(config.pins.some(p=>p.id===item.id))return false;
+  if(config.pins.length>=40)throw Error('Forty things is the limit. Take one off first.');
+  config.pins.push({id:item.id,kind:item.kind,label:item.label,detail:item.detail || '',target:item.target,icon:item.icon || '',glyph:item.glyph || '',iconFile:item.iconFile || '',folder:String(item.folder || '').slice(0,40)});
+  persistSoon();sendPins();
+  return true;
+}
 // The screen picker runs in the app's own window: thumbnails of every screen and window, and nothing shared until one is chosen.
 const screenPicks=new Map();
 function chooseScreenSource(appName,sources){
@@ -454,6 +670,7 @@ function placeBadges(list){const wanted=new Map();for(const p of list)if(Number.
     win.contentView.addChildView(b.view);b.attached=true;b.placed=true;
     b.view.setBounds(box);}
   applyBadgeVisibility();}
+function retintChrome(){const theme=config.theme==='dark'?'dark':'light';for(const w of [flickWindow,pillWindow])if(w && !w.isDestroyed())w.webContents.send(w===flickWindow?'flick-theme':'pill-theme',theme);}
 function retintBadges(){for(const b of badges)if(b && !b.view.webContents.isDestroyed())b.view.webContents.send('badge-theme',config.theme || 'light');}
 // An app can opt into the mobile web when its pane is thin (phone user agent and viewport); by default a narrow pane is just the site in a smaller window.
 const MOBILE_WIDTH=480;
@@ -651,7 +868,11 @@ app.whenReady().then(async () => {
   attachContextMenu(win.webContents,()=>'your workspace');
   win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
   win.on('close',()=>{quitting=true;for(const key of [...views.keys()]){try{views.get(key)?.view.webContents.removeAllListeners('will-prevent-unload');destroyView(key);}catch{}}try{peekClose();}catch{}});
-  win.on('closed',() => { try{terminal?.kill();}catch{} try{chat.stop();}catch{} for(const key of [...views.keys()]){try{destroyView(key);}catch{}} });
+  win.on('closed',() => { try{terminal?.kill();}catch{} try{chat.stop();}catch{} for(const key of [...views.keys()]){try{destroyView(key);}catch{}}
+    // With the pill or the menu bar in play, closing the window puts Just Zen in the background rather than ending it.
+    if(config.pillOn===true || config.menuBarOnly===true){if(flickWindow && !flickWindow.isDestroyed())flickWindow.hide();return;}
+    quitting=true;app.quit();setTimeout(()=>app.exit(0),2500);
+  });
   win.webContents.on('will-prevent-unload',e=>{if(quitting)e.preventDefault();});
   const documents=require('./documents.cjs').createDocuments(dialog,()=>win);
   const documentEntry=require('node:url').pathToFileURL(path.join(__dirname,'document-view.html')).href;
@@ -682,6 +903,127 @@ app.whenReady().then(async () => {
   ipcMain.on('pane-reveal',(e,payload)=>{if(![...views.values()].some(v=>v.view.webContents===e.sender))return;setBadgeReveal(payload?.on===true);});
   ipcMain.on('pane-hover',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0)setBadgeHover(i);});
   ipcMain.on('pane-unhover',e=>{const i=badges.findIndex(b=>b && b.view.webContents===e.sender);if(i>=0 && badgeHover===i)setBadgeHover(-1);});
+  // ---- Flick bar and pill ----
+  handle('flick-list',async ({query}={})=>{const items=await flickResults(query,'fast');const docs=await flickResults(query,'slow');const all=[...items,...docs].filter(i=>['app','file','url'].includes(i.kind));for(const item of all)flickIndex.set(item.id,item);return all.slice(0,12).map(({score,...rest})=>rest);});
+  handleShared('flick-search',async ({query,stage}={})=>{
+    const items=await flickResults(query,stage);
+    for(const item of items)flickIndex.set(item.id,item);
+    if(flickIndex.size>600)flickIndex.clear();
+    return items.map(({score,...rest})=>rest);
+  },[()=>flickWindow]);
+  handleShared('flick-open',async ({id,pin}={})=>{
+    if(pin===true){const item=flickIndex.get(String(id || ''));if(!item)throw Error('Nothing to pin');addPin(item);if(config.pillOn!==true)setPill(true);await persist();if(flickWindow && !flickWindow.isDestroyed())flickWindow.hide();return {ok:true,message:item.label+' is on the panel.'};}
+    const result=await openFlick(String(id || ''));
+    if(result?.ok && flickWindow && !flickWindow.isDestroyed())flickWindow.hide();
+    return result;
+  },[()=>flickWindow]);
+  handle('pin-folder',async ({id,folder}={})=>{
+    const pin=(config.pins || []).find(p=>p.id===id);
+    if(!pin)throw Error('Not on the panel');
+    pin.folder=String(folder || '').slice(0,40);
+    await persist();sendPins();
+    return pinList();
+  });
+  handle('pin-order',async ({order}={})=>{
+    const byId=new Map((config.pins || []).map(p=>[p.id,p]));
+    const next=[];
+    for(const id of (Array.isArray(order)?order:[]).slice(0,40))if(byId.has(id)){next.push(byId.get(id));byId.delete(id);}
+    for(const rest of byId.values())next.push(rest);
+    config.pins=next;await persist();sendPins();
+    return pinList();
+  });
+  handle('flick-pin',({id}={})=>{const item=flickIndex.get(String(id || ''));if(!item)throw Error('Nothing to pin');return addPin(item);});
+  // A workspace can carry real apps and documents; switching to it opens them.
+  handle('workspace-open',async ({id}={})=>{
+    const workspace=workspaceState().list.find(w=>w.id===id);
+    if(!workspace || !workspace.opens?.length)return {opened:0};
+    let opened=0;const problems=[];
+    for(const item of workspace.opens){
+      try{
+        if(item.kind==='app')await nativeApps.openApp(item.target);
+        else if(item.kind==='file')await nativeApps.openFile(item.target);
+        else await shell.openExternal(item.target);
+        opened++;
+      }catch(error){problems.push(item.label || item.target);}
+    }
+    return {opened,problems};
+  });
+  handle('workspace-add-open',async ({id,flickId}={})=>{
+    const workspace=workspaceState().list.find(w=>w.id===id);
+    if(!workspace)throw Error('Workspace not found');
+    const item=flickIndex.get(String(flickId || ''));
+    if(!item || !['app','file','url'].includes(item.kind))throw Error('Choose an app, a document or a link');
+    workspace.opens=Array.isArray(workspace.opens)?workspace.opens:[];
+    if(workspace.opens.length>=8)throw Error('Eight things per workspace is the limit');
+    if(!workspace.opens.some(o=>o.target===item.target))workspace.opens.push({kind:item.kind,label:item.label,target:item.target,detail:item.detail || ''});
+    await persist();
+    return workspaceState();
+  });
+  handle('workspace-remove-open',async ({id,target}={})=>{
+    const workspace=workspaceState().list.find(w=>w.id===id);
+    if(!workspace)throw Error('Workspace not found');
+    workspace.opens=(workspace.opens || []).filter(o=>o.target!==target);
+    await persist();
+    return workspaceState();
+  });
+  handle('pill-pin',async ({kind,key}={})=>{
+    if(kind==='pane'){const item=serviceItem(String(key || ''));if(!item)throw Error('App not found');addPin({id:'pane:'+(item.id || item.url),kind:'pane',label:item.name,detail:'Just Zen',glyph:'▣'});}
+    else if(kind==='workspace'){const workspace=workspaceState().list.find(w=>w.id===key);if(!workspace)throw Error('Workspace not found');addPin({id:'workspace:'+workspace.id,kind:'workspace',label:workspace.name,detail:'Workspace',glyph:'◧'});}
+    else throw Error('Nothing to pin');
+    if(config.pillOn!==true)setPill(true);
+    await persist();
+    return pinList();
+  });
+  handle('flick-toggle',({mode}={})=>{toggleFlick(mode==='pin'?'pin':'open');return true;});
+  handle('pill-set',({on}={})=>{setPill(on===true);return config.pillOn===true;});
+  handle('pill-state',()=>({on:config.pillOn===true,pins:pinList()}));
+  handle('pill-unpin',async ({id}={})=>{config.pins=(config.pins || []).filter(p=>p.id!==id);await persist();sendPins();return pinList();});
+  handle('safari-tabs-set',async ({on}={})=>{config.safariTabs=on===true;await persist();return config.safariTabs;});
+  handle('native-settings',()=>({pillOn:config.pillOn===true,safariTabs:config.safariTabs!==false,deepLinks:config.deepLinks!==false,menuBarOnly:config.menuBarOnly===true}));
+  handle('native-set',async ({key,value}={})=>{
+    if(!['pillOn','safariTabs','deepLinks','menuBarOnly'].includes(key))throw Error('Unknown setting');
+    if(key==='pillOn')setPill(value===true);
+    else config[key]=value===true;
+    if(key==='menuBarOnly')applyMenuBarOnly();
+    await persist();
+    return {pillOn:config.pillOn===true,safariTabs:config.safariTabs!==false,deepLinks:config.deepLinks!==false,menuBarOnly:config.menuBarOnly===true};
+  });
+  ipcMain.on('flick-close',e=>{if(flickWindow && !flickWindow.isDestroyed() && e.sender===flickWindow.webContents)flickWindow.hide();});
+  const fromPill=e=>Boolean(pillWindow && !pillWindow.isDestroyed() && e.sender===pillWindow.webContents);
+  ipcMain.on('pill-ready',e=>{if(fromPill(e))sendPins();});
+  ipcMain.on('pill-open',(e,id)=>{if(fromPill(e))openPin(String(id || '')).catch(()=>{});});
+  ipcMain.on('pill-flick',e=>{if(fromPill(e))toggleFlick();});
+  ipcMain.on('pill-add',e=>{if(fromPill(e))toggleFlick('pin');});
+  ipcMain.on('pill-home',e=>{if(fromPill(e))showMainWindow();});
+  ipcMain.on('pill-menu',(e,id)=>{
+    if(!fromPill(e))return;
+    const pin=pinList().find(p=>p.id===String(id || ''));if(!pin)return;
+    const folders=[...new Set(pinList().map(p=>p.folder).filter(Boolean))];
+    Menu.buildFromTemplate([
+      {label:'Open '+pin.label,click:()=>openPin(pin.id).catch(()=>{})},
+      {type:'separator'},
+      {label:'Group',submenu:[
+        ...folders.map(name=>({label:name,type:'radio',checked:pin.folder===name,click:()=>{const p=(config.pins || []).find(x=>x.id===pin.id);if(p){p.folder=name;persistSoon();sendPins();}}})),
+        ...(folders.length?[{type:'separator'}]:[]),
+        {label:'New group…',click:()=>askFolder(pin.id)},
+        ...(pin.folder?[{label:'Out of '+pin.folder,click:()=>{const p=(config.pins || []).find(x=>x.id===pin.id);if(p){p.folder='';persistSoon();sendPins();}}}]:[])
+      ]},
+      {label:'Add an app…',click:()=>toggleFlick('pin')},
+      {type:'separator'},
+      {label:'Take off the panel',click:()=>{config.pins=(config.pins || []).filter(p=>p.id!==pin.id);persistSoon();sendPins();}},
+      {label:'Hide the panel',click:()=>setPill(false)}
+    ]).popup({window:pillWindow});
+  });
+  ipcMain.on('pill-drop',async (e,{id,files}={})=>{
+    if(!fromPill(e))return;
+    const pin=pinList().find(p=>p.id===String(id || ''));
+    const list=(Array.isArray(files)?files:[]).slice(0,5);
+    if(!pin || !list.length)return;
+    try{
+      if(pin.kind==='app')for(const file of list)await nativeApps.openFile(file,{withApp:pin.target});
+      else for(const file of list)await nativeApps.openFile(file);
+    }catch(error){send('notice',error.message);}
+  });
   handle('screen-picked',({id,sourceId}={})=>{const done=screenPicks.get(id);if(done){screenPicks.delete(id);done(typeof sourceId==='string'?sourceId:null);}return true;});
   handle('badge-reveal',({on}={})=>{setBadgeReveal(on===true);return true;});
   handle('badge-hover',({slot}={})=>{setBadgeHover(Number.isInteger(slot)?slot:-1);return true;});
@@ -717,7 +1059,7 @@ app.whenReady().then(async () => {
   handle('disconnect-claude-folder',async ()=>{if(terminal || chat.state.busy)throw Error('Stop the current Claude session before disconnecting its workspace');claudeRoot=null;delete config.claudeRoot;chat.restore(null);chat.publish();await persist();return true;});
   handle('set-claude-policy',async mode=>{if(!['full','notes','readOnly'].includes(mode))throw Error('Invalid Claude access mode');if(terminal || chat.state.busy)throw Error('Stop the current Claude session before changing access');config.claudePolicy=mode;await persist();return mode;});
   handle('workspaces',async ({list,active}={})=>{const clean=validWorkspaces({list,active});config.workspaces=clean.list;config.workspace=clean.active;const current=clean.list.find(w=>w.id===clean.active);if(current)config.layout={...(config.layout || {}),tiles:current.tiles};await persist();return clean;});
-  handle('appearance',async ({theme,mode,layout,sidecar})=>{if(sidecar && typeof sidecar==='object'){const key=typeof sidecar.key==='string' && sidecar.key.length<200?sidecar.key:'';config.sidecar={key,open:key?sidecar.open===true:false};}if(theme && !['light','dark'].includes(theme))throw Error('Invalid theme');if(mode && !['chat','terminal','files'].includes(mode))throw Error('Invalid mode');if(layout && typeof layout==='object')config.layout=validLayout(layout);if(theme){config.theme=theme;nativeTheme.themeSource=theme;retheme();}if(mode)config.mode=mode;await persist();return true;});
+  handle('appearance',async ({theme,mode,layout,sidecar})=>{if(sidecar && typeof sidecar==='object'){const key=typeof sidecar.key==='string' && sidecar.key.length<200?sidecar.key:'';config.sidecar={key,open:key?sidecar.open===true:false};}if(theme && !['light','dark'].includes(theme))throw Error('Invalid theme');if(mode && !['chat','terminal','files'].includes(mode))throw Error('Invalid mode');if(layout && typeof layout==='object')config.layout=validLayout(layout);if(theme){config.theme=theme;nativeTheme.themeSource=theme;retheme();retintChrome();}if(mode)config.mode=mode;await persist();return true;});
   handle('chat-send',async (prompt,meta)=>{if(!CLAUDE_SUPPORTED)throw Error(CLAUDE_UNAVAILABLE);if(!claudeRoot)throw Error('Choose a Claude workspace first');if(terminal)throw Error('Stop the terminal session before sending a chat message');if(chat.state.busy)throw Error('Wait for the current reply');const sandbox=await prepareClaudeSandbox({fs,root:claudeRoot,mode:config.claudePolicy || 'notes',userData:app.getPath('userData'),packageRoot:__dirname,nodePath:findNode(),claudePath:findClaude(),configDir:claudeConfigDir});const openApps=(config.services || []).filter(openable).map(s=>s.name);chat.run(prompt,claudeRoot,sandbox.executable,{from:cleanFrom(meta?.from),apps:openApps}).catch(error=>send('notice',error.message));return true;});
   handle('chat-stop',()=>chat.stop());
   handle('claude-logout',async()=>{if(terminal || chat.state.busy)throw Error('Stop Claude before signing out');try{await execFile(requireClaude(),['auth','logout'],{env:subscriptionEnv(),timeout:15000});}catch(error){if(!/not logged in/i.test(String(error.stdout || '')+String(error.stderr || '')))throw Error('Sign-out failed: '+String(error.stderr || error.message).trim().slice(0,200));}chat.restore(null);chat.publish();config.chats={};await persist();return true;});
@@ -838,6 +1180,31 @@ app.whenReady().then(async () => {
   handle('reveal-download',p=>{if(typeof p!=='string' || !path.isAbsolute(p))throw Error('Invalid path');shell.showItemInFolder(p);return true;});
   handle('test-notification',()=>{if(!Notification.isSupported())throw Error('Notifications are not supported on this Mac');const n=new Notification({title:'Just Zen',body:'Notifications are working. If you did not see this, allow Just Zen in System Settings → Notifications.'});n.show();return true;});
   handle('check-updates',()=>{if(!updates.checkNow)throw Error(updates.reason==='development'?'Update checks are off in a development build.':'Updates are not available in this build.');updates.checkNow();return true;});
+  // ---- Menu bar presence and the keys that reach Just Zen from anywhere ----
+  try{
+    const trayIcon=nativeImage.createFromPath(path.join(__dirname,'assets','justzen.png')).resize({width:18,height:18});
+    trayIcon.setTemplateImage?.(process.platform==='darwin');
+    tray=new Tray(trayIcon);
+    tray.setToolTip('Just Zen');
+    const buildTrayMenu=()=>Menu.buildFromTemplate([
+      {label:'Find anything…',accelerator:'Alt+Space',click:()=>toggleFlick()},
+      {label:'Open Just Zen',click:()=>showMainWindow()},
+      {type:'separator'},
+      {label:'Show the pill',type:'checkbox',checked:config.pillOn===true,click:item=>setPill(item.checked)},
+      {label:'Menu bar only',type:'checkbox',checked:config.menuBarOnly===true,click:item=>{config.menuBarOnly=item.checked;applyMenuBarOnly();persistSoon();}},
+      {type:'separator'},
+      {label:'Quit Just Zen',click:()=>{quitting=true;app.quit();}}
+    ]);
+    tray.on('click',()=>{if(process.platform==='win32')toggleFlick();else tray.popUpContextMenu(buildTrayMenu());});
+    tray.on('right-click',()=>tray.popUpContextMenu(buildTrayMenu()));
+    tray.setContextMenu(buildTrayMenu());
+    trayRefresh=()=>{try{tray.setContextMenu(buildTrayMenu());}catch{}};
+  }catch{}
+  applyMenuBarOnly();
+  if(config.pillOn===true)setPill(true);
+  for(const [accel,run] of [['Alt+Space',()=>toggleFlick()],['Alt+Shift+Space',()=>showMainWindow()]]){
+    try{globalShortcut.register(accel,run);}catch{}
+  }
   const sleeper=setInterval(()=>{sleepSweep();expireMutes();},30_000);sleeper.unref?.();
   // A hidden page is also told to throttle itself: Chromium slows timers and animations once the view is not visible.
   win.on('blur',()=>{for(const entry of views.values())if(!entry.visible)try{entry.view.webContents.setBackgroundThrottling(true);}catch{}});
@@ -909,10 +1276,14 @@ app.whenReady().then(async () => {
 // Closing the window quits. If anything stalls the quit (a child process, a pending dialog), force the exit so a relaunch starts clean.
 function warmChatApps(){if(locked)return;for(const item of (config.services || []).filter(openable)){if(!isChatItem(item))continue;const key=item.id || item.url;for(const tab of tabsFor(key).items){try{ensureView(key,tab.id);}catch{}}}}
 let quitting=false;
-app.on('window-all-closed',()=>{quitting=true;app.quit();setTimeout(()=>app.exit(0),2500);});
-app.on('before-quit',()=>{quitting=true;setTimeout(()=>app.exit(0),4000);});
+app.on('window-all-closed',()=>{if(config.pillOn===true || config.menuBarOnly===true)return;quitting=true;app.quit();setTimeout(()=>app.exit(0),2500);});
+app.on('before-quit',()=>{quitting=true;try{globalShortcut.unregisterAll();}catch{}setTimeout(()=>app.exit(0),4000);});
 // Dock click with no window left (a quit that stalled): start over rather than sit there.
-app.on('activate',()=>{if(!BrowserWindow.getAllWindows().length){app.relaunch();app.exit(0);}});
+app.on('activate',()=>{
+  if(win && !win.isDestroyed()){win.show();win.focus();return;}
+  if(config.pillOn===true || config.menuBarOnly===true){app.relaunch();app.exit(0);return;}
+  if(!BrowserWindow.getAllWindows().length){app.relaunch();app.exit(0);}
+});
 // Cookies are written to disk on quit, so a login made moments before closing survives.
 app.on('before-quit',()=>{for(const view of views.values()){try{view.view.webContents.session.cookies.flushStore().catch(()=>{});}catch{}}});
 setInterval(()=>{for(const target of hardenedSessions){try{target.cookies.flushStore().catch(()=>{});}catch{}}},30000).unref?.();
