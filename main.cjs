@@ -16,7 +16,7 @@ const BROWSER_KEY='browser';
 const SLEEP_CHOICES=new Set([0,5,15,30,60,120]);
 const { pathToFileURL } = require('node:url');
 let flickWindow=null,pillWindow=null,tray=null,trayRefresh=()=>{},flickReady=false,pendingFlickMode='';
-let updateReady='',checkUpdates=()=>{},installUpdate=()=>{};
+let updateReady='',updateState='idle',updateDetail='',checkUpdates=()=>{},installUpdate=()=>{},retryUpdate=()=>{};
 function applyMenuBarOnly(){if(process.platform!=='darwin')return;try{if(config.menuBarOnly===true)app.dock?.hide();else app.dock?.show();}catch{}}
 let config = {}, secureStore;
 const entry = pathToFileURL(path.join(__dirname, 'index.html')).href;
@@ -521,7 +521,10 @@ app.whenReady().then(async () => {
       {label:'Add to the panel…',click:()=>toggleFlick('pin')},
       {type:'separator'},
       {label:'Show the panel',type:'checkbox',checked:config.pillOn===true,click:item=>setPill(item.checked)},
-      {label:updateReady?('Restart to update to '+updateReady):'Check for updates…',click:()=>{if(updateReady)installUpdate();else checkUpdates();}},
+      ...(updateReady?[{label:'Restart to update to '+updateReady,click:()=>installUpdate()}]
+        :updateState==='downloading'?[{label:'Downloading '+(updateDetail || 'the update')+'…',enabled:false},{label:'Start the download again',click:()=>retryUpdate()}]
+        :updateState==='failed'?[{label:'Update failed · try again',click:()=>retryUpdate()},{label:String(updateDetail || '').slice(0,60),enabled:false}]
+        :[{label:'Check for updates…',click:()=>checkUpdates()}]),
       {label:'Settings',submenu:[
         {label:'Menu bar only (no Dock icon)',type:'checkbox',checked:config.menuBarOnly===true,click:item=>{config.menuBarOnly=item.checked;applyMenuBarOnly();persistSoon();}},
         {label:'Reuse an open browser tab',type:'checkbox',checked:config.safariTabs!==false,click:item=>{config.safariTabs=item.checked;persistSoon();trayRefresh();}},
@@ -546,10 +549,12 @@ app.whenReady().then(async () => {
   function notify(title,body){try{if(Notification.isSupported())new Notification({title,body:String(body || '').slice(0,200)}).show();}catch{}}
   const updates=startAutoUpdates(
     message=>{if(!/No update|up to date|Checking/i.test(message))notify('Just Zen',message);},
-    version=>{updateReady=String(version || '');trayRefresh();notify('Just Zen '+updateReady+' is ready','Choose it in the menu bar to restart and update.');}
+    version=>{updateReady=String(version || '');trayRefresh();notify('Just Zen '+updateReady+' is ready','Choose it in the menu bar to restart and update.');},
+    (state,detail)=>{updateState=state;updateDetail=detail;trayRefresh();}
   );
   checkUpdates=()=>{try{updates.checkNow?.();notify('Just Zen','Looking for a new version…');}catch(error){notify('Just Zen',error.message);}};
   installUpdate=()=>{try{updates.install?.();}catch(error){notify('Just Zen',error.message);}};
+  retryUpdate=()=>{try{updates.retry?.();}catch(error){notify('Just Zen',error.message);}};
   if(smoke){
     try{
       for(const item of require('./app-catalog.cjs').catalogue){if(nativeImage.createFromPath(path.join(__dirname,item.icon)).isEmpty())throw Error('Invalid bundled icon: '+item.name);}
