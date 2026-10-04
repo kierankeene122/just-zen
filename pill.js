@@ -14,7 +14,31 @@ window.pill.onBadges(map=>{
  }
 });
 
-let openFolder='',dragging=null,groupPair=null;
+let openFolder='',dragging=null,draggingFolder=null,groupPair=null;
+// The panel is a sequence of blocks: a single icon, or a whole group. Either can be dragged into a new place.
+function blocks(){
+ const out=[];const byName=new Map();
+ for(const pin of pins){
+  const name=pin.folder || '';
+  if(!name){out.push({kind:'pin',id:pin.id,items:[pin]});continue;}
+  const found=byName.get(name);
+  if(found){found.items.push(pin);continue;}
+  const block={kind:'folder',name,items:[pin]};byName.set(name,block);out.push(block);
+ }
+ return out;
+}
+function blockKey(block){return block.kind==='folder'?'folder:'+block.name:'pin:'+block.id;}
+function moveBlock(sourceKey,targetKey,after){
+ if(sourceKey===targetKey)return;
+ const list=blocks();
+ const from=list.findIndex(b=>blockKey(b)===sourceKey);
+ if(from<0)return;
+ const [moved]=list.splice(from,1);
+ const at=list.findIndex(b=>blockKey(b)===targetKey);
+ if(at<0)return;
+ list.splice(at+(after?1:0),0,moved);
+ window.pill.order(list.flatMap(b=>b.items.map(p=>p.id)));
+}
 // The panel's order is the user's: dropping between two icons moves one there, and the main process keeps it.
 function reorder(movedId,targetId,after){
  const ids=pins.map(p=>p.id).filter(id=>id!==movedId);
@@ -33,12 +57,12 @@ function spotFor(pin){
  spot.oncontextmenu=e=>{e.preventDefault();window.pill.menu(pin.id);};
  spot.draggable=true;
  spot.addEventListener('dragstart',e=>{dragging=pin.id;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',pin.label);}catch{}spot.classList.add('lifting');});
- spot.addEventListener('dragend',()=>{dragging=null;spot.classList.remove('lifting');for(const s of document.querySelectorAll('.spot'))s.classList.remove('over');});
+ spot.addEventListener('dragend',()=>{dragging=null;draggingFolder=null;spot.classList.remove('lifting');for(const s of document.querySelectorAll('.spot'))s.classList.remove('over','above','below');});
  // Dropping on the top or bottom of an icon moves yours there; dropping on its middle makes a group of the two.
  const zoneFor=e=>{const r=spot.getBoundingClientRect();const y=e.clientY-r.top;return y<r.height*0.33?'before':y>r.height*0.67?'after':'group';};
  spot.addEventListener('dragover',e=>{
-  e.preventDefault();e.dataTransfer.dropEffect=dragging?'move':'copy';
-  const zone=dragging && dragging!==pin.id?zoneFor(e):'group';
+  e.preventDefault();e.dataTransfer.dropEffect=(dragging || draggingFolder)?'move':'copy';
+  const zone=draggingFolder?(zoneFor(e)==='before'?'before':'after'):(dragging && dragging!==pin.id?zoneFor(e):'group');
   spot.classList.toggle('over',zone==='group');
   spot.classList.toggle('above',zone==='before');
   spot.classList.toggle('below',zone==='after');
@@ -46,8 +70,9 @@ function spotFor(pin){
  spot.addEventListener('dragleave',()=>spot.classList.remove('over','above','below'));
  spot.addEventListener('drop',e=>{
   e.preventDefault();
-  const zone=dragging && dragging!==pin.id?zoneFor(e):'group';
+  const zone=draggingFolder?(zoneFor(e)==='before'?'before':'after'):(dragging && dragging!==pin.id?zoneFor(e):'group');
   spot.classList.remove('over','above','below');
+  if(draggingFolder){const name=draggingFolder;draggingFolder=null;moveBlock('folder:'+name,'pin:'+pin.id,zone==='after');return;}
   if(dragging && dragging!==pin.id){
    const moved=dragging;dragging=null;
    if(zone==='group'){askGroupFor([moved,pin.id],pin.folder);return;}
@@ -72,11 +97,23 @@ function folderFor(name,items){
  spot.append(stack);
  spot.onclick=()=>{openFolder=openFolder===name?'':name;render();};
  spot.oncontextmenu=e=>{e.preventDefault();if(items[0])window.pill.menu(items[0].id);};
- // Dropping an icon on a group puts it in that group; dropping a file opens it with the first thing inside.
- spot.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect=dragging?'move':'copy';spot.classList.add('over');});
- spot.addEventListener('dragleave',()=>spot.classList.remove('over'));
+ // A group can be picked up whole and put somewhere else on the panel.
+ spot.draggable=true;
+ spot.addEventListener('dragstart',e=>{draggingFolder=name;dragging=null;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',name);}catch{}spot.classList.add('lifting');});
+ spot.addEventListener('dragend',()=>{draggingFolder=null;spot.classList.remove('lifting');for(const s of document.querySelectorAll('.spot'))s.classList.remove('over','above','below');});
+ // Dropping an icon on a group puts it in that group; dropping another group reorders them; a file opens with the first thing inside.
+ const folderZone=e=>{const r=spot.getBoundingClientRect();return (e.clientY-r.top)<r.height/2?'before':'after';};
+ spot.addEventListener('dragover',e=>{
+  e.preventDefault();e.dataTransfer.dropEffect=(dragging || draggingFolder)?'move':'copy';
+  if(draggingFolder && draggingFolder!==name){const zone=folderZone(e);spot.classList.toggle('above',zone==='before');spot.classList.toggle('below',zone==='after');spot.classList.remove('over');return;}
+  spot.classList.add('over');
+ });
+ spot.addEventListener('dragleave',()=>spot.classList.remove('over','above','below'));
  spot.addEventListener('drop',e=>{
-  e.preventDefault();spot.classList.remove('over');
+  e.preventDefault();
+  const zone=draggingFolder && draggingFolder!==name?folderZone(e):null;
+  spot.classList.remove('over','above','below');
+  if(draggingFolder){const moved=draggingFolder;draggingFolder=null;if(moved!==name)moveBlock('folder:'+moved,'folder:'+name,zone==='after');return;}
   if(dragging){const moved=dragging;dragging=null;window.pill.group(moved,name);openFolder=name;return;}
   const files=[...(e.dataTransfer?.files || [])].map(file=>window.pill.pathFor(file)).filter(Boolean);
   if(files.length && items[0])window.pill.drop(items[0].id,files);

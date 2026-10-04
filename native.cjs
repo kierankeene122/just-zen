@@ -221,4 +221,14 @@ async function focusBrowserTab({window:w,tab:t,app}={}){
   try{await run('/usr/bin/osascript',['-e',script],{timeout:8000});return true;}catch(error){throw Error(automationMessage(error,name));}
 }
 
-module.exports={openInBrowser,defaultBrowser,browserName,browserTabs,focusBrowserTab,appIconFile,appIconPng,listApps,findDocs,openApp,openFile,safariTabs,focusSafariTab,raiseWindow,deepLinkFor,isAppPath,prettyDir,MAC,WIN};
+// A picture chosen by hand becomes the icon: nativeImage reads png and jpeg, sips converts everything else.
+async function imageAsPng(file,cacheDir){
+  if(!MAC)return '';
+  if(/\.(png|jpe?g)$/i.test(file))return file;
+  if(!cacheDir)return '';
+  const out=path.join(cacheDir,crypto.createHash('sha1').update(file+String(Date.now())).digest('hex').slice(0,16)+'.png');
+  try{await fs.mkdir(cacheDir,{recursive:true});}catch{}
+  try{await run('/usr/bin/sips',['-s','format','png','-Z','144',file,'--out',out],{timeout:8000});return out;}catch{return '';}
+}
+
+module.exports={imageAsPng,openInBrowser,defaultBrowser,browserName,browserTabs,focusBrowserTab,appIconFile,appIconPng,listApps,findDocs,openApp,openFile,safariTabs,focusSafariTab,raiseWindow,deepLinkFor,isAppPath,prettyDir,MAC,WIN};

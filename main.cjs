@@ -225,12 +225,12 @@ function toggleFlick(mode='open'){
   else pendingFlickMode=mode==='pin'?'pin':'open';
 }
 function pinList(){
-  return (Array.isArray(config.pins)?config.pins:[]).slice(0,40).map(pin=>({id:String(pin.id || '').slice(0,2000),kind:pin.kind,label:String(pin.label || '').slice(0,80),detail:String(pin.detail || '').slice(0,120),target:pin.target,icon:pin.icon || '',glyph:pin.glyph || '',folder:String(pin.folder || '').slice(0,40),iconFile:pin.iconFile || ''}));
+  return (Array.isArray(config.pins)?config.pins:[]).slice(0,40).map(pin=>({iconCustom:pin.iconCustom===true,id:String(pin.id || '').slice(0,2000),kind:pin.kind,label:String(pin.label || '').slice(0,80),detail:String(pin.detail || '').slice(0,120),target:pin.target,icon:pin.icon || '',glyph:pin.glyph || '',folder:String(pin.folder || '').slice(0,40),iconFile:pin.iconFile || ''}));
 }
 async function sendPins(){
   if(!pillWindow || pillWindow.isDestroyed())return;
   const pins=pinList();
-  for(const pin of pins){if(pin.icon)continue;if(pin.iconFile)pin.icon=await catalogueIcon(pin.iconFile);else if(pin.kind==='web' && typeof pin.target==='string'){try{pin.icon=await favicon(pin.target) || '';}catch{}}else if(typeof pin.target==='string' && (pin.kind==='app' || pin.kind==='file'))pin.icon=await appIcon(pin.target);}
+  for(const pin of pins){if(pin.icon || pin.iconCustom)continue;if(pin.iconFile)pin.icon=await catalogueIcon(pin.iconFile);else if(pin.kind==='web' && typeof pin.target==='string'){try{pin.icon=await favicon(pin.target) || '';}catch{}}else if(typeof pin.target==='string' && (pin.kind==='app' || pin.kind==='file'))pin.icon=await appIcon(pin.target);}
   pillWindow.webContents.send('pill-pins',pins);
   const rows=new Set(pins.map(p=>p.folder).filter(Boolean)).size+pins.filter(p=>!p.folder).length;
   // An empty panel stands taller: it is the only thing on screen until something is added to it.
@@ -268,6 +268,33 @@ function setPill(on){
 }
 function askFolder(pinId){
   if(pillWindow && !pillWindow.isDestroyed()){pillWindow.webContents.send('pill-ask-group',{id:pinId});pillWindow.focus();}
+}
+// Choosing a picture for a pin, for the places a favicon does not do justice to.
+async function chooseIcon(pinId){
+  const pin=(config.pins || []).find(p=>p.id===pinId);
+  if(!pin)return;
+  const forced=!app.isPackaged?process.env.HEARTH_TEST_ICON:'';
+  const choice=forced?{canceled:false,filePaths:[forced]}:await dialog.showOpenDialog(pillWindow || undefined,{
+    title:'Choose an icon for '+pin.label,
+    properties:['openFile'],
+    filters:[{name:'Images',extensions:['png','jpg','jpeg','webp','tiff','tif','heic','gif','bmp','icns']}]
+  });
+  const file=choice.canceled?'':choice.filePaths?.[0];
+  if(!file)return;
+  try{
+    const png=await nativeApps.imageAsPng(file,path.join(app.getPath('userData'),'app-icons'));
+    const image=nativeImage.createFromPath(png || file);
+    if(image.isEmpty())throw Error('That file is not an image Just Zen can read.');
+    pin.icon=image.resize({width:72,height:72}).toDataURL();
+    pin.iconCustom=true;
+    await persist();sendPins();
+  }catch(error){notifyPanel(error.message);}
+}
+function clearIcon(pinId){
+  const pin=(config.pins || []).find(p=>p.id===pinId);
+  if(!pin)return;
+  delete pin.iconCustom;pin.icon='';
+  persistSoon();sendPins();
 }
 async function openPin(id){
   const pin=pinList().find(p=>p.id===id);
@@ -460,6 +487,8 @@ app.whenReady().then(async () => {
         {label:'Tip: drag one icon onto another',enabled:false},
         ...(pin.folder?[{label:'Out of '+pin.folder,click:()=>{const p=(config.pins || []).find(x=>x.id===pin.id);if(p){p.folder='';persistSoon();sendPins();}}}]:[])
       ]},
+      {label:'Choose an icon…',click:()=>chooseIcon(pin.id)},
+      ...(pin.iconCustom?[{label:'Use the usual icon',click:()=>clearIcon(pin.id)}]:[]),
       {label:'Add an app…',click:()=>toggleFlick('pin')},
       {type:'separator'},
       {label:'Take off the panel',click:()=>{config.pins=(config.pins || []).filter(p=>p.id!==pin.id);persistSoon();sendPins();}},
@@ -532,6 +561,16 @@ app.whenReady().then(async () => {
       const typed=webFromQuery('example.com');
       if(!typed || typed.target!=='https://example.com/')throw Error('Typed address not understood');
       if(webFromQuery('not an address'))throw Error('Nonsense accepted as an address');
+      // A picture chosen by hand becomes that pin's icon, and the usual one can be put back.
+      addPin({id:'web:https://icon.example/',kind:'web',label:'Icon test',target:'https://icon.example/'});
+      process.env.HEARTH_TEST_ICON=path.join(__dirname,'assets','justzen.png');
+      await chooseIcon('web:https://icon.example/');
+      const iconPin=(config.pins || []).find(p=>p.id==='web:https://icon.example/');
+      if(!iconPin?.icon?.startsWith('data:image/png;base64,'))throw Error('Chosen icon not kept');
+      if(iconPin.iconCustom!==true)throw Error('Chosen icon not marked as the user\'s');
+      clearIcon('web:https://icon.example/');
+      if((config.pins || []).find(p=>p.id==='web:https://icon.example/')?.icon)throw Error('Icon not cleared');
+      config.pins=[];
       // The panel keeps what it is given, once, and gives it back in the order it is put in.
       addPin({id:'web:https://example.com/',kind:'web',label:'Example',target:'https://example.com/'});
       addPin({id:'web:https://example.org/',kind:'web',label:'Example org',target:'https://example.org/'});
@@ -547,7 +586,7 @@ app.whenReady().then(async () => {
       const bridged=await flickWindow.webContents.executeJavaScript('Boolean(window.flick && window.flick.search) && !window.require && !window.hearth');
       if(!bridged)throw Error('The finder bridge is wrong');
       await require('./smoke-adversarial.cjs')({});
-      console.log('SMOKE PASS: config, finder, panel, order, windows, bridges');
+      console.log('SMOKE PASS: config, finder, panel, order, icons, windows, bridges');
       app.quit();
     }catch(error){console.error(error);app.exit(1);}
   }
