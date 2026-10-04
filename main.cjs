@@ -17,6 +17,9 @@ const SLEEP_CHOICES=new Set([0,5,15,30,60,120]);
 const { pathToFileURL } = require('node:url');
 let flickWindow=null,pillWindow=null,tray=null,trayRefresh=()=>{},flickReady=false,pendingFlickMode='';
 let updateReady='',updateState='idle',updateDetail='',checkUpdates=()=>{},installUpdate=()=>{},retryUpdate=()=>{};
+function sendUpdateState(){
+  if(pillWindow && !pillWindow.isDestroyed())pillWindow.webContents.send('pill-update',{state:updateReady?'ready':updateState,detail:updateDetail,version:updateReady});
+}
 function applyMenuBarOnly(){if(process.platform!=='darwin')return;try{if(config.menuBarOnly===true)app.dock?.hide();else app.dock?.show();}catch{}}
 let config = {}, secureStore;
 const entry = pathToFileURL(path.join(__dirname, 'index.html')).href;
@@ -254,7 +257,7 @@ function ensurePill(){
   pillWindow.setVisibleOnAllWorkspaces?.(true,{visibleOnFullScreen:true});
   const c=pillWindow.webContents;
   c.setWindowOpenHandler(()=>({action:'deny'}));c.on('will-navigate',e=>e.preventDefault());
-  c.on('did-finish-load',()=>{c.send('pill-theme',flickTheme());sendPins();});
+  c.on('did-finish-load',()=>{c.send('pill-theme',flickTheme());sendPins();sendUpdateState();});
   pillWindow.on('moved',()=>{const b=pillWindow.getBounds();config.pillSpot={x:b.x,y:b.y};persistSoon();});
   pillWindow.loadFile('pill.html');
   return pillWindow;
@@ -441,6 +444,12 @@ app.whenReady().then(async () => {
   ipcMain.on('pill-flick',e=>{if(fromPill(e))toggleFlick();});
 
   ipcMain.on('pill-add',e=>{if(fromPill(e))toggleFlick('pin');});
+  ipcMain.on('pill-update',e=>{
+    if(!fromPill(e))return;
+    if(updateReady)installUpdate();
+    else if(updateState==='failed')retryUpdate();
+    else checkUpdates();
+  });
 
   ipcMain.on('pill-order',(e,ids)=>{
     if(!fromPill(e))return;
@@ -549,8 +558,8 @@ app.whenReady().then(async () => {
   function notify(title,body){try{if(Notification.isSupported())new Notification({title,body:String(body || '').slice(0,200)}).show();}catch{}}
   const updates=startAutoUpdates(
     message=>{if(!/No update|up to date|Checking/i.test(message))notify('Just Zen',message);},
-    version=>{updateReady=String(version || '');trayRefresh();notify('Just Zen '+updateReady+' is ready','Choose it in the menu bar to restart and update.');},
-    (state,detail)=>{updateState=state;updateDetail=detail;trayRefresh();}
+    version=>{updateReady=String(version || '');trayRefresh();sendUpdateState();notify('Just Zen '+updateReady+' is ready','Click the ↑ on the panel, or the menu bar, to restart and update.');},
+    (state,detail)=>{updateState=state;updateDetail=detail;trayRefresh();sendUpdateState();}
   );
   checkUpdates=()=>{try{updates.checkNow?.();notify('Just Zen','Looking for a new version…');}catch(error){notify('Just Zen',error.message);}};
   installUpdate=()=>{try{updates.install?.();}catch(error){notify('Just Zen',error.message);}};
@@ -576,6 +585,16 @@ app.whenReady().then(async () => {
       clearIcon('web:https://icon.example/');
       if((config.pins || []).find(p=>p.id==='web:https://icon.example/')?.icon)throw Error('Icon not cleared');
       config.pins=[];
+      // The panel is where an update announces itself, so it must be able to say each thing.
+      updateState='downloading';updateDetail='42%';sendUpdateState();
+      updateReady='9.9.9';sendUpdateState();
+      await new Promise(resolve=>setTimeout(resolve,200));
+      const shown=await pillWindow.webContents.executeJavaScript("(()=>{const b=document.getElementById('update');return {hidden:b.hidden,title:b.title,glyph:b.querySelector('.glyph').textContent};})()");
+      if(shown.hidden || !/Restart to update to 9\.9\.9/.test(shown.title))throw Error('The panel does not show a ready update: '+JSON.stringify(shown));
+      updateReady='';updateState='idle';sendUpdateState();
+      await new Promise(resolve=>setTimeout(resolve,200));
+      const quiet=await pillWindow.webContents.executeJavaScript("document.getElementById('update').hidden");
+      if(!quiet)throw Error('The update button stays on screen with nothing to say');
       // The panel keeps what it is given, once, and gives it back in the order it is put in.
       addPin({id:'web:https://example.com/',kind:'web',label:'Example',target:'https://example.com/'});
       addPin({id:'web:https://example.org/',kind:'web',label:'Example org',target:'https://example.org/'});
@@ -591,7 +610,7 @@ app.whenReady().then(async () => {
       const bridged=await flickWindow.webContents.executeJavaScript('Boolean(window.flick && window.flick.search) && !window.require && !window.hearth');
       if(!bridged)throw Error('The finder bridge is wrong');
       await require('./smoke-adversarial.cjs')({});
-      console.log('SMOKE PASS: config, finder, panel, order, icons, windows, bridges');
+      console.log('SMOKE PASS: config, finder, panel, order, icons, updates, windows, bridges');
       app.quit();
     }catch(error){console.error(error);app.exit(1);}
   }

@@ -30,6 +30,12 @@ body[data-theme=dark] .folder .stack i{background:rgba(220,230,220,.5)}
 #group-ask[hidden]{display:none}
 #group-name{width:100%;font:600 10px -apple-system,BlinkMacSystemFont,sans-serif;padding:7px 6px;border-radius:12px;border:1px solid rgba(60,70,80,.25);background:#fff;color:inherit;text-align:center;-webkit-app-region:no-drag}
 body[data-theme=dark] #group-name{background:#202622;border-color:rgba(255,255,255,.18)}
+/* An update has nowhere else to announce itself, so the panel says it. */
+#update[hidden]{display:none}
+#update{color:#0f3346;background:linear-gradient(135deg,#42b5f5,#39c7c0 55%,#a8d88b);box-shadow:0 0 0 0 rgba(57,199,192,.55);animation:beat 2.6s ease-in-out infinite}
+#update.working{background:rgba(120,140,160,.18);color:inherit;animation:none}
+#update.failed{background:rgba(217,72,59,.16);color:#b3392c;animation:none}
+#update small{position:absolute;bottom:-1px;left:0;right:0;text-align:center;font-size:7px;font-weight:700;letter-spacing:.2px}
 #empty{font-size:9px;text-align:center;opacity:.65;line-height:1.35;padding:6px 6px 2px}
 /* With nothing on it yet, the panel stands taller and the ＋ glows so it is obvious where to start. */
 body.empty #pill{justify-content:center;gap:12px}
@@ -43,7 +49,7 @@ body.empty #tail{margin-top:0}
   <div id="grip" title="Drag to move"><i></i><i></i><i></i></div>
   <div id="spots"></div>
   <div id="tail">
-    <button class="spot" id="add" title="Add an app to the panel"><span class="glyph">＋</span></button><button class="spot" id="flick" title="Find anything (⌥Space)"><span class="glyph">⌕</span></button>
+    <button class="spot" id="update" hidden title="An update is ready"><span class="glyph">↑</span></button><button class="spot" id="add" title="Add an app to the panel"><span class="glyph">＋</span></button><button class="spot" id="flick" title="Find anything (⌥Space)"><span class="glyph">⌕</span></button>
     
   </div>
 </div>

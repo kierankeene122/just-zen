@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('pill',{
   add:()=>ipcRenderer.send('pill-add'),
   order:ids=>ipcRenderer.send('pill-order',(Array.isArray(ids)?ids:[]).slice(0,40).map(id=>String(id).slice(0,2000))),
   group:(id,folder)=>ipcRenderer.send('pill-group',{id:String(id || '').slice(0,2000),folder:String(folder || '').slice(0,40)}),
+  update:()=>ipcRenderer.send('pill-update'),
+  onUpdate:fn=>ipcRenderer.on('pill-update',(_e,payload)=>fn(payload || {})),
   onAskGroup:fn=>ipcRenderer.on('pill-ask-group',(_e,payload)=>fn(payload && payload.id)),
   home:()=>ipcRenderer.send('pill-home'),
   pathFor:file=>{try{return webUtils.getPathForFile(file);}catch{return '';}},

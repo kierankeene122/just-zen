@@ -7,7 +7,7 @@ A small launcher for macOS and Windows: a floating panel on the edge of your scr
 - **Your browser stays yours** — web apps open in Safari or Chrome, whichever this machine opens links with, reusing the tab that already has the site open. Claude, Gemini, ChatGPT and Slack open through their own links.
 - **Groups and order** — drag one icon onto another to group them, drag between two to reorder, drag anything into a group, drag a whole group somewhere else, and give any pin a picture of your own as its icon.
 
-No account, no sync, no telemetry. Settings stay on your machine, encrypted with the Keychain where macOS allows it.
+Updates announce themselves on the panel: ↑ to restart into the new version, ↓ while downloading, ! if it failed. No account, no sync, no telemetry. Settings stay on your machine, encrypted with the Keychain where macOS allows it.
 
 ## Install
 

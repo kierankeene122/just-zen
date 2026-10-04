@@ -152,6 +152,16 @@ $('group-ask').onsubmit=e=>{
 };
 $('group-name').onkeydown=e=>{if(e.key==='Escape'){$('group-ask').hidden=true;groupFor=null;groupPair=null;}};
 $('group-name').onblur=()=>{setTimeout(()=>{if(!$('group-ask').hidden && document.activeElement!==$('group-name')){$('group-ask').hidden=true;groupFor=null;}},150);};
+// The update makes itself visible here, because there is nowhere else for it to be.
+window.pill.onUpdate(({state,detail,version}={})=>{
+ const button=$('update');
+ button.classList.remove('working','failed');
+ if(state==='ready'){button.hidden=false;button.title='Restart to update to '+(version || 'the new version');button.querySelector('.glyph').textContent='↑';}
+ else if(state==='downloading'){button.hidden=false;button.classList.add('working');button.title='Downloading '+(detail || 'the update')+'…';button.querySelector('.glyph').textContent='↓';}
+ else if(state==='failed'){button.hidden=false;button.classList.add('failed');button.title='Update failed'+(detail?' · '+detail:'')+' · click to try again';button.querySelector('.glyph').textContent='!';}
+ else{button.hidden=true;}
+});
+$('update').onclick=()=>window.pill.update();
 $('add').onclick=()=>window.pill.add();
 $('flick').onclick=()=>window.pill.flick();
 document.addEventListener('contextmenu',e=>{if(e.target.closest('.spot'))return;e.preventDefault();window.pill.menu('');});
